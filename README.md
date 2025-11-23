@@ -127,13 +127,19 @@ Works in all modern browsers supporting:
 - Shadow DOM
 - ES6 Modules
 
+## Demo
+
+Try the live demo: **[https://softwarity.github.io/geojson-editor/](https://softwarity.github.io/geojson-editor/)**
+
 ## Development
+
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed development guide.
 
 ```bash
 # Install dependencies
 npm install
 
-# Start dev server
+# Start dev server with live demo
 npm run dev
 
 # Build for production

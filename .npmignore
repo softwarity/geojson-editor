@@ -1,0 +1,15 @@
+# Development files
+demo/
+.github/
+vite.config.js
+*.log
+
+# Source maps (optional - remove this line if you want to publish them)
+*.map
+
+# Git
+.git
+.gitignore
+
+# Node
+node_modules/
