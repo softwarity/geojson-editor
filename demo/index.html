@@ -40,13 +40,33 @@
     }
 
     .controls {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
       margin-bottom: 2rem;
-      padding: 1rem;
+      padding: 1.5rem;
       background: #f5f5f5;
       border-radius: 8px;
+    }
+
+    .controls-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .controls-section h4 {
+      margin: 0;
+      color: #333;
+      font-size: 1rem;
+      border-bottom: 2px solid #667eea;
+      padding-bottom: 0.5rem;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
     }
 
     .control-group {
@@ -62,17 +82,28 @@
     }
 
     .control-group select,
-    .control-group input {
+    .control-group input[type="text"],
+    .control-group textarea {
       padding: 0.5rem;
       border: 1px solid #ddd;
       border-radius: 4px;
       font-size: 0.9rem;
+      font-family: 'Courier New', monospace;
+    }
+
+    .control-group textarea {
+      resize: vertical;
+      min-height: 60px;
     }
 
     .checkbox-group {
       display: flex;
       align-items: center;
       gap: 0.5rem;
+    }
+
+    .checkbox-group label {
+      margin: 0;
     }
 
     .editor-container {
@@ -193,6 +224,31 @@
       height: 20px;
       fill: currentColor;
     }
+
+    .code-example {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #f9f9f9;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .code-example h3 {
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .code-example pre {
+      background: #1e1e1e;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin: 0;
+      color: #d4d4d4;
+    }
   </style>
 </head>
 <body>
@@ -212,61 +268,109 @@
     </div>
 
     <div class="controls">
-      <div class="control-group">
-        <label>Mode</label>
-        <select id="modeSelect">
-          <option value="json">JSON</option>
-          <option value="array" selected>Array</option>
-        </select>
+      <div class="controls-section">
+        <h4>Content Wrapping</h4>
+        <div class="controls-grid">
+          <div class="control-group">
+            <label for="prefixInput">Prefix</label>
+            <textarea id="prefixInput">{"type": "FeatureCollection", "features": [</textarea>
+          </div>
+          <div class="control-group">
+            <label for="suffixInput">Suffix</label>
+            <input type="text" id="suffixInput" value="]}">
+          </div>
+        </div>
       </div>
 
-      <div class="control-group">
-        <label>Color Scheme</label>
-        <select id="colorSchemeSelect">
-          <option value="dark" selected>Dark</option>
-          <option value="light">Light</option>
-        </select>
+      <div class="controls-section">
+        <h4>Editor Settings</h4>
+        <div class="controls-grid">
+          <div class="control-group">
+            <label for="placeholderInput">Placeholder</label>
+            <input type="text" id="placeholderInput" value="Enter GeoJSON features here...">
+          </div>
+          <div class="control-group">
+            <label for="collapsableInput">Collapsable Keys (JSON array)</label>
+            <input type="text" id="collapsableInput" value='["coordinates", "properties", "geometry"]'>
+          </div>
+          <div class="control-group">
+            <label for="collapsedInput">Collapsed by Default (JSON array)</label>
+            <input type="text" id="collapsedInput" value='["coordinates"]'>
+          </div>
+          <div class="control-group">
+            <label for="colorAttributesInput">Color Picker Attributes (JSON array)</label>
+            <input type="text" id="colorAttributesInput" value='["color"]'>
+          </div>
+        </div>
       </div>
 
-      <div class="control-group checkbox-group">
-        <input type="checkbox" id="readonlyCheck">
-        <label for="readonlyCheck">Readonly</label>
+      <div class="controls-section">
+        <h4>Theme Detection</h4>
+        <div class="controls-grid">
+          <div class="control-group">
+            <label>Color Scheme (fallback)</label>
+            <select id="colorSchemeSelect">
+              <option value="dark" selected>Dark</option>
+              <option value="light">Light</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="darkSelectorInput">Dark Selector</label>
+            <input type="text" id="darkSelectorInput" value="html@data-theme=dark">
+          </div>
+          <div class="control-group">
+            <label for="lightSelectorInput">Light Selector</label>
+            <input type="text" id="lightSelectorInput" value="html@data-theme=light">
+          </div>
+        </div>
       </div>
 
-      <div class="control-group checkbox-group">
-        <input type="checkbox" id="autoFormatCheck" checked>
-        <label for="autoFormatCheck">Auto-format</label>
-      </div>
-
-      <div class="control-group">
-        <button onclick="loadSampleData()">Load Sample Data</button>
-      </div>
-
-      <div class="control-group">
-        <button onclick="clearEditor()">Clear Editor</button>
-      </div>
-
-      <div class="control-group">
-        <button onclick="toggleThemeEditor()">Edit Theme</button>
+      <div class="controls-section">
+        <h4>Options</h4>
+        <div class="controls-grid">
+          <div class="control-group checkbox-group">
+            <input type="checkbox" id="autoFormatCheck" checked>
+            <label for="autoFormatCheck">Auto-format</label>
+          </div>
+          <div class="control-group checkbox-group">
+            <input type="checkbox" id="readonlyCheck">
+            <label for="readonlyCheck">Readonly</label>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="editor-container">
-      <geojson-editor
-        id="editor"
-        mode="array"
-        collapsable='["coordinates", "properties", "geometry"]'
-        collapsed='["coordinates"]'
-        placeholder='Enter GeoJSON features here...'
-        auto-format
-        dark-selector="html@data-theme=dark"
-        light-selector="html@data-theme=light"
-      ></geojson-editor>
+      <geojson-editor id="editor"></geojson-editor>
     </div>
 
     <div class="output">
-      <h3>Output Events:</h3>
-      <pre id="eventLog">Waiting for events...</pre>
+      <h3>Change Events:</h3>
+      <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
+        The component emits <code>change</code> events with:
+        <strong>timestamp</strong>,
+        <strong>value</strong> (parsed JSON object, including prefix/suffix)
+      </p>
+      <pre id="eventLog">Waiting for change events...</pre>
+    </div>
+
+    <div class="output" style="background: #fff5f5; border-color: #ffcccc;">
+      <h3 style="color: #c53030;">Error Events:</h3>
+      <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
+        When JSON is invalid, the component emits <code>error</code> events with:
+        <strong>timestamp</strong>,
+        <strong>error</strong> (error message),
+        <strong>content</strong> (editor content for debugging)
+      </p>
+      <pre id="errorLog">No errors</pre>
+    </div>
+
+    <div class="code-example">
+      <h3>HTML Code:</h3>
+      <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
+        Copy this code to use the component in your own page (updates automatically with your settings)
+      </p>
+      <pre id="htmlCode"></pre>
     </div>
 
     <div class="theme-editor" id="themeEditor" style="display: none;">
@@ -288,48 +392,140 @@
   <script>
     const editor = document.getElementById('editor');
     const eventLog = document.getElementById('eventLog');
-    const modeSelect = document.getElementById('modeSelect');
+    const errorLog = document.getElementById('errorLog');
+    const prefixInput = document.getElementById('prefixInput');
+    const suffixInput = document.getElementById('suffixInput');
+    const placeholderInput = document.getElementById('placeholderInput');
+    const collapsableInput = document.getElementById('collapsableInput');
+    const collapsedInput = document.getElementById('collapsedInput');
+    const colorAttributesInput = document.getElementById('colorAttributesInput');
     const colorSchemeSelect = document.getElementById('colorSchemeSelect');
+    const darkSelectorInput = document.getElementById('darkSelectorInput');
+    const lightSelectorInput = document.getElementById('lightSelectorInput');
     const readonlyCheck = document.getElementById('readonlyCheck');
     const autoFormatCheck = document.getElementById('autoFormatCheck');
     const themeEditor = document.getElementById('themeEditor');
     const themeTextarea = document.getElementById('themeTextarea');
+    const htmlCode = document.getElementById('htmlCode');
 
-    // Listen to changes
-    editor.addEventListener('change', (e) => {
-      eventLog.textContent = JSON.stringify({
-        timestamp: new Date().toISOString(),
-        value: e.detail.value,
-        valid: e.detail.valid
-      }, null, 2);
-    });
+    // Update editor attributes from inputs
+    function updateEditor() {
+      editor.setAttribute('prefix', prefixInput.value);
+      editor.setAttribute('suffix', suffixInput.value);
+      editor.setAttribute('placeholder', placeholderInput.value);
 
-    // Mode change
-    modeSelect.addEventListener('change', (e) => {
-      editor.setAttribute('mode', e.target.value);
-    });
-
-    // Color scheme change
-    colorSchemeSelect.addEventListener('change', (e) => {
-      editor.setAttribute('color-scheme', e.target.value);
-    });
-
-    // Readonly toggle
-    readonlyCheck.addEventListener('change', (e) => {
-      if (e.target.checked) {
-        editor.setAttribute('readonly', '');
+      // Handle collapsable: empty or null means "all collapsable"
+      if (collapsableInput.value && collapsableInput.value !== 'null' && collapsableInput.value !== '""') {
+        editor.setAttribute('collapsable', collapsableInput.value);
       } else {
-        editor.removeAttribute('readonly');
+        editor.removeAttribute('collapsable');
       }
-    });
 
-    // Auto-format toggle
-    autoFormatCheck.addEventListener('change', (e) => {
-      if (e.target.checked) {
+      editor.setAttribute('collapsed', collapsedInput.value);
+      editor.setAttribute('color-attributes', colorAttributesInput.value);
+      editor.setAttribute('dark-selector', darkSelectorInput.value);
+      editor.setAttribute('light-selector', lightSelectorInput.value);
+
+      if (autoFormatCheck.checked) {
         editor.setAttribute('auto-format', '');
       } else {
         editor.removeAttribute('auto-format');
       }
+
+      if (readonlyCheck.checked) {
+        editor.setAttribute('readonly', '');
+      } else {
+        editor.removeAttribute('readonly');
+      }
+
+      updateHTMLCode();
+    }
+
+    // Update HTML code display
+    function updateHTMLCode() {
+      const prefix = prefixInput.value;
+      const suffix = suffixInput.value;
+      const placeholder = placeholderInput.value;
+      const collapsable = collapsableInput.value;
+      const collapsed = collapsedInput.value;
+      const colorAttributes = colorAttributesInput.value;
+      const darkSelector = darkSelectorInput.value;
+      const lightSelector = lightSelectorInput.value;
+      const readonly = readonlyCheck.checked;
+      const autoFormat = autoFormatCheck.checked;
+
+      // Build attribute list
+      let attrs = [];
+      if (prefix) attrs.push(`prefix='${prefix.replace(/'/g, "\\'")}'`);
+      if (suffix) attrs.push(`suffix='${suffix.replace(/'/g, "\\'")}'`);
+      if (collapsable) attrs.push(`collapsable='${collapsable.replace(/'/g, "\\'")}'`);
+      if (collapsed && collapsed !== '[]') attrs.push(`collapsed='${collapsed.replace(/'/g, "\\'")}'`);
+      if (colorAttributes && colorAttributes !== '["color"]') attrs.push(`color-attributes='${colorAttributes.replace(/'/g, "\\'")}'`);
+      if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
+      if (autoFormat) attrs.push('auto-format');
+      if (readonly) attrs.push('readonly');
+      if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
+      if (lightSelector) attrs.push(`light-selector="${lightSelector.replace(/"/g, '&quot;')}"`);
+
+      let code = '<!DOCTYPE html>\n';
+      code += '<html lang="en">\n';
+      code += '<head>\n';
+      code += '  <meta charset="UTF-8">\n';
+      code += '  <title>GeoJSON Editor</title>\n';
+      code += '</head>\n';
+      code += '<body>\n';
+      code += '  <geojson-editor\n';
+      code += '    ' + attrs.join('\n    ') + '\n';
+      code += '  ></geojson-editor>\n\n';
+      code += '  <script type="module">\n';
+      code += '    import \'@softwarity/geojson-editor\';\n\n';
+      code += '    const editor = document.querySelector(\'geojson-editor\');\n\n';
+      code += '    // Valid JSON - emits parsed object\n';
+      code += '    editor.addEventListener(\'change\', (e) => {\n';
+      code += '      console.log(\'Timestamp:\', e.detail.timestamp);\n';
+      code += '      console.log(\'Parsed Value:\', e.detail.value);\n';
+      code += '    });\n\n';
+      code += '    // Invalid JSON - emits error\n';
+      code += '    editor.addEventListener(\'error\', (e) => {\n';
+      code += '      console.error(\'Error:\', e.detail.error);\n';
+      code += '      console.log(\'Content:\', e.detail.content);\n';
+      code += '    });\n';
+      code += '  <\/script>\n';
+      code += '</body>\n';
+      code += '</html>';
+
+      htmlCode.textContent = code;
+    }
+
+    // Listen to editor change events (valid JSON parsed object)
+    editor.addEventListener('change', (e) => {
+      eventLog.textContent = JSON.stringify(e.detail, null, 2);
+      // Clear error log on successful parse
+      errorLog.textContent = 'No errors';
+      errorLog.style.color = '';
+    });
+
+    // Listen to editor error events (invalid JSON)
+    editor.addEventListener('error', (e) => {
+      errorLog.textContent = JSON.stringify(e.detail, null, 2);
+      errorLog.style.color = '#c53030';
+    });
+
+    // Listen to input changes
+    prefixInput.addEventListener('input', updateEditor);
+    suffixInput.addEventListener('input', updateEditor);
+    placeholderInput.addEventListener('input', updateEditor);
+    collapsableInput.addEventListener('input', updateEditor);
+    collapsedInput.addEventListener('input', updateEditor);
+    colorAttributesInput.addEventListener('input', updateEditor);
+    darkSelectorInput.addEventListener('input', updateEditor);
+    lightSelectorInput.addEventListener('input', updateEditor);
+    readonlyCheck.addEventListener('change', updateEditor);
+    autoFormatCheck.addEventListener('change', updateEditor);
+
+    // Color scheme change (separate from theme selectors)
+    colorSchemeSelect.addEventListener('change', (e) => {
+      editor.setAttribute('color-scheme', e.target.value);
     });
 
     // Toggle theme editor
@@ -421,11 +617,24 @@
     }
 
     function clearEditor() {
-      editor.setAttribute('value', '');
+      const textarea = editor.shadowRoot.getElementById('textarea');
+      if (textarea) {
+        textarea.value = '';
+        editor.updateHighlight();
+      }
     }
 
-    // Load initial sample
-    loadSampleData();
+    // Load initial sample automatically after component is ready
+    customElements.whenDefined('geojson-editor').then(() => {
+      // Wait for next frame to ensure component is fully rendered
+      requestAnimationFrame(() => {
+        // Initialize editor with current input values
+        updateEditor();
+        // Load sample data
+        loadSampleData();
+        console.log('Sample data loaded');
+      });
+    });
   </script>
 </body>
 </html>

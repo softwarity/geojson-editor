@@ -9,6 +9,7 @@ export default defineConfig({
       fileName: 'geojson-editor',
       formats: ['es']
     },
+    minify: 'esbuild',
     rollupOptions: {
       output: {
         assetFileNames: 'geojson-editor.[ext]'

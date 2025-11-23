@@ -10,11 +10,10 @@ A feature-rich, framework-agnostic Web Component for editing GeoJSON features wi
 - **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`)
 - **Color Picker** - Built-in color picker for color properties in left gutter
 - **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
-- **Two Modes** - `json` mode for complete objects, `array` mode for feature lists
 - **Auto-format** - Optional automatic JSON formatting
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
 - **Smart Copy/Paste** - Copy includes expanded content even from collapsed nodes
-- **Prefix/Suffix** - Configurable text before/after editor (e.g., `[` and `]` for arrays)
+- **Prefix/Suffix** - Configurable text before/after editor content for wrapping (e.g., FeatureCollection wrapper)
 - **CSS Isolation** - Complete Shadow DOM isolation from external CSS frameworks
 
 ## Installation
@@ -29,21 +28,23 @@ npm install @softwarity/geojson-editor
 
 ```html
 <script type="module">
-  import '/path/to/geojson-editor.js';
+  import '@softwarity/geojson-editor';
 </script>
 
 <geojson-editor
-  mode="array"
+  prefix='{"type": "FeatureCollection", "features": ['
+  suffix=']}'
   collapsable='["coordinates", "properties", "geometry"]'
   placeholder="Enter GeoJSON features here..."
 ></geojson-editor>
 ```
 
-### With Framework Detection
+### With Auto-format and Theme Detection
 
 ```html
 <geojson-editor
-  mode="array"
+  prefix='{"type": "FeatureCollection", "features": ['
+  suffix=']}'
   dark-selector="html@data-theme=dark"
   light-selector="html@data-theme=light"
   auto-format
@@ -66,18 +67,16 @@ editor.addEventListener('change', (e) => {
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `mode` | `"json"` \| `"array"` | `"json"` | Editor mode - `array` wraps content in brackets |
-| `value` | `string` | `""` | Initial value |
+| `value` | `string` | `""` | Initial value (editor content only, without prefix/suffix) |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
 | `collapsable` | `string[]` (JSON) | `[]` | List of keys that can be collapsed (empty = all) |
-| `collapsed` | `string[]` (JSON) | `[]` | List of keys collapsed by default |
 | `auto-format` | `boolean` | `false` | Auto-format JSON on input |
 | `color-scheme` | `"dark"` \| `"light"` | `"dark"` | Color scheme (if no selectors) |
 | `dark-selector` | `string` | - | Selector for dark theme detection |
 | `light-selector` | `string` | - | Selector for light theme detection |
-| `prefix` | `string` | `"["` (array mode) | Text displayed before editor |
-| `suffix` | `string` | `"]"` (array mode) | Text displayed after editor |
+| `prefix` | `string` | `""` | Text displayed before editor (used for validation) |
+| `suffix` | `string` | `""` | Text displayed after editor (used for validation) |
 
 ### Selector Syntax
 
@@ -113,8 +112,36 @@ Fired when content changes (debounced 150ms).
 
 ```javascript
 editor.addEventListener('change', (e) => {
-  console.log(e.detail.value);  // string
-  console.log(e.detail.valid);  // boolean
+  console.log(e.detail.timestamp);  // ISO timestamp
+  console.log(e.detail.value);      // Complete value (with prefix/suffix)
+  console.log(e.detail.valid);      // Is valid JSON
+});
+```
+
+**Event detail properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `timestamp` | `string` | ISO timestamp of the change |
+| `value` | `string` | Complete value including prefix and suffix |
+| `valid` | `boolean` | Whether the JSON is valid (validation includes prefix/suffix) |
+
+**Example with custom prefix/suffix:**
+
+```html
+<geojson-editor
+  prefix='{"type": "FeatureCollection", "features": ['
+  suffix=']}'
+></geojson-editor>
+```
+
+```javascript
+editor.addEventListener('change', (e) => {
+  console.log(e.detail.value);
+  // → {"type": "FeatureCollection", "features": [{ "type": "Feature", ... }]}
+
+  console.log(e.detail.valid);
+  // → true (validated with prefix/suffix)
 });
 ```
 

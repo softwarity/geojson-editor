@@ -12,7 +12,7 @@ class GeoJsonEditor extends HTMLElement {
     this.attachShadow({ mode: 'open' });
 
     // Internal state
-    this.collapsedNodes = new Map(); // key -> {startLine, endLine, content, indent}
+    this.collapsedData = new Map(); // nodeKey -> {originalLines: string[], indent: number}
     this.colorPositions = []; // {line, color}
     this.nodeTogglePositions = []; // {line, nodeKey, isCollapsed, indent}
 
@@ -63,12 +63,15 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['mode', 'readonly', 'collapsable', 'collapsed', 'value', 'placeholder', 'color-scheme', 'auto-format', 'dark-selector', 'light-selector', 'prefix', 'suffix'];
+    return ['readonly', 'collapsable', 'collapsed', 'color-attributes', 'value', 'placeholder', 'color-scheme', 'auto-format', 'dark-selector', 'light-selector', 'prefix', 'suffix'];
   }
 
   connectedCallback() {
     this.render();
     this.setupEventListeners();
+
+    // Update prefix/suffix display
+    this.updatePrefixSuffix();
 
     // Setup theme detection
     this.setupThemeDetection();
@@ -76,6 +79,12 @@ class GeoJsonEditor extends HTMLElement {
     // Initial highlight
     if (this.value) {
       this.updateHighlight();
+      // Apply default collapsed nodes after initial rendering
+      if (this.defaultCollapsed.length > 0) {
+        requestAnimationFrame(() => {
+          this.applyDefaultCollapsed();
+        });
+      }
     }
   }
 
@@ -94,9 +103,6 @@ class GeoJsonEditor extends HTMLElement {
       this.updateValue(newValue);
     } else if (name === 'readonly') {
       this.updateReadonly();
-    } else if (name === 'mode') {
-      this.updatePrefixSuffix();
-      this.updateHighlight();
     } else if (name === 'placeholder') {
       const textarea = this.shadowRoot.querySelector('textarea');
       if (textarea) textarea.placeholder = newValue || '';
@@ -106,25 +112,50 @@ class GeoJsonEditor extends HTMLElement {
       this.setupThemeDetection();
     } else if (name === 'prefix' || name === 'suffix') {
       this.updatePrefixSuffix();
+    } else if (name === 'collapsable') {
+      // Re-render collapse buttons when collapsable list changes
+      const textarea = this.shadowRoot?.getElementById('textarea');
+      if (textarea && textarea.value) {
+        // First expand nodes that are no longer collapsable
+        this.expandNodesNotInCollapsable();
+        // Then update the highlight to refresh button visibility
+        this.updateHighlight();
+      }
+    } else if (name === 'color-attributes') {
+      // Re-render color indicators when color attribute list changes
+      const textarea = this.shadowRoot?.getElementById('textarea');
+      if (textarea && textarea.value) {
+        this.updateHighlight();
+      }
+    } else if (name === 'collapsed') {
+      // Only apply if textarea exists (component is initialized)
+      const textarea = this.shadowRoot?.getElementById('textarea');
+      if (textarea && textarea.value) {
+        // First expand nodes that are no longer in collapsed list
+        this.expandNodesNotInCollapsed();
+        // Then apply new collapsed nodes
+        this.applyDefaultCollapsed();
+      }
     }
   }
 
   // Properties
-  get mode() {
-    return this.getAttribute('mode') || 'json';
-  }
-
   get readonly() {
     return this.hasAttribute('readonly');
   }
 
   get collapsableNodes() {
     const attr = this.getAttribute('collapsable');
-    if (!attr) return []; // All nodes collapsable if not specified
+    if (!attr) return null; // null = all nodes collapsable
     try {
-      return JSON.parse(attr);
+      const parsed = JSON.parse(attr);
+      // Only accept arrays, treat everything else as "all collapsable"
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      return null;
     } catch {
-      return [];
+      return null;
     }
   }
 
@@ -135,6 +166,20 @@ class GeoJsonEditor extends HTMLElement {
       return JSON.parse(attr);
     } catch {
       return [];
+    }
+  }
+
+  get colorAttributeNames() {
+    const attr = this.getAttribute('color-attributes');
+    if (!attr) return ['color']; // Default: only "color" attribute
+    try {
+      const parsed = JSON.parse(attr);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+      return ['color'];
+    } catch {
+      return ['color'];
     }
   }
 
@@ -151,21 +196,11 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   get prefix() {
-    // If explicitly set, use it
-    if (this.hasAttribute('prefix')) {
-      return this.getAttribute('prefix');
-    }
-    // Default based on mode
-    return this.mode === 'array' ? '[' : '';
+    return this.getAttribute('prefix') || '';
   }
 
   get suffix() {
-    // If explicitly set, use it
-    if (this.hasAttribute('suffix')) {
-      return this.getAttribute('suffix');
-    }
-    // Default based on mode
-    return this.mode === 'array' ? ']' : '';
+    return this.getAttribute('suffix') || '';
   }
 
   render() {
@@ -406,6 +441,19 @@ class GeoJsonEditor extends HTMLElement {
           white-space: pre-wrap;
           word-wrap: break-word;
           flex-shrink: 0;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 13px;
+          line-height: 1.5;
+          opacity: 0.6;
+          border-left: 3px solid rgba(102, 126, 234, 0.5);
+        }
+
+        .editor-prefix {
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .editor-suffix {
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         /* Scrollbar styling */
@@ -430,7 +478,7 @@ class GeoJsonEditor extends HTMLElement {
     `;
 
     const template = `
-      <div class="editor-prefix" id="editorPrefix" style="display: ${this.prefix ? 'block' : 'none'}">${this.prefix}</div>
+      <div class="editor-prefix" id="editorPrefix"></div>
       <div class="editor-wrapper">
         <div class="gutter">
           <div class="gutter-content" id="gutterContent"></div>
@@ -447,7 +495,7 @@ class GeoJsonEditor extends HTMLElement {
           ></textarea>
         </div>
       </div>
-      <div class="editor-suffix" id="editorSuffix" style="display: ${this.suffix ? 'block' : 'none'}">${this.suffix}</div>
+      <div class="editor-suffix" id="editorSuffix"></div>
     `;
 
     this.shadowRoot.innerHTML = styles + template;
@@ -473,13 +521,21 @@ class GeoJsonEditor extends HTMLElement {
       }, 150);
     });
 
+    // Auto-format on blur (when user leaves the field)
+    textarea.addEventListener('blur', () => {
+      if (this.autoFormat) {
+        this.autoFormatContent();
+      }
+    });
+
     // Gutter clicks (color indicators and collapse buttons)
     const gutterContent = this.shadowRoot.getElementById('gutterContent');
     gutterContent.addEventListener('click', (e) => {
       if (e.target.classList.contains('color-indicator')) {
         const line = parseInt(e.target.dataset.line);
         const color = e.target.dataset.color;
-        this.showColorPicker(e.target, line, color);
+        const attributeName = e.target.dataset.attributeName;
+        this.showColorPicker(e.target, line, color, attributeName);
       } else if (e.target.classList.contains('collapse-button')) {
         const nodeKey = e.target.dataset.nodeKey;
         const line = parseInt(e.target.dataset.line);
@@ -529,7 +585,49 @@ class GeoJsonEditor extends HTMLElement {
     const textarea = this.shadowRoot.getElementById('textarea');
     if (textarea && textarea.value !== newValue) {
       textarea.value = newValue || '';
+
+      // Apply auto-format if enabled
+      if (this.autoFormat && newValue) {
+        try {
+          const prefix = this.prefix;
+          const suffix = this.suffix;
+
+          // Check if prefix ends with [ and suffix starts with ]
+          const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
+          const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
+
+          if (prefixEndsWithBracket && suffixStartsWithBracket) {
+            // Wrap content in array brackets for validation and formatting
+            const wrapped = '[' + newValue + ']';
+            const parsed = JSON.parse(wrapped);
+            const formatted = JSON.stringify(parsed, null, 2);
+
+            // Remove first [ and last ] from formatted
+            const lines = formatted.split('\n');
+            if (lines.length > 2) {
+              textarea.value = lines.slice(1, -1).join('\n');
+            } else {
+              textarea.value = '';
+            }
+          } else if (!prefix && !suffix) {
+            // No prefix/suffix - format directly
+            const parsed = JSON.parse(newValue);
+            textarea.value = JSON.stringify(parsed, null, 2);
+          }
+          // else: keep as-is for complex cases
+        } catch (e) {
+          // Invalid JSON, keep as-is
+        }
+      }
+
       this.updateHighlight();
+
+      // Apply default collapsed nodes after value is set
+      if (this.defaultCollapsed.length > 0 && textarea.value) {
+        requestAnimationFrame(() => {
+          this.applyDefaultCollapsed();
+        });
+      }
     }
   }
 
@@ -538,12 +636,23 @@ class GeoJsonEditor extends HTMLElement {
     const suffixEl = this.shadowRoot.getElementById('editorSuffix');
 
     if (prefixEl) {
-      prefixEl.textContent = this.prefix;
-      prefixEl.style.display = this.prefix ? 'block' : 'none';
+      if (this.prefix) {
+        prefixEl.textContent = this.prefix;
+        prefixEl.style.display = 'block';
+      } else {
+        prefixEl.textContent = '';
+        prefixEl.style.display = 'none';
+      }
     }
+
     if (suffixEl) {
-      suffixEl.textContent = this.suffix;
-      suffixEl.style.display = this.suffix ? 'block' : 'none';
+      if (this.suffix) {
+        suffixEl.textContent = this.suffix;
+        suffixEl.style.display = 'block';
+      } else {
+        suffixEl.textContent = '';
+        suffixEl.style.display = 'none';
+      }
     }
   }
 
@@ -577,34 +686,70 @@ class GeoJsonEditor extends HTMLElement {
     let highlightedLines = [];
 
     lines.forEach((line, lineIndex) => {
-      // Detect color properties
-      const colorMatch = line.match(/"color"\s*:\s*"(#[0-9a-fA-F]{6})"/);
-      if (colorMatch) {
-        colors.push({
-          line: lineIndex,
-          color: colorMatch[1]
-        });
-      }
+      // Detect color properties for all configured attributes
+      const colorAttrNames = this.colorAttributeNames;
+      colorAttrNames.forEach(attrName => {
+        const regex = new RegExp(`"${attrName}"\\s*:\\s*"(#[0-9a-fA-F]{6})"`);
+        const colorMatch = line.match(regex);
+        if (colorMatch) {
+          colors.push({
+            line: lineIndex,
+            color: colorMatch[1],
+            attributeName: attrName
+          });
+        }
+      });
 
       // Detect collapsible nodes
       const nodeMatch = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])/);
       if (nodeMatch) {
         const nodeKey = nodeMatch[2];
         const collapsableList = this.collapsableNodes;
-        const isCollapsable = collapsableList.length === 0 || collapsableList.includes(nodeKey);
+        const isCollapsable = collapsableList === null || collapsableList.includes(nodeKey);
 
         if (isCollapsable) {
-          const isCollapsed = this.collapsedNodes.has(`${lineIndex}-${nodeKey}`);
-          toggles.push({
-            line: lineIndex,
-            nodeKey,
-            isCollapsed
-          });
+          // Check if this is a collapsed marker first
+          const isCollapsed = line.includes('{...}') || line.includes('[...]');
+
+          if (isCollapsed) {
+            // It's collapsed, always show button
+            toggles.push({
+              line: lineIndex,
+              nodeKey,
+              isCollapsed: true
+            });
+          } else {
+            // Not collapsed - check if it closes on same line
+            const openBracket = nodeMatch[3];
+            const closeBracket = openBracket === '{' ? '}' : ']';
+            const bracketPos = line.indexOf(openBracket);
+            const restOfLine = line.substring(bracketPos + 1);
+            let depth = 1;
+            let closesOnSameLine = false;
+
+            for (const char of restOfLine) {
+              if (char === openBracket) depth++;
+              if (char === closeBracket) depth--;
+              if (depth === 0) {
+                closesOnSameLine = true;
+                break;
+              }
+            }
+
+            // Only add toggle button if it doesn't close on same line
+            if (!closesOnSameLine) {
+              toggles.push({
+                line: lineIndex,
+                nodeKey,
+                isCollapsed: false
+              });
+            }
+          }
         }
       }
 
       // Highlight the line
-      highlightedLines.push(this.highlightLine(line, lineIndex, toggles));
+      highlightedLines.push(this.highlightLine(line));
     });
 
     return {
@@ -614,7 +759,7 @@ class GeoJsonEditor extends HTMLElement {
     };
   }
 
-  highlightLine(line, lineIndex, toggles) {
+  highlightLine(line) {
     // Just highlight syntax, no buttons in the text
     return this.highlightSyntax(line);
   }
@@ -640,90 +785,296 @@ class GeoJsonEditor extends HTMLElement {
 
   toggleCollapse(nodeKey, line) {
     const textarea = this.shadowRoot.getElementById('textarea');
-    const text = textarea.value;
-    const lines = text.split('\n');
+    const lines = textarea.value.split('\n');
+    const currentLine = lines[line];
 
-    const collapseKey = `${line}-${nodeKey}`;
-    const isCurrentlyCollapsed = this.collapsedNodes.has(collapseKey);
+    // Check if line has collapse marker
+    const hasMarker = currentLine.includes('{...}') || currentLine.includes('[...]');
 
-    if (isCurrentlyCollapsed) {
-      // Expand: restore the content
-      this.expandNode(collapseKey, lines, line);
+    if (hasMarker) {
+      // Expand: find the correct collapsed data by searching for this nodeKey
+      let foundKey = null;
+      let foundData = null;
+
+      // Try exact match first
+      const exactKey = `${line}-${nodeKey}`;
+      if (this.collapsedData.has(exactKey)) {
+        foundKey = exactKey;
+        foundData = this.collapsedData.get(exactKey);
+      } else {
+        // Search for any key with this nodeKey (line numbers may have shifted)
+        for (const [key, data] of this.collapsedData.entries()) {
+          if (data.nodeKey === nodeKey) {
+            // Check indent to distinguish between multiple nodes with same name
+            const currentIndent = currentLine.match(/^(\s*)/)[1].length;
+            if (data.indent === currentIndent) {
+              foundKey = key;
+              foundData = data;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!foundKey || !foundData) {
+        return;
+      }
+
+      const {originalLine, content} = foundData;
+
+      // Restore original line and content
+      lines[line] = originalLine;
+      lines.splice(line + 1, 0, ...content);
+
+      // Remove from storage
+      this.collapsedData.delete(foundKey);
     } else {
-      // Collapse: hide the content
-      this.collapseNode(collapseKey, lines, line);
+      // Collapse: read and store content
+      const match = currentLine.match(/^(\s*)"([^"]+)"\s*:\s*([{\[])/);
+      if (!match) return;
+
+      const indent = match[1];
+      const openBracket = match[3];
+      const closeBracket = openBracket === '{' ? '}' : ']';
+
+      // Check if bracket closes on same line (not collapsable)
+      const bracketPos = currentLine.indexOf(openBracket);
+      const restOfLine = currentLine.substring(bracketPos + 1);
+      let depth = 1;
+
+      for (const char of restOfLine) {
+        if (char === openBracket) depth++;
+        if (char === closeBracket) depth--;
+        if (depth === 0) {
+          // Closes on same line - not collapsable
+          return;
+        }
+      }
+
+      // Find closing bracket in following lines
+      depth = 1;
+      let endLine = line;
+      const content = [];
+
+      for (let i = line + 1; i < lines.length; i++) {
+        const scanLine = lines[i];
+
+        for (const char of scanLine) {
+          if (char === openBracket) depth++;
+          if (char === closeBracket) depth--;
+        }
+
+        content.push(scanLine);
+
+        if (depth === 0) {
+          endLine = i;
+          break;
+        }
+      }
+
+      // Store the original data with unique key
+      const uniqueKey = `${line}-${nodeKey}`;
+      this.collapsedData.set(uniqueKey, {
+        originalLine: currentLine,
+        content: content,
+        indent: indent.length,
+        nodeKey: nodeKey  // Store nodeKey for later use
+      });
+
+      // Replace with marker
+      const beforeBracket = currentLine.substring(0, currentLine.indexOf(openBracket));
+      const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
+      lines[line] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
+
+      // Remove content lines
+      lines.splice(line + 1, endLine - line);
     }
 
-    // Update textarea and highlight (no change event for UI operation)
+    // Update textarea
     textarea.value = lines.join('\n');
     this.updateHighlight();
   }
 
-  collapseNode(collapseKey, lines, lineIndex) {
-    const line = lines[lineIndex];
-    const match = line.match(/^(\s*)"([^"]+)"\s*:\s*([{\[])/);
+  expandNodesNotInCollapsable() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    if (!textarea || !textarea.value) return;
 
-    if (!match) return;
+    const collapsableList = this.collapsableNodes;
+    const lines = textarea.value.split('\n');
+    let modified = false;
 
-    const indent = match[1];
-    const nodeKey = match[2];
-    const openBracket = match[3];
-    const closeBracket = openBracket === '{' ? '}' : ']';
+    // Check all collapsed nodes
+    for (const [key, data] of this.collapsedData.entries()) {
+      const nodeKey = data.nodeKey;
 
-    // Find matching closing bracket
-    let depth = 1;
-    let endLine = lineIndex;
-    let collapsedContent = [];
+      // If this nodeKey is no longer in the collapsable list, expand it
+      if (collapsableList !== null && !collapsableList.includes(nodeKey)) {
+        // Find the line with the marker
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const hasMarker = line.includes('{...}') || line.includes('[...]');
 
-    for (let i = lineIndex + 1; i < lines.length; i++) {
-      const currentLine = lines[i];
+          if (hasMarker) {
+            // Check if this is the right node by matching indent and position
+            const currentIndent = line.match(/^(\s*)/)[1].length;
+            if (currentIndent === data.indent && line.includes(`"${nodeKey}"`)) {
+              // Expand this node
+              // Restore original line
+              lines[i] = data.originalLine;
 
-      // Count brackets
-      for (const char of currentLine) {
-        if (char === openBracket) depth++;
-        if (char === closeBracket) depth--;
-      }
+              // Insert content lines
+              lines.splice(i + 1, 0, ...data.content);
 
-      collapsedContent.push(currentLine);
-
-      if (depth === 0) {
-        endLine = i;
-        break;
+              // Remove from collapsedData
+              this.collapsedData.delete(key);
+              modified = true;
+              break;
+            }
+          }
+        }
       }
     }
 
-    // Store collapsed content with original line
-    this.collapsedNodes.set(collapseKey, {
-      startLine: lineIndex + 1,
-      endLine: endLine,
-      content: collapsedContent,
-      indent: indent.length,
-      originalLine: line
-    });
-
-    // Build collapsed line: keep everything before bracket, add placeholder with brackets
-    const beforeBracket = line.substring(0, line.indexOf(openBracket));
-    const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
-    lines[lineIndex] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
-
-    // Remove lines from array (including closing bracket)
-    lines.splice(lineIndex + 1, endLine - lineIndex);
+    if (modified) {
+      textarea.value = lines.join('\n');
+      this.updateHighlight();
+    }
   }
 
-  expandNode(collapseKey, lines, lineIndex) {
-    const collapsed = this.collapsedNodes.get(collapseKey);
+  expandNodesNotInCollapsed() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    if (!textarea || !textarea.value) return;
 
-    if (!collapsed) return;
+    const defaultCollapsed = this.defaultCollapsed;
+    const lines = textarea.value.split('\n');
+    let modified = false;
 
-    // Restore the exact original line
-    lines[lineIndex] = collapsed.originalLine;
+    // Check all collapsed nodes
+    for (const [key, data] of this.collapsedData.entries()) {
+      const nodeKey = data.nodeKey;
 
-    // Insert back the content
-    lines.splice(lineIndex + 1, 0, ...collapsed.content);
+      // If this nodeKey is no longer in the collapsed list, expand it
+      if (!defaultCollapsed.includes(nodeKey)) {
+        // Find the line with the marker
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const hasMarker = line.includes('{...}') || line.includes('[...]');
 
-    // Remove from collapsed map
-    this.collapsedNodes.delete(collapseKey);
+          if (hasMarker) {
+            // Check if this is the right node by matching indent and position
+            const currentIndent = line.match(/^(\s*)/)[1].length;
+            if (currentIndent === data.indent && line.includes(`"${nodeKey}"`)) {
+              // Expand this node
+              // Restore original line
+              lines[i] = data.originalLine;
+
+              // Insert content lines
+              lines.splice(i + 1, 0, ...data.content);
+
+              // Remove from collapsedData
+              this.collapsedData.delete(key);
+              modified = true;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (modified) {
+      textarea.value = lines.join('\n');
+      this.updateHighlight();
+    }
   }
+
+  applyDefaultCollapsed() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    if (!textarea || !textarea.value) return;
+
+    const defaultCollapsed = this.defaultCollapsed;
+    if (defaultCollapsed.length === 0) return;
+
+    const lines = textarea.value.split('\n');
+
+    // Iterate backwards to avoid index issues when collapsing
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])/);
+
+      if (match) {
+        const nodeKey = match[2];
+
+        // Check if this node should be collapsed by default
+        if (defaultCollapsed.includes(nodeKey)) {
+          const indent = match[1];
+          const openBracket = match[3];
+          const closeBracket = openBracket === '{' ? '}' : ']';
+
+          // Check if bracket closes on same line (skip if so)
+          const bracketPos = line.indexOf(openBracket);
+          const restOfLine = line.substring(bracketPos + 1);
+          let checkDepth = 1;
+          let closesOnSameLine = false;
+
+          for (const char of restOfLine) {
+            if (char === openBracket) checkDepth++;
+            if (char === closeBracket) checkDepth--;
+            if (checkDepth === 0) {
+              closesOnSameLine = true;
+              break;
+            }
+          }
+
+          if (closesOnSameLine) {
+            continue; // Skip this node, go to next line in main loop
+          }
+
+          // Find closing bracket in following lines
+          let depth = 1;
+          let endLine = i;
+          const content = [];
+
+          for (let j = i + 1; j < lines.length; j++) {
+            const scanLine = lines[j];
+
+            for (const char of scanLine) {
+              if (char === openBracket) depth++;
+              if (char === closeBracket) depth--;
+            }
+
+            content.push(scanLine);
+
+            if (depth === 0) {
+              endLine = j;
+              break;
+            }
+          }
+
+          // Store the original data with unique key
+          const uniqueKey = `${i}-${nodeKey}`;
+          this.collapsedData.set(uniqueKey, {
+            originalLine: line,
+            content: content,
+            indent: indent.length,
+            nodeKey: nodeKey
+          });
+
+          // Replace with marker
+          const beforeBracket = line.substring(0, line.indexOf(openBracket));
+          const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
+          lines[i] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
+
+          // Remove content lines
+          lines.splice(i + 1, endLine - i);
+        }
+      }
+    }
+
+    // Update textarea
+    textarea.value = lines.join('\n');
+    this.updateHighlight();
+  }
+
 
   updateGutter() {
     const gutterContent = this.shadowRoot.getElementById('gutterContent');
@@ -731,7 +1082,6 @@ class GeoJsonEditor extends HTMLElement {
 
     if (!textarea) return;
 
-    const lines = textarea.value.split('\n');
     const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight);
     const paddingTop = parseFloat(getComputedStyle(textarea).paddingTop);
 
@@ -742,11 +1092,11 @@ class GeoJsonEditor extends HTMLElement {
     const lineElements = new Map();
 
     // Add color indicators
-    this.colorPositions.forEach(({ line, color }) => {
+    this.colorPositions.forEach(({ line, color, attributeName }) => {
       if (!lineElements.has(line)) {
         lineElements.set(line, { colors: [], buttons: [] });
       }
-      lineElements.get(line).colors.push(color);
+      lineElements.get(line).colors.push({ color, attributeName });
     });
 
     // Add collapse buttons
@@ -765,13 +1115,14 @@ class GeoJsonEditor extends HTMLElement {
       gutterLine.style.top = `${paddingTop + line * lineHeight}px`;
 
       // Add color indicators
-      elements.colors.forEach(color => {
+      elements.colors.forEach(({ color, attributeName }) => {
         const indicator = document.createElement('div');
         indicator.className = 'color-indicator';
         indicator.style.backgroundColor = color;
         indicator.dataset.line = line;
         indicator.dataset.color = color;
-        indicator.title = `Color: ${color}`;
+        indicator.dataset.attributeName = attributeName;
+        indicator.title = `${attributeName}: ${color}`;
         gutterLine.appendChild(indicator);
       });
 
@@ -790,7 +1141,7 @@ class GeoJsonEditor extends HTMLElement {
     });
   }
 
-  showColorPicker(indicator, line, currentColor) {
+  showColorPicker(indicator, line, currentColor, attributeName) {
     // Remove existing picker
     const existing = document.querySelector('.geojson-color-picker-input');
     if (existing) existing.remove();
@@ -815,7 +1166,7 @@ class GeoJsonEditor extends HTMLElement {
     colorInput.style.zIndex = '9999';
 
     colorInput.addEventListener('change', (e) => {
-      this.updateColorValue(line, e.target.value);
+      this.updateColorValue(line, e.target.value, attributeName);
       colorInput.remove();
     });
 
@@ -828,12 +1179,13 @@ class GeoJsonEditor extends HTMLElement {
     setTimeout(() => colorInput.click(), 10);
   }
 
-  updateColorValue(line, newColor) {
+  updateColorValue(line, newColor, attributeName) {
     const textarea = this.shadowRoot.getElementById('textarea');
     const lines = textarea.value.split('\n');
 
-    // Replace color value on the specified line
-    lines[line] = lines[line].replace(/"color"\s*:\s*"#[0-9a-fA-F]{6}"/, `"color": "${newColor}"`);
+    // Replace color value on the specified line for the specific attribute
+    const regex = new RegExp(`"${attributeName}"\\s*:\\s*"#[0-9a-fA-F]{6}"`);
+    lines[line] = lines[line].replace(regex, `"${attributeName}": "${newColor}"`);
 
     textarea.value = lines.join('\n');
     this.updateHighlight();
@@ -938,67 +1290,311 @@ class GeoJsonEditor extends HTMLElement {
 
   emitChange() {
     const textarea = this.shadowRoot.getElementById('textarea');
-    const value = textarea.value;
 
-    // Validate JSON
-    let valid = false;
-    let parsed = null;
+    // Expand ALL collapsed nodes to get full content
+    let editorContent = textarea.value;
+
+    // Keep expanding until no more markers found
+    while (editorContent.includes('{...}') || editorContent.includes('[...]')) {
+      const lines = editorContent.split('\n');
+      let expanded = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.includes('{...}') || line.includes('[...]')) {
+          // Find which node this is
+          const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
+          if (match) {
+            const nodeKey = match[2];
+            const currentIndent = match[1].length;
+
+            // Search for this nodeKey in collapsedData
+            let foundKey = null;
+            const exactKey = `${i}-${nodeKey}`;
+
+            if (this.collapsedData.has(exactKey)) {
+              foundKey = exactKey;
+            } else {
+              // Search by nodeKey + indent
+              for (const [key, data] of this.collapsedData.entries()) {
+                if (data.nodeKey === nodeKey && data.indent === currentIndent) {
+                  foundKey = key;
+                  break;
+                }
+              }
+            }
+
+            if (foundKey) {
+              const {originalLine, content} = this.collapsedData.get(foundKey);
+
+              // Restore
+              lines[i] = originalLine;
+              lines.splice(i + 1, 0, ...content);
+
+              expanded = true;
+              break; // Restart scan from beginning with new line numbers
+            }
+          }
+        }
+      }
+
+      if (!expanded) {
+        break; // No more to expand
+      }
+
+      editorContent = lines.join('\n');
+    }
+
+    // Build complete value with prefix/suffix
+    const prefix = this.prefix;
+    const suffix = this.suffix;
+    const fullValue = prefix + editorContent + suffix;
+
+    // Try to parse
     try {
-      if (this.mode === 'array') {
-        parsed = JSON.parse(`[${value}]`);
-      } else {
-        parsed = JSON.parse(value);
-      }
-      valid = true;
+      const parsed = JSON.parse(fullValue);
 
-      // Auto-format if enabled and valid
-      if (valid && this.autoFormat && parsed) {
-        this.formatJSON(parsed);
-        return; // formatJSON will trigger another emitChange, so exit here
-      }
-    } catch (e) {
-      valid = false;
-    }
-
-    this.dispatchEvent(new CustomEvent('change', {
-      detail: { value, valid },
-      bubbles: true,
-      composed: true
-    }));
-  }
-
-  formatJSON(parsed) {
-    const textarea = this.shadowRoot.getElementById('textarea');
-
-    // Format with 2-space indentation
-    let formatted;
-    if (this.mode === 'array') {
-      // For array mode, format each element and join with commas
-      const elements = Array.isArray(parsed) ? parsed : [parsed];
-      formatted = elements.map(el => JSON.stringify(el, null, 2)).join(',\n');
-    } else {
-      formatted = JSON.stringify(parsed, null, 2);
-    }
-
-    // Only update if different to avoid infinite loops
-    if (textarea.value !== formatted) {
-      const cursorPos = textarea.selectionStart;
-      textarea.value = formatted;
-
-      // Try to maintain cursor position (approximate)
-      textarea.selectionStart = Math.min(cursorPos, formatted.length);
-      textarea.selectionEnd = textarea.selectionStart;
-
-      this.updateHighlight();
-
-      // Emit change event after formatting
+      // Emit change event with parsed object
       this.dispatchEvent(new CustomEvent('change', {
-        detail: { value: formatted, valid: true },
+        detail: {
+          timestamp: new Date().toISOString(),
+          value: parsed  // Parsed JSON object
+        },
+        bubbles: true,
+        composed: true
+      }));
+    } catch (e) {
+      // Emit error event for invalid JSON
+      this.dispatchEvent(new CustomEvent('error', {
+        detail: {
+          timestamp: new Date().toISOString(),
+          error: e.message,
+          content: editorContent  // Raw content for debugging
+        },
         bubbles: true,
         composed: true
       }));
     }
   }
+
+  autoFormatContent() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+
+    // Expand all collapsed to get full content
+    let content = textarea.value;
+
+    // Save collapsed node details (nodeKey + indent) instead of just keys
+    const collapsedNodes = Array.from(this.collapsedData.values()).map(data => ({
+      nodeKey: data.nodeKey,
+      indent: data.indent
+    }));
+
+    // Expand all markers
+    while (content.includes('{...}') || content.includes('[...]')) {
+      const lines = content.split('\n');
+      let expanded = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.includes('{...}') || line.includes('[...]')) {
+          const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
+          if (match) {
+            const nodeKey = match[2];
+            const currentIndent = match[1].length;
+
+            // Search for this nodeKey in collapsedData
+            let foundKey = null;
+            const exactKey = `${i}-${nodeKey}`;
+
+            if (this.collapsedData.has(exactKey)) {
+              foundKey = exactKey;
+            } else {
+              // Search by nodeKey + indent
+              for (const [key, data] of this.collapsedData.entries()) {
+                if (data.nodeKey === nodeKey && data.indent === currentIndent) {
+                  foundKey = key;
+                  break;
+                }
+              }
+            }
+
+            if (foundKey) {
+              const {originalLine, content: nodeContent} = this.collapsedData.get(foundKey);
+
+              lines[i] = originalLine;
+              lines.splice(i + 1, 0, ...nodeContent);
+
+              expanded = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!expanded) break;
+      content = lines.join('\n');
+    }
+
+    // Try to parse and format (with prefix/suffix for validation)
+    try {
+      const prefix = this.prefix;
+      const suffix = this.suffix;
+
+      // Check if prefix ends with [ and suffix starts with ]
+      const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
+      const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
+
+      let formattedContent;
+
+      if (prefixEndsWithBracket && suffixStartsWithBracket) {
+        // Wrap content in array brackets for validation and formatting
+        const wrapped = '[' + content + ']';
+        const parsed = JSON.parse(wrapped);
+        const formatted = JSON.stringify(parsed, null, 2);
+
+        // Remove first [ and last ] from formatted
+        const lines = formatted.split('\n');
+        if (lines.length > 2) {
+          // Remove first line "[" and last line "]"
+          formattedContent = lines.slice(1, -1).join('\n');
+        } else {
+          // Empty array case
+          formattedContent = '';
+        }
+      } else {
+        // No prefix/suffix or different pattern - format as-is
+        const fullValue = prefix + content + suffix;
+        const parsed = JSON.parse(fullValue);
+        const formatted = JSON.stringify(parsed, null, 2);
+
+        // If no prefix/suffix, use formatted directly
+        if (!prefix && !suffix) {
+          formattedContent = formatted;
+        } else {
+          // Complex case - keep original content
+          formattedContent = content;
+        }
+      }
+
+      // Only update if different
+      if (formattedContent !== content) {
+        // Clear collapsed data
+        this.collapsedData.clear();
+
+        // Update textarea
+        textarea.value = formattedContent;
+
+        // Re-apply collapsed nodes
+        if (collapsedNodes.length > 0) {
+          this.reapplyCollapsed(collapsedNodes);
+        }
+      }
+    } catch (e) {
+      // Invalid JSON, don't format
+    }
+  }
+
+  reapplyCollapsed(collapsedNodes) {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    const lines = textarea.value.split('\n');
+
+    // Group collapsed nodes by nodeKey+indent and count occurrences
+    const collapseMap = new Map();
+    collapsedNodes.forEach(({nodeKey, indent}) => {
+      const key = `${nodeKey}-${indent}`;
+      collapseMap.set(key, (collapseMap.get(key) || 0) + 1);
+    });
+
+    // Track occurrences as we iterate
+    const occurrenceCount = new Map();
+
+    // Iterate backwards to avoid index issues
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])/);
+
+      if (match) {
+        const nodeKey = match[2];
+        const currentIndent = match[1].length;
+        const key = `${nodeKey}-${currentIndent}`;
+
+        if (collapseMap.has(key)) {
+          // Count this occurrence
+          occurrenceCount.set(key, (occurrenceCount.get(key) || 0) + 1);
+          const currentOccurrence = occurrenceCount.get(key);
+
+          // Only collapse if this occurrence should be collapsed
+          if (currentOccurrence <= collapseMap.get(key)) {
+          const indent = match[1];
+          const openBracket = match[3];
+          const closeBracket = openBracket === '{' ? '}' : ']';
+
+          // Check if closes on same line
+          const bracketPos = line.indexOf(openBracket);
+          const restOfLine = line.substring(bracketPos + 1);
+          let checkDepth = 1;
+          let closesOnSameLine = false;
+
+          for (const char of restOfLine) {
+            if (char === openBracket) checkDepth++;
+            if (char === closeBracket) checkDepth--;
+            if (checkDepth === 0) {
+              closesOnSameLine = true;
+              break;
+            }
+          }
+
+          if (closesOnSameLine) {
+            continue;
+          }
+
+          // Find closing bracket
+          let depth = 1;
+          let endLine = i;
+          const content = [];
+
+          for (let j = i + 1; j < lines.length; j++) {
+            const scanLine = lines[j];
+
+            for (const char of scanLine) {
+              if (char === openBracket) depth++;
+              if (char === closeBracket) depth--;
+            }
+
+            content.push(scanLine);
+
+            if (depth === 0) {
+              endLine = j;
+              break;
+            }
+          }
+
+          // Store with unique key
+          const uniqueKey = `${i}-${nodeKey}`;
+          this.collapsedData.set(uniqueKey, {
+            originalLine: line,
+            content: content,
+            indent: indent.length,
+            nodeKey: nodeKey
+          });
+
+          // Replace with marker
+          const beforeBracket = line.substring(0, line.indexOf(openBracket));
+          const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
+          lines[i] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
+
+          // Remove content lines
+          lines.splice(i + 1, endLine - i);
+          }
+        }
+      }
+    }
+
+    textarea.value = lines.join('\n');
+  }
+
 
   // Theme detection setup
   setupThemeDetection() {
