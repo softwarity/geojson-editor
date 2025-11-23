@@ -2,6 +2,8 @@
 
 A feature-rich, framework-agnostic Web Component for editing GeoJSON features with syntax highlighting, collapsible nodes, and integrated color picker.
 
+**[🚀 Try the Live Demo](https://softwarity.github.io/geojson-editor/)**
+
 ## Features
 
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
@@ -126,10 +128,6 @@ Works in all modern browsers supporting:
 - Web Components
 - Shadow DOM
 - ES6 Modules
-
-## Demo
-
-Try the live demo: **[https://softwarity.github.io/geojson-editor/](https://softwarity.github.io/geojson-editor/)**
 
 ## Development
 

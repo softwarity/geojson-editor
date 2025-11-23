@@ -19,6 +19,14 @@
     "build": "vite build",
     "preview": "vite preview"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/softwarity/geojson-editor.git"
+  },
+  "bugs": {
+    "url": "https://github.com/softwarity/geojson-editor/issues"
+  },
+  "homepage": "https://softwarity.github.io/geojson-editor/",
   "keywords": [
     "geojson",
     "editor",
