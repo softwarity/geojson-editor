@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GeoJSON Editor Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      padding: 2rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 1rem;
+      font-size: 2rem;
+    }
+
+    .description {
+      color: #666;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+      padding: 1rem;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .control-group label {
+      font-weight: 600;
+      color: #555;
+      font-size: 0.9rem;
+    }
+
+    .control-group select,
+    .control-group input {
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .editor-container {
+      margin-top: 2rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .output {
+      margin-top: 2rem;
+      padding: 1rem;
+      background: #f9f9f9;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .output h3 {
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .output pre {
+      background: white;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #5568d3;
+    }
+
+    .theme-editor {
+      margin-top: 2rem;
+      padding: 1.5rem;
+      background: #f9f9f9;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+    }
+
+    .theme-editor h3 {
+      margin-top: 0;
+      color: #333;
+    }
+
+    .theme-controls label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #555;
+    }
+
+    #themeTextarea {
+      width: 100%;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      background: white;
+      resize: vertical;
+    }
+
+    .theme-actions {
+      margin-top: 1rem;
+      display: flex;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>GeoJSON Editor Component Demo</h1>
+    <div class="description">
+      This demo showcases the &lt;geojson-editor&gt; Web Component with syntax highlighting,
+      collapsible nodes, and color picker integration.
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Mode</label>
+        <select id="modeSelect">
+          <option value="json">JSON</option>
+          <option value="array" selected>Array</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>Color Scheme</label>
+        <select id="colorSchemeSelect">
+          <option value="dark" selected>Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+
+      <div class="control-group checkbox-group">
+        <input type="checkbox" id="readonlyCheck">
+        <label for="readonlyCheck">Readonly</label>
+      </div>
+
+      <div class="control-group checkbox-group">
+        <input type="checkbox" id="autoFormatCheck" checked>
+        <label for="autoFormatCheck">Auto-format</label>
+      </div>
+
+      <div class="control-group">
+        <button onclick="loadSampleData()">Load Sample Data</button>
+      </div>
+
+      <div class="control-group">
+        <button onclick="clearEditor()">Clear Editor</button>
+      </div>
+
+      <div class="control-group">
+        <button onclick="toggleThemeEditor()">Edit Theme</button>
+      </div>
+    </div>
+
+    <div class="editor-container">
+      <geojson-editor
+        id="editor"
+        mode="array"
+        collapsable='["coordinates", "properties", "geometry"]'
+        collapsed='["coordinates"]'
+        placeholder='Enter GeoJSON features here...'
+        auto-format
+        dark-selector="html@data-theme=dark"
+        light-selector="html@data-theme=light"
+      ></geojson-editor>
+    </div>
+
+    <div class="output">
+      <h3>Output Events:</h3>
+      <pre id="eventLog">Waiting for events...</pre>
+    </div>
+
+    <div class="theme-editor" id="themeEditor" style="display: none;">
+      <h3>Theme Editor</h3>
+      <div class="theme-controls">
+        <label>
+          Edit theme colors (JSON format):
+          <textarea id="themeTextarea" rows="15" spellcheck="false"></textarea>
+        </label>
+        <div class="theme-actions">
+          <button onclick="applyTheme()">Apply Theme</button>
+          <button onclick="resetTheme()">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="../src/geojson-editor.js"></script>
+  <script>
+    const editor = document.getElementById('editor');
+    const eventLog = document.getElementById('eventLog');
+    const modeSelect = document.getElementById('modeSelect');
+    const colorSchemeSelect = document.getElementById('colorSchemeSelect');
+    const readonlyCheck = document.getElementById('readonlyCheck');
+    const autoFormatCheck = document.getElementById('autoFormatCheck');
+    const themeEditor = document.getElementById('themeEditor');
+    const themeTextarea = document.getElementById('themeTextarea');
+
+    // Listen to changes
+    editor.addEventListener('change', (e) => {
+      eventLog.textContent = JSON.stringify({
+        timestamp: new Date().toISOString(),
+        value: e.detail.value,
+        valid: e.detail.valid
+      }, null, 2);
+    });
+
+    // Mode change
+    modeSelect.addEventListener('change', (e) => {
+      editor.setAttribute('mode', e.target.value);
+    });
+
+    // Color scheme change
+    colorSchemeSelect.addEventListener('change', (e) => {
+      editor.setAttribute('color-scheme', e.target.value);
+    });
+
+    // Readonly toggle
+    readonlyCheck.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        editor.setAttribute('readonly', '');
+      } else {
+        editor.removeAttribute('readonly');
+      }
+    });
+
+    // Auto-format toggle
+    autoFormatCheck.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        editor.setAttribute('auto-format', '');
+      } else {
+        editor.removeAttribute('auto-format');
+      }
+    });
+
+    // Toggle theme editor
+    function toggleThemeEditor() {
+      const isVisible = themeEditor.style.display !== 'none';
+      if (isVisible) {
+        themeEditor.style.display = 'none';
+      } else {
+        themeEditor.style.display = 'block';
+        loadCurrentTheme();
+      }
+    }
+
+    // Load current theme into textarea
+    function loadCurrentTheme() {
+      const theme = editor.getTheme();
+      themeTextarea.value = JSON.stringify(theme, null, 2);
+    }
+
+    // Apply theme from textarea
+    function applyTheme() {
+      try {
+        const theme = JSON.parse(themeTextarea.value);
+        editor.setTheme(theme);
+        alert('Theme applied successfully!');
+      } catch (e) {
+        alert('Invalid JSON: ' + e.message);
+      }
+    }
+
+    // Reset to default theme
+    function resetTheme() {
+      editor.resetTheme();
+      loadCurrentTheme();
+      alert('Theme reset to default!');
+    }
+
+    // Sample data
+    function loadSampleData() {
+      const sampleFeatures = `{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point",
+    "coordinates": [166.4581, -22.2758]
+  },
+  "properties": {
+    "name": "Noumea Airport",
+    "color": "#3498db",
+    "category": "airport"
+  }
+},
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [166.4, -22.2],
+      [167.0, -22.5],
+      [167.5, -23.0]
+    ]
+  },
+  "properties": {
+    "name": "Flight Path",
+    "color": "#e74c3c",
+    "width": 2
+  }
+},
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [166.0, -22.0],
+        [167.0, -22.0],
+        [167.0, -23.0],
+        [166.0, -23.0],
+        [166.0, -22.0]
+      ]
+    ]
+  },
+  "properties": {
+    "name": "Coverage Area",
+    "color": "#2ecc71",
+    "opacity": 0.5
+  }
+}`;
+      editor.setAttribute('value', sampleFeatures);
+    }
+
+    function clearEditor() {
+      editor.setAttribute('value', '');
+    }
+
+    // Load initial sample
+    loadSampleData();
+  </script>
+</body>
+</html>

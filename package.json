@@ -1,0 +1,35 @@
+{
+  "name": "@softwarity/geojson-editor",
+  "version": "1.0.0",
+  "description": "A feature-rich GeoJSON editor Web Component with syntax highlighting, collapsible nodes, and color picker",
+  "type": "module",
+  "main": "./dist/geojson-editor.js",
+  "module": "./dist/geojson-editor.js",
+  "exports": {
+    ".": {
+      "import": "./dist/geojson-editor.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "geojson",
+    "editor",
+    "web-component",
+    "custom-element",
+    "syntax-highlighting",
+    "json-editor"
+  ],
+  "author": "Softwarity",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}
