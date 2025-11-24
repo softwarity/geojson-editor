@@ -34,7 +34,7 @@ npm install @softwarity/geojson-editor
 <geojson-editor
   prefix='{"type": "FeatureCollection", "features": ['
   suffix=']}'
-  collapsable='["coordinates", "properties", "geometry"]'
+  collapsed='["coordinates"]'
   placeholder="Enter GeoJSON features here..."
 ></geojson-editor>
 ```
@@ -45,8 +45,7 @@ npm install @softwarity/geojson-editor
 <geojson-editor
   prefix='{"type": "FeatureCollection", "features": ['
   suffix=']}'
-  dark-selector="html@data-theme=dark"
-  light-selector="html@data-theme=light"
+  dark-selector="html.dark"
   auto-format
 ></geojson-editor>
 ```
@@ -56,10 +55,16 @@ npm install @softwarity/geojson-editor
 ```javascript
 const editor = document.querySelector('geojson-editor');
 
+// Valid JSON emits change event with parsed object
 editor.addEventListener('change', (e) => {
-  const { value, valid } = e.detail;
-  console.log('Valid JSON:', valid);
-  console.log('Value:', value);
+  console.log('Timestamp:', e.detail.timestamp);
+  console.log('Parsed value:', e.detail.value); // Parsed JSON object
+});
+
+// Invalid JSON emits error event
+editor.addEventListener('error', (e) => {
+  console.error('Error:', e.detail.error);
+  console.log('Content:', e.detail.content); // Raw content for debugging
 });
 ```
 
@@ -70,21 +75,22 @@ editor.addEventListener('change', (e) => {
 | `value` | `string` | `""` | Initial value (editor content only, without prefix/suffix) |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
-| `collapsable` | `string[]` (JSON) | `[]` | List of keys that can be collapsed (empty = all) |
+| `collapsed` | `string[]` (JSON) | `[]` | List of keys that start collapsed (all nodes are collapsible) |
 | `auto-format` | `boolean` | `false` | Auto-format JSON on input |
-| `color-scheme` | `"dark"` \| `"light"` | `"dark"` | Color scheme (if no selectors) |
-| `dark-selector` | `string` | - | Selector for dark theme detection |
-| `light-selector` | `string` | - | Selector for light theme detection |
+| `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
 | `prefix` | `string` | `""` | Text displayed before editor (used for validation) |
 | `suffix` | `string` | `""` | Text displayed after editor (used for validation) |
 
-### Selector Syntax
+### Dark Selector Syntax
 
-Theme selectors support special syntax for framework detection:
+The `dark-selector` attribute determines when the dark theme is active. If the selector matches, dark theme is applied; otherwise, light theme is used.
 
-- `html@data-theme=dark` - Attribute matching (e.g., `<html data-theme="dark">`)
-- `html.dark` - Class matching (e.g., `<html class="dark">`)
-- `@color-scheme=dark` - Self-reference (component's own attribute)
+**Examples:**
+
+- `.dark` - Component has `dark` class: `<geojson-editor class="dark">`
+- `html.dark` - HTML element has `dark` class (Tailwind CSS): `<html class="dark">`
+- `html[data-bs-theme=dark]` - HTML has Bootstrap theme attribute: `<html data-bs-theme="dark">`
+- Empty string `""` - Uses component's `data-color-scheme` attribute as fallback
 
 ## API Methods
 
@@ -108,13 +114,12 @@ const value = editor.querySelector('#textarea').value; // via Shadow DOM
 
 ### `change`
 
-Fired when content changes (debounced 150ms).
+Fired when content changes and JSON is valid (debounced 150ms).
 
 ```javascript
 editor.addEventListener('change', (e) => {
   console.log(e.detail.timestamp);  // ISO timestamp
-  console.log(e.detail.value);      // Complete value (with prefix/suffix)
-  console.log(e.detail.valid);      // Is valid JSON
+  console.log(e.detail.value);      // Parsed JSON object (includes prefix/suffix)
 });
 ```
 
@@ -123,8 +128,27 @@ editor.addEventListener('change', (e) => {
 | Property | Type | Description |
 |----------|------|-------------|
 | `timestamp` | `string` | ISO timestamp of the change |
-| `value` | `string` | Complete value including prefix and suffix |
-| `valid` | `boolean` | Whether the JSON is valid (validation includes prefix/suffix) |
+| `value` | `object` | Parsed JSON object including prefix and suffix |
+
+### `error`
+
+Fired when content changes but JSON is invalid (debounced 150ms).
+
+```javascript
+editor.addEventListener('error', (e) => {
+  console.error(e.detail.error);    // Error message
+  console.log(e.detail.content);    // Raw content for debugging
+  console.log(e.detail.timestamp);  // ISO timestamp
+});
+```
+
+**Event detail properties:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `timestamp` | `string` | ISO timestamp of the change |
+| `error` | `string` | Error message from JSON.parse |
+| `content` | `string` | Raw editor content (for debugging) |
 
 **Example with custom prefix/suffix:**
 
@@ -138,10 +162,8 @@ editor.addEventListener('change', (e) => {
 ```javascript
 editor.addEventListener('change', (e) => {
   console.log(e.detail.value);
-  // → {"type": "FeatureCollection", "features": [{ "type": "Feature", ... }]}
-
-  console.log(e.detail.valid);
-  // → true (validated with prefix/suffix)
+  // → { type: "FeatureCollection", features: [{ type: "Feature", ... }] }
+  // Already parsed as JSON object
 });
 ```
 

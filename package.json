@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && terser dist/geojson-editor.js -o dist/geojson-editor.js --compress passes=3 --mangle toplevel=true --format comments=false",
     "preview": "vite preview"
   },
   "repository": {
@@ -38,6 +38,7 @@
   "author": "Softwarity",
   "license": "MIT",
   "devDependencies": {
+    "terser": "^5.44.1",
     "vite": "^5.0.0"
   }
 }

@@ -19,9 +19,6 @@ class GeoJsonEditor extends HTMLElement {
     // Debounce timer for syntax highlighting
     this.highlightTimer = null;
 
-    // MutationObserver for theme detection
-    this.themeObserver = null;
-
     // Default themes
     this.themes = {
       dark: {
@@ -57,13 +54,10 @@ class GeoJsonEditor extends HTMLElement {
         collapseButtonBorder: '#999'
       }
     };
-
-    // Current theme
-    this.currentTheme = { ...this.themes.dark };
   }
 
   static get observedAttributes() {
-    return ['readonly', 'collapsable', 'collapsed', 'color-attributes', 'value', 'placeholder', 'color-scheme', 'auto-format', 'dark-selector', 'light-selector', 'prefix', 'suffix'];
+    return ['readonly', 'collapsed', 'value', 'placeholder', 'auto-format', 'dark-selector', 'prefix', 'suffix'];
   }
 
   connectedCallback() {
@@ -73,8 +67,8 @@ class GeoJsonEditor extends HTMLElement {
     // Update prefix/suffix display
     this.updatePrefixSuffix();
 
-    // Setup theme detection
-    this.setupThemeDetection();
+    // Setup theme CSS
+    this.updateThemeCSS();
 
     // Initial highlight
     if (this.value) {
@@ -88,14 +82,6 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  disconnectedCallback() {
-    // Cleanup observer
-    if (this.themeObserver) {
-      this.themeObserver.disconnect();
-      this.themeObserver = null;
-    }
-  }
-
   attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue === newValue) return;
 
@@ -106,27 +92,10 @@ class GeoJsonEditor extends HTMLElement {
     } else if (name === 'placeholder') {
       const textarea = this.shadowRoot.querySelector('textarea');
       if (textarea) textarea.placeholder = newValue || '';
-    } else if (name === 'color-scheme') {
-      this.applyColorScheme(newValue || 'dark');
-    } else if (name === 'dark-selector' || name === 'light-selector') {
-      this.setupThemeDetection();
+    } else if (name === 'dark-selector') {
+      this.updateThemeCSS();
     } else if (name === 'prefix' || name === 'suffix') {
       this.updatePrefixSuffix();
-    } else if (name === 'collapsable') {
-      // Re-render collapse buttons when collapsable list changes
-      const textarea = this.shadowRoot?.getElementById('textarea');
-      if (textarea && textarea.value) {
-        // First expand nodes that are no longer collapsable
-        this.expandNodesNotInCollapsable();
-        // Then update the highlight to refresh button visibility
-        this.updateHighlight();
-      }
-    } else if (name === 'color-attributes') {
-      // Re-render color indicators when color attribute list changes
-      const textarea = this.shadowRoot?.getElementById('textarea');
-      if (textarea && textarea.value) {
-        this.updateHighlight();
-      }
     } else if (name === 'collapsed') {
       // Only apply if textarea exists (component is initialized)
       const textarea = this.shadowRoot?.getElementById('textarea');
@@ -136,27 +105,19 @@ class GeoJsonEditor extends HTMLElement {
         // Then apply new collapsed nodes
         this.applyDefaultCollapsed();
       }
+    } else if (name === 'auto-format') {
+      // When auto-format is enabled, format the current content
+      const textarea = this.shadowRoot?.getElementById('textarea');
+      if (textarea && textarea.value && this.autoFormat) {
+        this.autoFormatContent();
+        this.updateHighlight();
+      }
     }
   }
 
   // Properties
   get readonly() {
     return this.hasAttribute('readonly');
-  }
-
-  get collapsableNodes() {
-    const attr = this.getAttribute('collapsable');
-    if (!attr) return null; // null = all nodes collapsable
-    try {
-      const parsed = JSON.parse(attr);
-      // Only accept arrays, treat everything else as "all collapsable"
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-      return null;
-    } catch {
-      return null;
-    }
   }
 
   get defaultCollapsed() {
@@ -166,20 +127,6 @@ class GeoJsonEditor extends HTMLElement {
       return JSON.parse(attr);
     } catch {
       return [];
-    }
-  }
-
-  get colorAttributeNames() {
-    const attr = this.getAttribute('color-attributes');
-    if (!attr) return ['color']; // Default: only "color" attribute
-    try {
-      const parsed = JSON.parse(attr);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-      return ['color'];
-    } catch {
-      return ['color'];
     }
   }
 
@@ -512,20 +459,33 @@ class GeoJsonEditor extends HTMLElement {
       this.syncGutterScroll(textarea.scrollTop);
     });
 
-    // Input handling with debounced highlight
+    // Input handling with debounced highlight and auto-format
     textarea.addEventListener('input', () => {
       clearTimeout(this.highlightTimer);
       this.highlightTimer = setTimeout(() => {
+        // Auto-format if enabled and JSON is valid
+        if (this.autoFormat) {
+          this.autoFormatContentWithCursor();
+        }
         this.updateHighlight();
         this.emitChange();
       }, 150);
     });
 
-    // Auto-format on blur (when user leaves the field)
-    textarea.addEventListener('blur', () => {
-      if (this.autoFormat) {
-        this.autoFormatContent();
-      }
+    // Paste handling - trigger immediately without debounce
+    textarea.addEventListener('paste', () => {
+      // Clear any pending highlight timer to avoid duplicate processing
+      clearTimeout(this.highlightTimer);
+
+      // Use a short delay to let the paste complete
+      setTimeout(() => {
+        // Auto-format if enabled and JSON is valid
+        if (this.autoFormat) {
+          this.autoFormatContentWithCursor();
+        }
+        this.updateHighlight();
+        this.emitChange();
+      }, 10);
     });
 
     // Gutter clicks (color indicators and collapse buttons)
@@ -686,64 +646,58 @@ class GeoJsonEditor extends HTMLElement {
     let highlightedLines = [];
 
     lines.forEach((line, lineIndex) => {
-      // Detect color properties for all configured attributes
-      const colorAttrNames = this.colorAttributeNames;
-      colorAttrNames.forEach(attrName => {
-        const regex = new RegExp(`"${attrName}"\\s*:\\s*"(#[0-9a-fA-F]{6})"`);
-        const colorMatch = line.match(regex);
-        if (colorMatch) {
-          colors.push({
-            line: lineIndex,
-            color: colorMatch[1],
-            attributeName: attrName
-          });
-        }
-      });
+      // Detect any hex color (6 digits) in string values
+      // Matches: "attributeName": "#RRGGBB"
+      const colorRegex = /"(\w+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g;
+      let colorMatch;
+      while ((colorMatch = colorRegex.exec(line)) !== null) {
+        colors.push({
+          line: lineIndex,
+          color: colorMatch[2],  // The hex color
+          attributeName: colorMatch[1]  // The attribute name
+        });
+      }
 
-      // Detect collapsible nodes
+      // Detect collapsible nodes (all nodes are collapsible)
       const nodeMatch = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])/);
       if (nodeMatch) {
         const nodeKey = nodeMatch[2];
-        const collapsableList = this.collapsableNodes;
-        const isCollapsable = collapsableList === null || collapsableList.includes(nodeKey);
 
-        if (isCollapsable) {
-          // Check if this is a collapsed marker first
-          const isCollapsed = line.includes('{...}') || line.includes('[...]');
+        // Check if this is a collapsed marker first
+        const isCollapsed = line.includes('{...}') || line.includes('[...]');
 
-          if (isCollapsed) {
-            // It's collapsed, always show button
+        if (isCollapsed) {
+          // It's collapsed, always show button
+          toggles.push({
+            line: lineIndex,
+            nodeKey,
+            isCollapsed: true
+          });
+        } else {
+          // Not collapsed - check if it closes on same line
+          const openBracket = nodeMatch[3];
+          const closeBracket = openBracket === '{' ? '}' : ']';
+          const bracketPos = line.indexOf(openBracket);
+          const restOfLine = line.substring(bracketPos + 1);
+          let depth = 1;
+          let closesOnSameLine = false;
+
+          for (const char of restOfLine) {
+            if (char === openBracket) depth++;
+            if (char === closeBracket) depth--;
+            if (depth === 0) {
+              closesOnSameLine = true;
+              break;
+            }
+          }
+
+          // Only add toggle button if it doesn't close on same line
+          if (!closesOnSameLine) {
             toggles.push({
               line: lineIndex,
               nodeKey,
-              isCollapsed: true
+              isCollapsed: false
             });
-          } else {
-            // Not collapsed - check if it closes on same line
-            const openBracket = nodeMatch[3];
-            const closeBracket = openBracket === '{' ? '}' : ']';
-            const bracketPos = line.indexOf(openBracket);
-            const restOfLine = line.substring(bracketPos + 1);
-            let depth = 1;
-            let closesOnSameLine = false;
-
-            for (const char of restOfLine) {
-              if (char === openBracket) depth++;
-              if (char === closeBracket) depth--;
-              if (depth === 0) {
-                closesOnSameLine = true;
-                break;
-              }
-            }
-
-            // Only add toggle button if it doesn't close on same line
-            if (!closesOnSameLine) {
-              toggles.push({
-                line: lineIndex,
-                nodeKey,
-                isCollapsed: false
-              });
-            }
           }
         }
       }
@@ -837,7 +791,7 @@ class GeoJsonEditor extends HTMLElement {
       const openBracket = match[3];
       const closeBracket = openBracket === '{' ? '}' : ']';
 
-      // Check if bracket closes on same line (not collapsable)
+      // Check if bracket closes on same line
       const bracketPos = currentLine.indexOf(openBracket);
       const restOfLine = currentLine.substring(bracketPos + 1);
       let depth = 1;
@@ -846,7 +800,7 @@ class GeoJsonEditor extends HTMLElement {
         if (char === openBracket) depth++;
         if (char === closeBracket) depth--;
         if (depth === 0) {
-          // Closes on same line - not collapsable
+          // Closes on same line - can't be collapsed
           return;
         }
       }
@@ -893,52 +847,6 @@ class GeoJsonEditor extends HTMLElement {
     // Update textarea
     textarea.value = lines.join('\n');
     this.updateHighlight();
-  }
-
-  expandNodesNotInCollapsable() {
-    const textarea = this.shadowRoot.getElementById('textarea');
-    if (!textarea || !textarea.value) return;
-
-    const collapsableList = this.collapsableNodes;
-    const lines = textarea.value.split('\n');
-    let modified = false;
-
-    // Check all collapsed nodes
-    for (const [key, data] of this.collapsedData.entries()) {
-      const nodeKey = data.nodeKey;
-
-      // If this nodeKey is no longer in the collapsable list, expand it
-      if (collapsableList !== null && !collapsableList.includes(nodeKey)) {
-        // Find the line with the marker
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const hasMarker = line.includes('{...}') || line.includes('[...]');
-
-          if (hasMarker) {
-            // Check if this is the right node by matching indent and position
-            const currentIndent = line.match(/^(\s*)/)[1].length;
-            if (currentIndent === data.indent && line.includes(`"${nodeKey}"`)) {
-              // Expand this node
-              // Restore original line
-              lines[i] = data.originalLine;
-
-              // Insert content lines
-              lines.splice(i + 1, 0, ...data.content);
-
-              // Remove from collapsedData
-              this.collapsedData.delete(key);
-              modified = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (modified) {
-      textarea.value = lines.join('\n');
-      this.updateHighlight();
-    }
   }
 
   expandNodesNotInCollapsed() {
@@ -1165,18 +1073,35 @@ class GeoJsonEditor extends HTMLElement {
     colorInput.style.padding = '0';
     colorInput.style.zIndex = '9999';
 
-    colorInput.addEventListener('change', (e) => {
+    colorInput.addEventListener('input', (e) => {
+      // User is actively changing the color - update in real-time
       this.updateColorValue(line, e.target.value, attributeName);
-      colorInput.remove();
     });
 
-    colorInput.addEventListener('blur', () => {
-      setTimeout(() => colorInput.remove(), 100);
+    colorInput.addEventListener('change', (e) => {
+      // Picker closed with validation
+      this.updateColorValue(line, e.target.value, attributeName);
     });
+
+    // Close picker when clicking anywhere else
+    const closeOnClickOutside = (e) => {
+      if (e.target !== colorInput && !colorInput.contains(e.target)) {
+        colorInput.remove();
+        document.removeEventListener('click', closeOnClickOutside, true);
+      }
+    };
 
     // Add to document body with fixed positioning
     document.body.appendChild(colorInput);
-    setTimeout(() => colorInput.click(), 10);
+
+    // Add click listener after a short delay to avoid immediate close
+    setTimeout(() => {
+      document.addEventListener('click', closeOnClickOutside, true);
+    }, 100);
+
+    // Open the picker and focus it
+    colorInput.focus();
+    colorInput.click();
   }
 
   updateColorValue(line, newColor, attributeName) {
@@ -1375,6 +1300,149 @@ class GeoJsonEditor extends HTMLElement {
         bubbles: true,
         composed: true
       }));
+    }
+  }
+
+  autoFormatContentWithCursor() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+
+    // Save cursor position (line and column)
+    const cursorPos = textarea.selectionStart;
+    const textBeforeCursor = textarea.value.substring(0, cursorPos);
+    const linesBeforeCursor = textBeforeCursor.split('\n');
+    const cursorLine = linesBeforeCursor.length - 1;
+    const cursorColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length;
+
+    // Expand all collapsed to get full content
+    let content = textarea.value;
+    const originalContent = content;
+
+    // Save collapsed node details (nodeKey + indent) instead of just keys
+    const collapsedNodes = Array.from(this.collapsedData.values()).map(data => ({
+      nodeKey: data.nodeKey,
+      indent: data.indent
+    }));
+
+    // Expand all markers
+    while (content.includes('{...}') || content.includes('[...]')) {
+      const lines = content.split('\n');
+      let expanded = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        if (line.includes('{...}') || line.includes('[...]')) {
+          const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
+          if (match) {
+            const nodeKey = match[2];
+            const currentIndent = match[1].length;
+
+            // Search for this nodeKey in collapsedData
+            let foundKey = null;
+            const exactKey = `${i}-${nodeKey}`;
+
+            if (this.collapsedData.has(exactKey)) {
+              foundKey = exactKey;
+            } else {
+              // Search by nodeKey + indent
+              for (const [key, data] of this.collapsedData.entries()) {
+                if (data.nodeKey === nodeKey && data.indent === currentIndent) {
+                  foundKey = key;
+                  break;
+                }
+              }
+            }
+
+            if (foundKey) {
+              const {originalLine, content: nodeContent} = this.collapsedData.get(foundKey);
+
+              lines[i] = originalLine;
+              lines.splice(i + 1, 0, ...nodeContent);
+
+              expanded = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!expanded) break;
+      content = lines.join('\n');
+    }
+
+    // Try to parse and format (with prefix/suffix for validation)
+    try {
+      const prefix = this.prefix;
+      const suffix = this.suffix;
+
+      // Check if prefix ends with [ and suffix starts with ]
+      const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
+      const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
+
+      let formattedContent;
+
+      if (prefixEndsWithBracket && suffixStartsWithBracket) {
+        // Wrap content in array brackets for validation and formatting
+        const wrapped = '[' + content + ']';
+        const parsed = JSON.parse(wrapped);
+        const formatted = JSON.stringify(parsed, null, 2);
+
+        // Remove first [ and last ] from formatted
+        const lines = formatted.split('\n');
+        if (lines.length > 2) {
+          // Remove first line "[" and last line "]"
+          formattedContent = lines.slice(1, -1).join('\n');
+        } else {
+          // Empty array case
+          formattedContent = '';
+        }
+      } else {
+        // No prefix/suffix or different pattern - format as-is
+        const fullValue = prefix + content + suffix;
+        const parsed = JSON.parse(fullValue);
+        const formatted = JSON.stringify(parsed, null, 2);
+
+        // If no prefix/suffix, use formatted directly
+        if (!prefix && !suffix) {
+          formattedContent = formatted;
+        } else {
+          // Complex case - keep original content
+          formattedContent = content;
+        }
+      }
+
+      // Only update if different
+      if (formattedContent !== content) {
+        // Clear collapsed data
+        this.collapsedData.clear();
+
+        // Update textarea
+        textarea.value = formattedContent;
+
+        // Re-apply collapsed nodes
+        if (collapsedNodes.length > 0) {
+          this.reapplyCollapsed(collapsedNodes);
+        }
+
+        // Restore cursor position
+        const newLines = textarea.value.split('\n');
+        if (cursorLine < newLines.length) {
+          // Try to place cursor at same line and column
+          const newLine = newLines[cursorLine];
+          const newColumn = Math.min(cursorColumn, newLine.length);
+
+          // Calculate absolute position
+          let newPos = 0;
+          for (let i = 0; i < cursorLine; i++) {
+            newPos += newLines[i].length + 1; // +1 for \n
+          }
+          newPos += newColumn;
+
+          textarea.setSelectionRange(newPos, newPos);
+        }
+      }
+    } catch (e) {
+      // Invalid JSON, don't format
     }
   }
 
@@ -1596,114 +1664,78 @@ class GeoJsonEditor extends HTMLElement {
   }
 
 
-  // Theme detection setup
-  setupThemeDetection() {
-    // Cleanup existing observer
-    if (this.themeObserver) {
-      this.themeObserver.disconnect();
-      this.themeObserver = null;
+  // Parse selector and generate CSS rule for dark theme
+  parseSelectorToHostRule(selector) {
+    if (!selector || selector === '') {
+      // Fallback: use data attribute on host element
+      return ':host([data-color-scheme="dark"])';
     }
 
-    const darkSelector = this.getAttribute('dark-selector');
-    const lightSelector = this.getAttribute('light-selector');
-
-    // If no selectors, use color-scheme attribute or default to dark
-    if (!darkSelector && !lightSelector) {
-      const scheme = this.getAttribute('color-scheme') || 'dark';
-      this.applyColorScheme(scheme);
-      return;
+    // Check if it's a simple class on host (.dark)
+    if (selector.startsWith('.') && !selector.includes(' ')) {
+      return `:host(${selector})`;
     }
 
-    // Evaluate selectors and apply theme
-    this.evaluateAndApplyTheme();
-
-    // Setup MutationObserver to watch for changes
-    const observedElements = new Set();
-
-    // Parse selectors to find which elements to observe
-    [darkSelector, lightSelector].forEach(selector => {
-      if (!selector) return;
-      const element = this.getElementFromSelector(selector);
-      if (element) observedElements.add(element);
-    });
-
-    // Observe all relevant elements
-    if (observedElements.size > 0) {
-      this.themeObserver = new MutationObserver(() => {
-        this.evaluateAndApplyTheme();
-      });
-
-      observedElements.forEach(element => {
-        this.themeObserver.observe(element, {
-          attributes: true,
-          attributeOldValue: false
-        });
-      });
-    }
+    // Complex selector - use :host-context for parent elements
+    return `:host-context(${selector})`;
   }
 
-  evaluateAndApplyTheme() {
-    const darkSelector = this.getAttribute('dark-selector');
-    const lightSelector = this.getAttribute('light-selector');
+  // Generate and inject theme CSS based on dark selector
+  updateThemeCSS() {
+    const darkSelector = this.getAttribute('dark-selector') || '.dark';
 
-    // Check dark first, then light, default to dark
-    if (darkSelector && this.evaluateSelector(darkSelector)) {
-      this.applyColorScheme('dark');
-    } else if (lightSelector && this.evaluateSelector(lightSelector)) {
-      this.applyColorScheme('light');
-    } else {
-      // Default to dark if neither matches
-      this.applyColorScheme('dark');
-    }
-  }
+    // Parse selector to create CSS rule for dark theme
+    const darkRule = this.parseSelectorToHostRule(darkSelector);
+    // Light theme is the default (no selector = light)
+    const lightRule = ':host';
 
-  evaluateSelector(selector) {
-    if (!selector) return false;
-
-    // Parse selector: "element@attribute=value" or "element.class" or "@attribute=value"
-
-    // Check for class syntax: "element.class"
-    const classMatch = selector.match(/^([a-zA-Z]*)?\.([a-zA-Z0-9_-]+)$/);
-    if (classMatch) {
-      const elementName = classMatch[1] || null;
-      const className = classMatch[2];
-      const element = elementName ? document.querySelector(elementName) : this;
-      return element && element.classList && element.classList.contains(className);
+    // Find or create theme style element
+    let themeStyle = this.shadowRoot.getElementById('theme-styles');
+    if (!themeStyle) {
+      themeStyle = document.createElement('style');
+      themeStyle.id = 'theme-styles';
+      // Insert at the beginning of shadow root to ensure it's before static styles
+      this.shadowRoot.insertBefore(themeStyle, this.shadowRoot.firstChild);
     }
 
-    // Check for attribute syntax: "element@attribute=value" or "@attribute=value"
-    const attrMatch = selector.match(/^([a-zA-Z]*)?@([a-zA-Z0-9_-]+)=(.+)$/);
-    if (attrMatch) {
-      const elementName = attrMatch[1] || null;
-      const attributeName = attrMatch[2];
-      const expectedValue = attrMatch[3];
-      const element = elementName ? document.querySelector(elementName) : this;
-      return element && element.getAttribute(attributeName) === expectedValue;
-    }
+    // Generate CSS with theme variables (light first as default, then dark overrides)
+    const css = `
+      ${lightRule} {
+        --bg-color: ${this.themes.light.background};
+        --text-color: ${this.themes.light.textColor};
+        --caret-color: ${this.themes.light.caretColor};
+        --gutter-bg: ${this.themes.light.gutterBackground};
+        --gutter-border: ${this.themes.light.gutterBorder};
+        --json-key: ${this.themes.light.jsonKey};
+        --json-string: ${this.themes.light.jsonString};
+        --json-number: ${this.themes.light.jsonNumber};
+        --json-boolean: ${this.themes.light.jsonBoolean};
+        --json-null: ${this.themes.light.jsonNull};
+        --json-punct: ${this.themes.light.jsonPunctuation};
+        --collapse-btn: ${this.themes.light.collapseButton};
+        --collapse-btn-bg: ${this.themes.light.collapseButtonBg};
+        --collapse-btn-border: ${this.themes.light.collapseButtonBorder};
+      }
 
-    return false;
-  }
+      ${darkRule} {
+        --bg-color: ${this.themes.dark.background};
+        --text-color: ${this.themes.dark.textColor};
+        --caret-color: ${this.themes.dark.caretColor};
+        --gutter-bg: ${this.themes.dark.gutterBackground};
+        --gutter-border: ${this.themes.dark.gutterBorder};
+        --json-key: ${this.themes.dark.jsonKey};
+        --json-string: ${this.themes.dark.jsonString};
+        --json-number: ${this.themes.dark.jsonNumber};
+        --json-boolean: ${this.themes.dark.jsonBoolean};
+        --json-null: ${this.themes.dark.jsonNull};
+        --json-punct: ${this.themes.dark.jsonPunctuation};
+        --collapse-btn: ${this.themes.dark.collapseButton};
+        --collapse-btn-bg: ${this.themes.dark.collapseButtonBg};
+        --collapse-btn-border: ${this.themes.dark.collapseButtonBorder};
+      }
+    `;
 
-  getElementFromSelector(selector) {
-    if (!selector) return null;
-
-    // Extract element name from selector
-    const classMatch = selector.match(/^([a-zA-Z]+)\./);
-    if (classMatch) {
-      return document.querySelector(classMatch[1]);
-    }
-
-    const attrMatch = selector.match(/^([a-zA-Z]+)@/);
-    if (attrMatch) {
-      return document.querySelector(attrMatch[1]);
-    }
-
-    // If selector starts with @, it's self
-    if (selector.startsWith('@')) {
-      return this;
-    }
-
-    return null;
+    themeStyle.textContent = css;
   }
 
   // Public API: Theme management
@@ -1722,9 +1754,8 @@ class GeoJsonEditor extends HTMLElement {
       this.themes.light = { ...this.themes.light, ...theme.light };
     }
 
-    // Reapply current color scheme
-    const scheme = this.getAttribute('color-scheme') || 'dark';
-    this.applyColorScheme(scheme);
+    // Regenerate CSS with new theme values
+    this.updateThemeCSS();
   }
 
   resetTheme() {
@@ -1764,29 +1795,8 @@ class GeoJsonEditor extends HTMLElement {
       }
     };
 
-    const scheme = this.getAttribute('color-scheme') || 'dark';
-    this.applyColorScheme(scheme);
-  }
-
-  applyColorScheme(scheme) {
-    const theme = this.themes[scheme] || this.themes.dark;
-    this.currentTheme = { ...theme };
-
-    // Update CSS variables on :host so they cascade to all children including prefix/suffix
-    this.style.setProperty('--bg-color', theme.background);
-    this.style.setProperty('--text-color', theme.textColor);
-    this.style.setProperty('--caret-color', theme.caretColor);
-    this.style.setProperty('--gutter-bg', theme.gutterBackground);
-    this.style.setProperty('--gutter-border', theme.gutterBorder);
-    this.style.setProperty('--json-key', theme.jsonKey);
-    this.style.setProperty('--json-string', theme.jsonString);
-    this.style.setProperty('--json-number', theme.jsonNumber);
-    this.style.setProperty('--json-boolean', theme.jsonBoolean);
-    this.style.setProperty('--json-null', theme.jsonNull);
-    this.style.setProperty('--json-punct', theme.jsonPunctuation);
-    this.style.setProperty('--collapse-btn', theme.collapseButton);
-    this.style.setProperty('--collapse-btn-bg', theme.collapseButtonBg);
-    this.style.setProperty('--collapse-btn-border', theme.collapseButtonBorder);
+    // Regenerate CSS with default theme values
+    this.updateThemeCSS();
   }
 }
 
