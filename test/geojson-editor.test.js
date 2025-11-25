@@ -519,6 +519,31 @@ describe('GeoJsonEditor - Collapsible Nodes', () => {
     // Should have collapsed marker
     expect(textarea.value).to.include('{...}');
   });
+
+  it('should auto-collapse coordinates when pasting valid GeoJSON', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    const textarea = el.shadowRoot.querySelector('textarea');
+
+    // GeoJSON with coordinates to paste
+    const geojsonToPaste = JSON.stringify({
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
+      },
+      properties: {}
+    }, null, 2);
+
+    // Set value and simulate paste event (paste handler triggers auto-collapse)
+    textarea.value = geojsonToPaste;
+    textarea.dispatchEvent(new Event('paste', { bubbles: true }));
+
+    // Wait for paste handler (10ms delay) + auto-collapse
+    await new Promise(r => setTimeout(r, 100));
+
+    // Coordinates should be auto-collapsed
+    expect(textarea.value).to.include('[...]');
+  });
 });
 
 describe('GeoJsonEditor - Color Picker', () => {

@@ -569,6 +569,8 @@ class GeoJsonEditor extends HTMLElement {
         }
         this.updateHighlight();
         this.emitChange();
+        // Auto-collapse coordinates after paste
+        this.applyAutoCollapsed();
       }, 10);
     });
 
