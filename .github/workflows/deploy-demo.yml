@@ -44,9 +44,8 @@ jobs:
         run: |
           mkdir -p gh-pages
           cp -r demo/* gh-pages/
-          cp -r dist gh-pages/
-          # Update script src in demo to use local built file
-          sed -i 's|../src/geojson-editor.js|./dist/geojson-editor.js|g' gh-pages/index.html
+          # Update script src in demo to use CDN
+          sed -i 's|../src/geojson-editor.js|https://unpkg.com/@softwarity/geojson-editor|g' gh-pages/index.html
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
