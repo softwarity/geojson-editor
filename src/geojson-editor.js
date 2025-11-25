@@ -97,10 +97,6 @@ class GeoJsonEditor extends HTMLElement {
   };
 
   connectedCallback() {
-    // Prevent browser translation of code content
-    this.setAttribute('translate', 'no');
-    this.classList.add('notranslate');
-
     this.render();
     this.setupEventListeners();
 
