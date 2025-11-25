@@ -19,6 +19,9 @@
   <a href="https://github.com/softwarity/geojson-editor/blob/main/LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   </a>
+  <a href="https://codecov.io/gh/softwarity/geojson-editor">
+    <img src="https://codecov.io/gh/softwarity/geojson-editor/graph/badge.svg" alt="codecov">
+  </a>
 </p>
 
 A feature-rich, framework-agnostic **Web Component** for editing GeoJSON features with syntax highlighting, collapsible nodes, and integrated color picker.

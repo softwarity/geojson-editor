@@ -17,7 +17,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && terser dist/geojson-editor.js -o dist/geojson-editor.js --compress passes=3 --mangle toplevel=true --comments /license/i",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "web-test-runner",
+    "test:watch": "web-test-runner --watch"
   },
   "repository": {
     "type": "git",
@@ -38,6 +40,10 @@
   "author": "Softwarity",
   "license": "MIT",
   "devDependencies": {
+    "@esm-bundle/chai": "^4.3.4-fix.0",
+    "@open-wc/testing": "^4.0.0",
+    "@web/test-runner": "^0.20.2",
+    "@web/test-runner-playwright": "^0.11.1",
     "terser": "^5.44.1",
     "vite": "^5.0.0"
   }

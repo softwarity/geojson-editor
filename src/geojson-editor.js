@@ -697,6 +697,9 @@ class GeoJsonEditor extends HTMLElement {
           this.applyAutoCollapsed();
         });
       }
+
+      // Emit change/error event for programmatic value changes
+      this.emitChange();
     }
   }
 
