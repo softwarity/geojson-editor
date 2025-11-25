@@ -97,6 +97,10 @@ class GeoJsonEditor extends HTMLElement {
   };
 
   connectedCallback() {
+    // Prevent browser translation of code content
+    this.setAttribute('translate', 'no');
+    this.classList.add('notranslate');
+
     this.render();
     this.setupEventListeners();
 
@@ -488,8 +492,8 @@ class GeoJsonEditor extends HTMLElement {
     `;
 
     const template = `
-      <div class="editor-prefix notranslate" id="editorPrefix" translate="no"></div>
-      <div class="editor-wrapper notranslate" translate="no">
+      <div class="editor-prefix" id="editorPrefix"></div>
+      <div class="editor-wrapper">
         <div class="gutter">
           <div class="gutter-content" id="gutterContent"></div>
         </div>
@@ -501,12 +505,11 @@ class GeoJsonEditor extends HTMLElement {
             autocomplete="off"
             autocorrect="off"
             autocapitalize="off"
-            translate="no"
             placeholder="${this.placeholder}"
           ></textarea>
         </div>
       </div>
-      <div class="editor-suffix notranslate" id="editorSuffix" translate="no"></div>
+      <div class="editor-suffix" id="editorSuffix"></div>
     `;
 
     this.shadowRoot.innerHTML = styles + template;
