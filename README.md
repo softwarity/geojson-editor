@@ -6,9 +6,42 @@
 
 # @softwarity/geojson-editor
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/@softwarity/geojson-editor">
+    <img src="https://img.shields.io/npm/v/@softwarity/geojson-editor?color=blue&label=npm" alt="npm version">
+  </a>
+  <a href="https://www.npmjs.com/package/@softwarity/geojson-editor">
+    <img src="https://img.shields.io/npm/dm/@softwarity/geojson-editor?color=green" alt="npm downloads">
+  </a>
+  <a href="https://bundlephobia.com/package/@softwarity/geojson-editor">
+    <img src="https://img.shields.io/bundlephobia/minzip/@softwarity/geojson-editor?label=size" alt="bundle size">
+  </a>
+  <a href="https://github.com/softwarity/geojson-editor/blob/main/LICENSE">
+    <img src="https://img.shields.io/npm/l/@softwarity/geojson-editor" alt="license">
+  </a>
+</p>
+
 A feature-rich, framework-agnostic **Web Component** for editing GeoJSON features with syntax highlighting, collapsible nodes, and integrated color picker.
 
 **[🚀 Try the Live Demo](https://softwarity.github.io/geojson-editor/)**
+
+## Why not Monaco, CodeMirror, or Prism?
+
+| | @softwarity/geojson-editor | Monaco Editor | CodeMirror | Prism.js |
+|---|:---:|:---:|:---:|:---:|
+| **Size (gzip)** | ~10 KB | ~2.5 MB | ~150 KB | ~15 KB + plugins |
+| **GeoJSON validation** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ None |
+| **Type highlighting** | ✅ Contextual | ⚠️ Generic JSON | ⚠️ Generic JSON | ⚠️ Generic JSON |
+| **Invalid type detection** | ✅ Visual feedback | ❌ | ❌ | ❌ |
+| **Collapsible nodes** | ✅ Native | ✅ | ✅ Plugin | ❌ |
+| **Color picker** | ✅ Integrated | ❌ | ❌ | ❌ |
+| **Auto-collapse coordinates** | ✅ | ❌ | ❌ | ❌ |
+| **FeatureCollection mode** | ✅ | ❌ | ❌ | ❌ |
+| **Dark mode detection** | ✅ Auto | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual |
+| **Dependencies** | 0 | Many | Few | 0 |
+| **Setup complexity** | 1 line | Complex | Moderate | Simple |
+
+**TL;DR**: If you're building a GeoJSON-focused application and need a lightweight, specialized editor with built-in validation and GeoJSON-aware features, this component does exactly that — without the overhead of a general-purpose code editor.
 
 ## Features
 
