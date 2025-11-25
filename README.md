@@ -17,7 +17,7 @@
     <img src="https://img.shields.io/bundlephobia/minzip/@softwarity/geojson-editor?label=size" alt="bundle size">
   </a>
   <a href="https://github.com/softwarity/geojson-editor/blob/main/LICENSE">
-    <img src="https://img.shields.io/npm/l/@softwarity/geojson-editor" alt="license">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
   </a>
 </p>
 
