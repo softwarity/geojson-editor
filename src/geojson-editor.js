@@ -19,48 +19,10 @@ class GeoJsonEditor extends HTMLElement {
     // Debounce timer for syntax highlighting
     this.highlightTimer = null;
 
-    // Default themes
+    // Initialize themes from defaults
     this.themes = {
-      dark: {
-        background: '#1e1e1e',
-        textColor: '#d4d4d4',
-        caretColor: '#fff',
-        gutterBackground: '#252526',
-        gutterBorder: '#3e3e42',
-        jsonKey: '#9cdcfe',
-        jsonString: '#ce9178',
-        jsonNumber: '#b5cea8',
-        jsonBoolean: '#569cd6',
-        jsonNull: '#569cd6',
-        jsonPunctuation: '#d4d4d4',
-        collapseButton: '#c586c0',
-        collapseButtonBg: '#3e3e42',
-        collapseButtonBorder: '#555',
-        geojsonKey: '#c586c0',
-        geojsonType: '#4ec9b0',
-        geojsonTypeInvalid: '#f44747',
-        jsonKeyInvalid: '#f44747'
-      },
-      light: {
-        background: '#ffffff',
-        textColor: '#333333',
-        caretColor: '#000',
-        gutterBackground: '#f5f5f5',
-        gutterBorder: '#ddd',
-        jsonKey: '#0000ff',
-        jsonString: '#a31515',
-        jsonNumber: '#098658',
-        jsonBoolean: '#0000ff',
-        jsonNull: '#0000ff',
-        jsonPunctuation: '#333333',
-        collapseButton: '#a31515',
-        collapseButtonBg: '#e0e0e0',
-        collapseButtonBorder: '#999',
-        geojsonKey: '#af00db',
-        geojsonType: '#267f99',
-        geojsonTypeInvalid: '#d32f2f',
-        jsonKeyInvalid: '#d32f2f'
-      }
+      dark: { ...GeoJsonEditor.DEFAULT_THEMES.dark },
+      light: { ...GeoJsonEditor.DEFAULT_THEMES.light }
     };
   }
 
@@ -70,6 +32,50 @@ class GeoJsonEditor extends HTMLElement {
 
   // Nodes that are always collapsed by default when content is loaded
   static AUTO_COLLAPSED_KEYS = ['coordinates'];
+
+  // Default theme values
+  static DEFAULT_THEMES = {
+    dark: {
+      background: '#1e1e1e',
+      textColor: '#d4d4d4',
+      caretColor: '#fff',
+      gutterBackground: '#252526',
+      gutterBorder: '#3e3e42',
+      jsonKey: '#9cdcfe',
+      jsonString: '#ce9178',
+      jsonNumber: '#b5cea8',
+      jsonBoolean: '#569cd6',
+      jsonNull: '#569cd6',
+      jsonPunctuation: '#d4d4d4',
+      collapseButton: '#c586c0',
+      collapseButtonBg: '#3e3e42',
+      collapseButtonBorder: '#555',
+      geojsonKey: '#c586c0',
+      geojsonType: '#4ec9b0',
+      geojsonTypeInvalid: '#f44747',
+      jsonKeyInvalid: '#f44747'
+    },
+    light: {
+      background: '#ffffff',
+      textColor: '#333333',
+      caretColor: '#000',
+      gutterBackground: '#f5f5f5',
+      gutterBorder: '#ddd',
+      jsonKey: '#0000ff',
+      jsonString: '#a31515',
+      jsonNumber: '#098658',
+      jsonBoolean: '#0000ff',
+      jsonNull: '#0000ff',
+      jsonPunctuation: '#333333',
+      collapseButton: '#a31515',
+      collapseButtonBg: '#e0e0e0',
+      collapseButtonBorder: '#999',
+      geojsonKey: '#af00db',
+      geojsonType: '#267f99',
+      geojsonTypeInvalid: '#d32f2f',
+      jsonKeyInvalid: '#d32f2f'
+    }
+  };
 
   // FeatureCollection wrapper constants
   static FEATURE_COLLECTION_PREFIX = '{"type": "FeatureCollection", "features": [';
@@ -1343,7 +1349,7 @@ class GeoJsonEditor extends HTMLElement {
       if (line.includes('{...}') || line.includes('[...]')) {
         // Find the collapsed node for this line
         let found = false;
-        this.collapsedNodes.forEach((collapsed, key) => {
+        this.collapsedData.forEach((collapsed, key) => {
           const collapsedLineNum = parseInt(key.split('-')[0]);
           if (collapsedLineNum === absoluteLineNum) {
             // Replace with original line and all collapsed content
@@ -1385,59 +1391,7 @@ class GeoJsonEditor extends HTMLElement {
     const textarea = this.shadowRoot.getElementById('textarea');
 
     // Expand ALL collapsed nodes to get full content
-    let editorContent = textarea.value;
-
-    // Keep expanding until no more markers found
-    while (editorContent.includes('{...}') || editorContent.includes('[...]')) {
-      const lines = editorContent.split('\n');
-      let expanded = false;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        if (line.includes('{...}') || line.includes('[...]')) {
-          // Find which node this is
-          const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
-          if (match) {
-            const nodeKey = match[2];
-            const currentIndent = match[1].length;
-
-            // Search for this nodeKey in collapsedData
-            let foundKey = null;
-            const exactKey = `${i}-${nodeKey}`;
-
-            if (this.collapsedData.has(exactKey)) {
-              foundKey = exactKey;
-            } else {
-              // Search by nodeKey + indent
-              for (const [key, data] of this.collapsedData.entries()) {
-                if (data.nodeKey === nodeKey && data.indent === currentIndent) {
-                  foundKey = key;
-                  break;
-                }
-              }
-            }
-
-            if (foundKey) {
-              const {originalLine, content} = this.collapsedData.get(foundKey);
-
-              // Restore
-              lines[i] = originalLine;
-              lines.splice(i + 1, 0, ...content);
-
-              expanded = true;
-              break; // Restart scan from beginning with new line numbers
-            }
-          }
-        }
-      }
-
-      if (!expanded) {
-        break; // No more to expand
-      }
-
-      editorContent = lines.join('\n');
-    }
+    const editorContent = this.expandAllCollapsed(textarea.value);
 
     // Build complete value with prefix/suffix
     const prefix = this.prefix;
@@ -1538,123 +1492,97 @@ class GeoJsonEditor extends HTMLElement {
     return errors;
   }
 
-  autoFormatContentWithCursor() {
-    const textarea = this.shadowRoot.getElementById('textarea');
-
-    // Save cursor position (line and column)
-    const cursorPos = textarea.selectionStart;
-    const textBeforeCursor = textarea.value.substring(0, cursorPos);
-    const linesBeforeCursor = textBeforeCursor.split('\n');
-    const cursorLine = linesBeforeCursor.length - 1;
-    const cursorColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length;
-
-    // Expand all collapsed to get full content
-    let content = textarea.value;
-    const originalContent = content;
-
-    // Save collapsed node details (nodeKey + indent) instead of just keys
-    const collapsedNodes = Array.from(this.collapsedData.values()).map(data => ({
-      nodeKey: data.nodeKey,
-      indent: data.indent
-    }));
-
-    // Expand all markers
+  // Helper: Expand all collapsed markers and return expanded content
+  expandAllCollapsed(content) {
     while (content.includes('{...}') || content.includes('[...]')) {
       const lines = content.split('\n');
       let expanded = false;
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        if (!line.includes('{...}') && !line.includes('[...]')) continue;
 
-        if (line.includes('{...}') || line.includes('[...]')) {
-          const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
-          if (match) {
-            const nodeKey = match[2];
-            const currentIndent = match[1].length;
+        const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
+        if (!match) continue;
 
-            // Search for this nodeKey in collapsedData
-            let foundKey = null;
-            const exactKey = `${i}-${nodeKey}`;
+        const nodeKey = match[2];
+        const currentIndent = match[1].length;
+        const exactKey = `${i}-${nodeKey}`;
 
-            if (this.collapsedData.has(exactKey)) {
-              foundKey = exactKey;
-            } else {
-              // Search by nodeKey + indent
-              for (const [key, data] of this.collapsedData.entries()) {
-                if (data.nodeKey === nodeKey && data.indent === currentIndent) {
-                  foundKey = key;
-                  break;
-                }
-              }
-            }
-
-            if (foundKey) {
-              const {originalLine, content: nodeContent} = this.collapsedData.get(foundKey);
-
-              lines[i] = originalLine;
-              lines.splice(i + 1, 0, ...nodeContent);
-
-              expanded = true;
+        let foundKey = this.collapsedData.has(exactKey) ? exactKey : null;
+        if (!foundKey) {
+          for (const [key, data] of this.collapsedData.entries()) {
+            if (data.nodeKey === nodeKey && data.indent === currentIndent) {
+              foundKey = key;
               break;
             }
           }
+        }
+
+        if (foundKey) {
+          const {originalLine, content: nodeContent} = this.collapsedData.get(foundKey);
+          lines[i] = originalLine;
+          lines.splice(i + 1, 0, ...nodeContent);
+          expanded = true;
+          break;
         }
       }
 
       if (!expanded) break;
       content = lines.join('\n');
     }
+    return content;
+  }
 
-    // Try to parse and format (with prefix/suffix for validation)
+  // Helper: Format JSON content respecting prefix/suffix
+  formatJSONContent(content) {
+    const prefix = this.prefix;
+    const suffix = this.suffix;
+    const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
+    const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
+
+    if (prefixEndsWithBracket && suffixStartsWithBracket) {
+      const wrapped = '[' + content + ']';
+      const parsed = JSON.parse(wrapped);
+      const formatted = JSON.stringify(parsed, null, 2);
+      const lines = formatted.split('\n');
+      return lines.length > 2 ? lines.slice(1, -1).join('\n') : '';
+    } else if (!prefix && !suffix) {
+      const parsed = JSON.parse(content);
+      return JSON.stringify(parsed, null, 2);
+    } else {
+      const fullValue = prefix + content + suffix;
+      JSON.parse(fullValue); // Validate only
+      return content;
+    }
+  }
+
+  autoFormatContentWithCursor() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+
+    // Save cursor position
+    const cursorPos = textarea.selectionStart;
+    const textBeforeCursor = textarea.value.substring(0, cursorPos);
+    const linesBeforeCursor = textBeforeCursor.split('\n');
+    const cursorLine = linesBeforeCursor.length - 1;
+    const cursorColumn = linesBeforeCursor[linesBeforeCursor.length - 1].length;
+
+    // Save collapsed node details
+    const collapsedNodes = Array.from(this.collapsedData.values()).map(data => ({
+      nodeKey: data.nodeKey,
+      indent: data.indent
+    }));
+
+    // Expand and format
+    const content = this.expandAllCollapsed(textarea.value);
+
     try {
-      const prefix = this.prefix;
-      const suffix = this.suffix;
+      const formattedContent = this.formatJSONContent(content);
 
-      // Check if prefix ends with [ and suffix starts with ]
-      const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
-      const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
-
-      let formattedContent;
-
-      if (prefixEndsWithBracket && suffixStartsWithBracket) {
-        // Wrap content in array brackets for validation and formatting
-        const wrapped = '[' + content + ']';
-        const parsed = JSON.parse(wrapped);
-        const formatted = JSON.stringify(parsed, null, 2);
-
-        // Remove first [ and last ] from formatted
-        const lines = formatted.split('\n');
-        if (lines.length > 2) {
-          // Remove first line "[" and last line "]"
-          formattedContent = lines.slice(1, -1).join('\n');
-        } else {
-          // Empty array case
-          formattedContent = '';
-        }
-      } else {
-        // No prefix/suffix or different pattern - format as-is
-        const fullValue = prefix + content + suffix;
-        const parsed = JSON.parse(fullValue);
-        const formatted = JSON.stringify(parsed, null, 2);
-
-        // If no prefix/suffix, use formatted directly
-        if (!prefix && !suffix) {
-          formattedContent = formatted;
-        } else {
-          // Complex case - keep original content
-          formattedContent = content;
-        }
-      }
-
-      // Only update if different
       if (formattedContent !== content) {
-        // Clear collapsed data
         this.collapsedData.clear();
-
-        // Update textarea
         textarea.value = formattedContent;
 
-        // Re-apply collapsed nodes
         if (collapsedNodes.length > 0) {
           this.reapplyCollapsed(collapsedNodes);
         }
@@ -1662,17 +1590,12 @@ class GeoJsonEditor extends HTMLElement {
         // Restore cursor position
         const newLines = textarea.value.split('\n');
         if (cursorLine < newLines.length) {
-          // Try to place cursor at same line and column
-          const newLine = newLines[cursorLine];
-          const newColumn = Math.min(cursorColumn, newLine.length);
-
-          // Calculate absolute position
+          const newColumn = Math.min(cursorColumn, newLines[cursorLine].length);
           let newPos = 0;
           for (let i = 0; i < cursorLine; i++) {
-            newPos += newLines[i].length + 1; // +1 for \n
+            newPos += newLines[i].length + 1;
           }
           newPos += newColumn;
-
           textarea.setSelectionRange(newPos, newPos);
         }
       }
@@ -1684,112 +1607,22 @@ class GeoJsonEditor extends HTMLElement {
   autoFormatContent() {
     const textarea = this.shadowRoot.getElementById('textarea');
 
-    // Expand all collapsed to get full content
-    let content = textarea.value;
-
-    // Save collapsed node details (nodeKey + indent) instead of just keys
+    // Save collapsed node details
     const collapsedNodes = Array.from(this.collapsedData.values()).map(data => ({
       nodeKey: data.nodeKey,
       indent: data.indent
     }));
 
-    // Expand all markers
-    while (content.includes('{...}') || content.includes('[...]')) {
-      const lines = content.split('\n');
-      let expanded = false;
+    // Expand and format
+    const content = this.expandAllCollapsed(textarea.value);
 
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-
-        if (line.includes('{...}') || line.includes('[...]')) {
-          const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
-          if (match) {
-            const nodeKey = match[2];
-            const currentIndent = match[1].length;
-
-            // Search for this nodeKey in collapsedData
-            let foundKey = null;
-            const exactKey = `${i}-${nodeKey}`;
-
-            if (this.collapsedData.has(exactKey)) {
-              foundKey = exactKey;
-            } else {
-              // Search by nodeKey + indent
-              for (const [key, data] of this.collapsedData.entries()) {
-                if (data.nodeKey === nodeKey && data.indent === currentIndent) {
-                  foundKey = key;
-                  break;
-                }
-              }
-            }
-
-            if (foundKey) {
-              const {originalLine, content: nodeContent} = this.collapsedData.get(foundKey);
-
-              lines[i] = originalLine;
-              lines.splice(i + 1, 0, ...nodeContent);
-
-              expanded = true;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!expanded) break;
-      content = lines.join('\n');
-    }
-
-    // Try to parse and format (with prefix/suffix for validation)
     try {
-      const prefix = this.prefix;
-      const suffix = this.suffix;
+      const formattedContent = this.formatJSONContent(content);
 
-      // Check if prefix ends with [ and suffix starts with ]
-      const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
-      const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
-
-      let formattedContent;
-
-      if (prefixEndsWithBracket && suffixStartsWithBracket) {
-        // Wrap content in array brackets for validation and formatting
-        const wrapped = '[' + content + ']';
-        const parsed = JSON.parse(wrapped);
-        const formatted = JSON.stringify(parsed, null, 2);
-
-        // Remove first [ and last ] from formatted
-        const lines = formatted.split('\n');
-        if (lines.length > 2) {
-          // Remove first line "[" and last line "]"
-          formattedContent = lines.slice(1, -1).join('\n');
-        } else {
-          // Empty array case
-          formattedContent = '';
-        }
-      } else {
-        // No prefix/suffix or different pattern - format as-is
-        const fullValue = prefix + content + suffix;
-        const parsed = JSON.parse(fullValue);
-        const formatted = JSON.stringify(parsed, null, 2);
-
-        // If no prefix/suffix, use formatted directly
-        if (!prefix && !suffix) {
-          formattedContent = formatted;
-        } else {
-          // Complex case - keep original content
-          formattedContent = content;
-        }
-      }
-
-      // Only update if different
       if (formattedContent !== content) {
-        // Clear collapsed data
         this.collapsedData.clear();
-
-        // Update textarea
         textarea.value = formattedContent;
 
-        // Re-apply collapsed nodes
         if (collapsedNodes.length > 0) {
           this.reapplyCollapsed(collapsedNodes);
         }
@@ -2004,47 +1837,9 @@ class GeoJsonEditor extends HTMLElement {
   resetTheme() {
     // Reset to defaults
     this.themes = {
-      dark: {
-        background: '#1e1e1e',
-        textColor: '#d4d4d4',
-        caretColor: '#fff',
-        gutterBackground: '#252526',
-        gutterBorder: '#3e3e42',
-        jsonKey: '#9cdcfe',
-        jsonString: '#ce9178',
-        jsonNumber: '#b5cea8',
-        jsonBoolean: '#569cd6',
-        jsonNull: '#569cd6',
-        jsonPunctuation: '#d4d4d4',
-        collapseButton: '#c586c0',
-        collapseButtonBg: '#3e3e42',
-        collapseButtonBorder: '#555',
-        geojsonKey: '#c586c0',
-        geojsonType: '#4ec9b0',
-        geojsonTypeInvalid: '#f44747'
-      },
-      light: {
-        background: '#ffffff',
-        textColor: '#333333',
-        caretColor: '#000',
-        gutterBackground: '#f5f5f5',
-        gutterBorder: '#ddd',
-        jsonKey: '#0000ff',
-        jsonString: '#a31515',
-        jsonNumber: '#098658',
-        jsonBoolean: '#0000ff',
-        jsonNull: '#0000ff',
-        jsonPunctuation: '#333333',
-        collapseButton: '#a31515',
-        collapseButtonBg: '#e0e0e0',
-        collapseButtonBorder: '#999',
-        geojsonKey: '#af00db',
-        geojsonType: '#267f99',
-        geojsonTypeInvalid: '#d32f2f'
-      }
+      dark: { ...GeoJsonEditor.DEFAULT_THEMES.dark },
+      light: { ...GeoJsonEditor.DEFAULT_THEMES.light }
     };
-
-    // Regenerate CSS with default theme values
     this.updateThemeCSS();
   }
 }
