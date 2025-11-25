@@ -7,6 +7,8 @@ class GeoJsonEditor extends HTMLElement {
     this.collapsedData = new Map(); // nodeKey -> {originalLines: string[], indent: number}
     this.colorPositions = []; // {line, color}
     this.nodeTogglePositions = []; // {line, nodeKey, isCollapsed, indent}
+    this.hiddenFeatures = new Set(); // Set of feature keys (hidden from events)
+    this.featureRanges = new Map(); // featureKey -> {startLine, endLine, featureIndex}
 
     // Debounce timer for syntax highlighting
     this.highlightTimer = null;
@@ -74,6 +76,9 @@ class GeoJsonEditor extends HTMLElement {
   // FeatureCollection wrapper constants
   static FEATURE_COLLECTION_PREFIX = '{"type": "FeatureCollection", "features": [';
   static FEATURE_COLLECTION_SUFFIX = ']}';
+
+  // SVG icon for visibility toggle (single icon, style changes based on state)
+  static ICON_EYE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></svg>';
 
   // Pre-compiled regex patterns (avoid recompilation on each call)
   static REGEX = {
@@ -299,6 +304,43 @@ class GeoJsonEditor extends HTMLElement {
           background: var(--control-bg);
           border-color: var(--control-color);
           transform: scale(1.1);
+        }
+
+        .visibility-button {
+          width: 14px;
+          height: 14px;
+          background: transparent;
+          border: none;
+          color: var(--control-color);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.1s;
+          flex-shrink: 0;
+          opacity: 0.7;
+          padding: 0;
+        }
+
+        .visibility-button:hover {
+          opacity: 1;
+          transform: scale(1.1);
+        }
+
+        .visibility-button.hidden {
+          opacity: 0.4;
+        }
+
+        .visibility-button svg {
+          width: 12px;
+          height: 12px;
+          fill: currentColor;
+        }
+
+        /* Hidden feature lines - grayed out */
+        .line-hidden {
+          opacity: 0.35;
+          filter: grayscale(50%);
         }
 
         .color-picker-popup {
@@ -577,6 +619,14 @@ class GeoJsonEditor extends HTMLElement {
     // Gutter clicks (color indicators and collapse buttons)
     const gutterContent = this.shadowRoot.getElementById('gutterContent');
     gutterContent.addEventListener('click', (e) => {
+      // Check for visibility button (may click on SVG inside button)
+      const visibilityButton = e.target.closest('.visibility-button');
+      if (visibilityButton) {
+        const featureKey = visibilityButton.dataset.featureKey;
+        this.toggleFeatureVisibility(featureKey);
+        return;
+      }
+
       if (e.target.classList.contains('color-indicator')) {
         const line = parseInt(e.target.dataset.line);
         const color = e.target.dataset.color;
@@ -738,8 +788,14 @@ class GeoJsonEditor extends HTMLElement {
 
     const text = textarea.value;
 
+    // Update feature ranges for visibility tracking
+    this.updateFeatureRanges();
+
+    // Get hidden line ranges
+    const hiddenRanges = this.getHiddenLineRanges();
+
     // Parse and highlight
-    const { highlighted, colors, toggles } = this.highlightJSON(text);
+    const { highlighted, colors, toggles } = this.highlightJSON(text, hiddenRanges);
 
     highlightLayer.innerHTML = highlighted;
     this.colorPositions = colors;
@@ -749,7 +805,7 @@ class GeoJsonEditor extends HTMLElement {
     this.updateGutter();
   }
 
-  highlightJSON(text) {
+  highlightJSON(text, hiddenRanges = []) {
     if (!text.trim()) {
       return { highlighted: '', colors: [], toggles: [] };
     }
@@ -761,6 +817,11 @@ class GeoJsonEditor extends HTMLElement {
 
     // Build context map for validation
     const contextMap = this.buildContextMap(text);
+
+    // Helper to check if a line is in a hidden range
+    const isLineHidden = (lineIndex) => {
+      return hiddenRanges.some(range => lineIndex >= range.startLine && lineIndex <= range.endLine);
+    };
 
     lines.forEach((line, lineIndex) => {
       // Detect any hex color (6 digits) in string values
@@ -804,7 +865,14 @@ class GeoJsonEditor extends HTMLElement {
 
       // Highlight the line with context
       const context = contextMap.get(lineIndex);
-      highlightedLines.push(this.highlightSyntax(line, context));
+      let highlightedLine = this.highlightSyntax(line, context);
+
+      // Wrap hidden lines with .line-hidden class
+      if (isLineHidden(lineIndex)) {
+        highlightedLine = `<span class="line-hidden">${highlightedLine}</span>`;
+      }
+
+      highlightedLines.push(highlightedLine);
     });
 
     return {
@@ -1193,24 +1261,32 @@ class GeoJsonEditor extends HTMLElement {
     // Clear gutter
     gutterContent.textContent = '';
 
-    // Create a map of line -> elements (color, collapse button, or both)
+    // Create a map of line -> elements (color, collapse button, visibility button)
     const lineElements = new Map();
+
+    // Helper to ensure line entry exists
+    const ensureLine = (line) => {
+      if (!lineElements.has(line)) {
+        lineElements.set(line, { colors: [], buttons: [], visibilityButtons: [] });
+      }
+      return lineElements.get(line);
+    };
 
     // Add color indicators
     this.colorPositions.forEach(({ line, color, attributeName }) => {
-      if (!lineElements.has(line)) {
-        lineElements.set(line, { colors: [], buttons: [] });
-      }
-      lineElements.get(line).colors.push({ color, attributeName });
+      ensureLine(line).colors.push({ color, attributeName });
     });
 
     // Add collapse buttons
     this.nodeTogglePositions.forEach(({ line, nodeKey, isCollapsed }) => {
-      if (!lineElements.has(line)) {
-        lineElements.set(line, { colors: [], buttons: [] });
-      }
-      lineElements.get(line).buttons.push({ nodeKey, isCollapsed });
+      ensureLine(line).buttons.push({ nodeKey, isCollapsed });
     });
+
+    // Add visibility buttons for Features (on the opening brace line)
+    for (const [featureKey, range] of this.featureRanges) {
+      const isHidden = this.hiddenFeatures.has(featureKey);
+      ensureLine(range.startLine).visibilityButtons.push({ featureKey, isHidden });
+    }
 
     // Create gutter lines with DocumentFragment (single DOM update)
     const fragment = document.createDocumentFragment();
@@ -1219,6 +1295,16 @@ class GeoJsonEditor extends HTMLElement {
       const gutterLine = document.createElement('div');
       gutterLine.className = 'gutter-line';
       gutterLine.style.top = `${paddingTop + line * lineHeight}px`;
+
+      // Add visibility buttons first (leftmost)
+      elements.visibilityButtons.forEach(({ featureKey, isHidden }) => {
+        const button = document.createElement('button');
+        button.className = 'visibility-button' + (isHidden ? ' hidden' : '');
+        button.innerHTML = GeoJsonEditor.ICON_EYE;
+        button.dataset.featureKey = featureKey;
+        button.title = isHidden ? 'Show feature in events' : 'Hide feature from events';
+        gutterLine.appendChild(button);
+      });
 
       // Add color indicators
       elements.colors.forEach(({ color, attributeName }) => {
@@ -1428,7 +1514,10 @@ class GeoJsonEditor extends HTMLElement {
 
     // Try to parse
     try {
-      const parsed = JSON.parse(fullValue);
+      let parsed = JSON.parse(fullValue);
+
+      // Filter out hidden features before emitting
+      parsed = this.filterHiddenFeatures(parsed);
 
       // Validate GeoJSON types
       const validationErrors = this.validateGeoJSON(parsed);
@@ -1466,6 +1555,191 @@ class GeoJsonEditor extends HTMLElement {
       }));
     }
   }
+
+  // Filter hidden features from parsed GeoJSON before emitting events
+  filterHiddenFeatures(parsed) {
+    if (!parsed || this.hiddenFeatures.size === 0) return parsed;
+
+    if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+      // Filter features array
+      const visibleFeatures = parsed.features.filter(feature => {
+        const key = this.getFeatureKey(feature);
+        return !this.hiddenFeatures.has(key);
+      });
+      return { ...parsed, features: visibleFeatures };
+    } else if (parsed.type === 'Feature') {
+      // Single feature - check if hidden
+      const key = this.getFeatureKey(parsed);
+      if (this.hiddenFeatures.has(key)) {
+        // Return empty FeatureCollection when single feature is hidden
+        return { type: 'FeatureCollection', features: [] };
+      }
+    }
+
+    return parsed;
+  }
+
+  // ========== Feature Visibility Management ==========
+
+  // Generate a unique key for a Feature to track visibility state
+  getFeatureKey(feature) {
+    if (!feature || typeof feature !== 'object') return null;
+
+    // 1. Use GeoJSON id if present (most stable)
+    if (feature.id !== undefined) return `id:${feature.id}`;
+
+    // 2. Use properties.id if present
+    if (feature.properties?.id !== undefined) return `prop:${feature.properties.id}`;
+
+    // 3. Fallback: hash based on geometry type + first coordinates
+    const geomType = feature.geometry?.type || 'null';
+    const coords = JSON.stringify(feature.geometry?.coordinates || []).slice(0, 100);
+    return `hash:${geomType}:${this.simpleHash(coords)}`;
+  }
+
+  // Simple hash function for string
+  simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString(36);
+  }
+
+  // Toggle feature visibility
+  toggleFeatureVisibility(featureKey) {
+    if (this.hiddenFeatures.has(featureKey)) {
+      this.hiddenFeatures.delete(featureKey);
+    } else {
+      this.hiddenFeatures.add(featureKey);
+    }
+    this.updateHighlight();
+    this.updateGutter();
+    this.emitChange();
+  }
+
+  // Check if a feature is hidden
+  isFeatureHidden(featureKey) {
+    return this.hiddenFeatures.has(featureKey);
+  }
+
+  // Parse JSON and extract feature ranges (line numbers for each Feature)
+  updateFeatureRanges() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    if (!textarea) return;
+
+    const text = textarea.value;
+    this.featureRanges.clear();
+
+    try {
+      // Expand collapsed content for parsing (collapsed markers like [...] are not valid JSON)
+      const expandedText = this.expandAllCollapsed(text);
+
+      // Try to parse and find Features
+      const prefix = this.prefix;
+      const suffix = this.suffix;
+      const fullValue = prefix + expandedText + suffix;
+      const parsed = JSON.parse(fullValue);
+
+      let features = [];
+      if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+        features = parsed.features;
+      } else if (parsed.type === 'Feature') {
+        features = [parsed];
+      }
+
+      // Now find each feature's line range in the text
+      const lines = text.split('\n');
+      let featureIndex = 0;
+      let braceDepth = 0;
+      let inFeature = false;
+      let featureStartLine = -1;
+      let currentFeatureKey = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Detect start of a Feature object (not FeatureCollection)
+        // Use regex to match exact "Feature" value, not "FeatureCollection"
+        const isFeatureTypeLine = /"type"\s*:\s*"Feature"/.test(line);
+        if (!inFeature && isFeatureTypeLine) {
+          // Find the opening brace for this Feature
+          // Look backwards for the opening brace
+          let startLine = i;
+          for (let j = i; j >= 0; j--) {
+            if (lines[j].includes('{')) {
+              startLine = j;
+              break;
+            }
+          }
+          featureStartLine = startLine;
+          inFeature = true;
+
+          // Start braceDepth at 1 since we're inside the Feature's opening brace
+          // Then count any additional braces from startLine to current line
+          braceDepth = 1;
+          for (let k = startLine; k <= i; k++) {
+            const scanLine = lines[k];
+            // Skip the first { we already counted
+            let skipFirst = (k === startLine);
+            for (const char of scanLine) {
+              if (char === '{') {
+                if (skipFirst) {
+                  skipFirst = false;
+                } else {
+                  braceDepth++;
+                }
+              } else if (char === '}') {
+                braceDepth--;
+              }
+            }
+          }
+
+          // Get the feature key
+          if (featureIndex < features.length) {
+            currentFeatureKey = this.getFeatureKey(features[featureIndex]);
+          }
+        } else if (inFeature) {
+          // Count braces
+          for (const char of line) {
+            if (char === '{') braceDepth++;
+            else if (char === '}') braceDepth--;
+          }
+
+          // Feature ends when braceDepth returns to 0
+          if (braceDepth <= 0) {
+            if (currentFeatureKey) {
+              this.featureRanges.set(currentFeatureKey, {
+                startLine: featureStartLine,
+                endLine: i,
+                featureIndex: featureIndex
+              });
+            }
+            featureIndex++;
+            inFeature = false;
+            currentFeatureKey = null;
+          }
+        }
+      }
+    } catch (e) {
+      // Invalid JSON, can't extract feature ranges
+    }
+  }
+
+  // Get hidden line ranges for highlighting
+  getHiddenLineRanges() {
+    const ranges = [];
+    for (const [featureKey, range] of this.featureRanges) {
+      if (this.hiddenFeatures.has(featureKey)) {
+        ranges.push(range);
+      }
+    }
+    return ranges;
+  }
+
+  // ========== GeoJSON Validation ==========
 
   // Validate GeoJSON structure and types
   // context: 'root' | 'geometry' | 'properties'

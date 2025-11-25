@@ -656,3 +656,163 @@ describe('GeoJsonEditor - Dark Selector', () => {
     expect(themeStyle.textContent).to.include('.night-mode');
   });
 });
+
+describe('GeoJsonEditor - Feature Visibility', () => {
+
+  const featureCollection = {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        id: 'feature-1',
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: { name: 'First' }
+      },
+      {
+        type: 'Feature',
+        id: 'feature-2',
+        geometry: { type: 'Point', coordinates: [1, 1] },
+        properties: { name: 'Second' }
+      }
+    ]
+  };
+  const featureCollectionStr = JSON.stringify(featureCollection, null, 2);
+
+  it('should show visibility buttons for Features', async () => {
+    const el = await fixture(html`
+      <geojson-editor value='${featureCollectionStr}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 150));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const visibilityButtons = gutter.querySelectorAll('.visibility-button');
+
+    // Should have 2 visibility buttons (one per feature)
+    expect(visibilityButtons.length).to.equal(2);
+  });
+
+  it('should toggle feature visibility on button click', async () => {
+    const el = await fixture(html`
+      <geojson-editor value='${featureCollectionStr}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 150));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const visibilityButton = gutter.querySelector('.visibility-button');
+
+    expect(visibilityButton).to.exist;
+    expect(visibilityButton.classList.contains('hidden')).to.be.false;
+
+    // Click to hide
+    visibilityButton.click();
+    await new Promise(r => setTimeout(r, 50));
+
+    // Button should now have 'hidden' class
+    const updatedButton = gutter.querySelector('.visibility-button');
+    expect(updatedButton.classList.contains('hidden')).to.be.true;
+  });
+
+  it('should gray out hidden feature lines', async () => {
+    const el = await fixture(html`
+      <geojson-editor value='${featureCollectionStr}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 150));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const visibilityButton = gutter.querySelector('.visibility-button');
+
+    // Hide the first feature
+    visibilityButton.click();
+    await new Promise(r => setTimeout(r, 50));
+
+    const highlightLayer = el.shadowRoot.querySelector('.highlight-layer');
+
+    // Should have hidden lines
+    expect(highlightLayer.innerHTML).to.include('line-hidden');
+  });
+
+  it('should exclude hidden features from change event', async () => {
+    const el = await fixture(html`
+      <geojson-editor value='${featureCollectionStr}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 150));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const visibilityButton = gutter.querySelector('.visibility-button');
+
+    // Listen for change event
+    const changePromise = new Promise(resolve => {
+      el.addEventListener('change', resolve, { once: true });
+    });
+
+    // Hide the first feature (this triggers emitChange)
+    visibilityButton.click();
+
+    const event = await changePromise;
+
+    // Event should only contain one feature (the second one)
+    expect(event.detail.type).to.equal('FeatureCollection');
+    expect(event.detail.features.length).to.equal(1);
+    expect(event.detail.features[0].id).to.equal('feature-2');
+  });
+
+  it('should restore feature in event when made visible again', async () => {
+    const el = await fixture(html`
+      <geojson-editor value='${featureCollectionStr}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 150));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    let visibilityButton = gutter.querySelector('.visibility-button');
+
+    // Hide the first feature
+    visibilityButton.click();
+    await new Promise(r => setTimeout(r, 50));
+
+    // Listen for change event
+    const changePromise = new Promise(resolve => {
+      el.addEventListener('change', resolve, { once: true });
+    });
+
+    // Show the feature again
+    visibilityButton = gutter.querySelector('.visibility-button');
+    visibilityButton.click();
+
+    const event = await changePromise;
+
+    // Event should contain both features again
+    expect(event.detail.features.length).to.equal(2);
+  });
+
+  it('should generate feature key from id', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    const feature = { type: 'Feature', id: 'test-123', geometry: null, properties: {} };
+    const key = el.getFeatureKey(feature);
+
+    expect(key).to.equal('id:test-123');
+  });
+
+  it('should generate feature key from properties.id when no root id', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    const feature = { type: 'Feature', geometry: null, properties: { id: 'prop-456' } };
+    const key = el.getFeatureKey(feature);
+
+    expect(key).to.equal('prop:prop-456');
+  });
+
+  it('should generate feature key from geometry hash when no id', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    const feature = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} };
+    const key = el.getFeatureKey(feature);
+
+    expect(key).to.include('hash:Point:');
+  });
+});
