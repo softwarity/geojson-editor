@@ -184,6 +184,28 @@ class GeoJsonEditor extends HTMLElement {
           overflow: hidden;
         }
 
+        :host([readonly]) .editor-wrapper::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          pointer-events: none;
+          background: repeating-linear-gradient(
+            -45deg,
+            rgba(128, 128, 128, 0.08),
+            rgba(128, 128, 128, 0.08) 3px,
+            transparent 3px,
+            transparent 12px
+          );
+          z-index: 1;
+        }
+
+        :host([readonly]) textarea {
+          cursor: text;
+        }
+
         .editor-wrapper {
           position: relative;
           width: 100%;

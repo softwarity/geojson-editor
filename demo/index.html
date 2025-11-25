@@ -373,25 +373,29 @@
         </div>
         <div class="controls-grid">
           <div class="control-group">
-            <label for="selectorPreview">Dark Selector (readonly)</label>
-            <input type="text" id="selectorPreview" value="dark-selector='.dark'" readonly style="font-size: 0.8rem;">
+            <label for="selectorPreview">Dark Selector</label>
+            <input type="text" id="selectorPreview" value="dark-selector='.dark'" readonly style="font-size: 0.8rem; background: #e9e9e9;">
+            <small style="color: #666; font-size: 0.85rem;">CSS selector used to detect dark mode. Changes with framework selection.</small>
           </div>
         </div>
       </div>
 
       <div class="controls-section">
-        <h4>Collapsible Nodes</h4>
+        <h4>Collapsed Nodes</h4>
         <div class="controls-grid">
           <div class="control-group">
-            <label for="collapsedInput">Collapsed by Default (JSON array)</label>
+            <label for="collapsedInput">Initially Collapsed Keys</label>
             <input type="text" id="collapsedInput" value='["coordinates"]'>
-            <small style="color: #666; font-size: 0.85rem;">All nodes are collapsible. Specify which should start collapsed.</small>
+            <small style="color: #666; font-size: 0.85rem;">JSON array of property keys to collapse on load (e.g., <code>["coordinates", "properties"]</code>)</small>
           </div>
         </div>
       </div>
 
       <div class="controls-section">
-        <h4>Content & Options</h4>
+        <h4>Content Wrapper</h4>
+        <small style="color: #666; font-size: 0.85rem; display: block; margin-bottom: 0.75rem;">
+          Prefix and suffix wrap the editable content to form a complete JSON structure. They appear grayed out and cannot be edited.
+        </small>
         <div class="controls-grid">
           <div class="control-group">
             <label for="prefixInput">Prefix</label>
@@ -401,17 +405,26 @@
             <label for="suffixInput">Suffix</label>
             <input type="text" id="suffixInput" value="]}">
           </div>
-          <div class="control-group">
-            <label for="placeholderInput">Placeholder</label>
-            <input type="text" id="placeholderInput" value="Enter GeoJSON features here...">
-          </div>
-          <div class="control-group checkbox-group">
+        </div>
+      </div>
+
+      <div class="controls-section">
+        <h4>Editor Options</h4>
+        <div class="control-group" style="margin-bottom: 1rem;">
+          <label for="placeholderInput">Placeholder Text</label>
+          <input type="text" id="placeholderInput" value="Enter GeoJSON features here...">
+          <small style="color: #666; font-size: 0.85rem;">Shown when editor is empty</small>
+        </div>
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+          <div class="checkbox-group">
             <input type="checkbox" id="autoFormatCheck" checked>
             <label for="autoFormatCheck">Auto-format JSON</label>
+            <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— indent in real-time</small>
           </div>
-          <div class="control-group checkbox-group">
+          <div class="checkbox-group">
             <input type="checkbox" id="readonlyCheck">
             <label for="readonlyCheck">Readonly mode</label>
+            <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— disable editing</small>
           </div>
         </div>
       </div>
