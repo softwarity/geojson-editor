@@ -35,7 +35,10 @@ class GeoJsonEditor extends HTMLElement {
         jsonPunctuation: '#d4d4d4',
         collapseButton: '#c586c0',
         collapseButtonBg: '#3e3e42',
-        collapseButtonBorder: '#555'
+        collapseButtonBorder: '#555',
+        geojsonKey: '#c586c0',
+        geojsonType: '#4ec9b0',
+        geojsonTypeInvalid: '#f44747'
       },
       light: {
         background: '#ffffff',
@@ -51,14 +54,21 @@ class GeoJsonEditor extends HTMLElement {
         jsonPunctuation: '#333333',
         collapseButton: '#a31515',
         collapseButtonBg: '#e0e0e0',
-        collapseButtonBorder: '#999'
+        collapseButtonBorder: '#999',
+        geojsonKey: '#af00db',
+        geojsonType: '#267f99',
+        geojsonTypeInvalid: '#d32f2f'
       }
     };
   }
 
   static get observedAttributes() {
-    return ['readonly', 'collapsed', 'value', 'placeholder', 'auto-format', 'dark-selector', 'prefix', 'suffix'];
+    return ['readonly', 'collapsed', 'value', 'placeholder', 'auto-format', 'dark-selector', 'feature-collection'];
   }
+
+  // FeatureCollection wrapper constants
+  static FEATURE_COLLECTION_PREFIX = '{"type": "FeatureCollection", "features": [';
+  static FEATURE_COLLECTION_SUFFIX = ']}';
 
   connectedCallback() {
     this.render();
@@ -94,7 +104,7 @@ class GeoJsonEditor extends HTMLElement {
       if (textarea) textarea.placeholder = newValue || '';
     } else if (name === 'dark-selector') {
       this.updateThemeCSS();
-    } else if (name === 'prefix' || name === 'suffix') {
+    } else if (name === 'feature-collection') {
       this.updatePrefixSuffix();
     } else if (name === 'collapsed') {
       // Only apply if textarea exists (component is initialized)
@@ -142,12 +152,17 @@ class GeoJsonEditor extends HTMLElement {
     return this.hasAttribute('auto-format');
   }
 
+  get featureCollection() {
+    return this.hasAttribute('feature-collection');
+  }
+
+  // Internal getters for prefix/suffix based on feature-collection mode
   get prefix() {
-    return this.getAttribute('prefix') || '';
+    return this.featureCollection ? GeoJsonEditor.FEATURE_COLLECTION_PREFIX : '';
   }
 
   get suffix() {
-    return this.getAttribute('suffix') || '';
+    return this.featureCollection ? GeoJsonEditor.FEATURE_COLLECTION_SUFFIX : '';
   }
 
   render() {
@@ -398,6 +413,23 @@ class GeoJsonEditor extends HTMLElement {
 
         .json-punctuation {
           color: var(--json-punct, #d4d4d4);
+        }
+
+        /* GeoJSON-specific highlighting */
+        .geojson-key {
+          color: var(--geojson-key, #c586c0);
+          font-weight: 600;
+        }
+
+        .geojson-type {
+          color: var(--geojson-type, #4ec9b0);
+          font-weight: 600;
+        }
+
+        .geojson-type-invalid {
+          color: var(--geojson-type-invalid, #f44747);
+          text-decoration: wavy underline var(--geojson-type-invalid, #f44747);
+          font-weight: 600;
         }
 
         /* Prefix and suffix styling */
@@ -740,17 +772,44 @@ class GeoJsonEditor extends HTMLElement {
     return this.highlightSyntax(line);
   }
 
+  // GeoJSON-specific keywords (excluding 'type' which is too ambiguous - could be in properties)
+  static GEOJSON_KEYS = ['coordinates', 'geometry', 'geometries', 'properties', 'features', 'bbox', 'crs'];
+  static GEOJSON_TYPES_FEATURE = ['Feature', 'FeatureCollection'];
+  static GEOJSON_TYPES_GEOMETRY = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection'];
+  static GEOJSON_TYPES_ALL = [...GeoJsonEditor.GEOJSON_TYPES_FEATURE, ...GeoJsonEditor.GEOJSON_TYPES_GEOMETRY];
+
   highlightSyntax(text) {
     if (!text.trim()) return '';
+
+    const geojsonKeysPattern = GeoJsonEditor.GEOJSON_KEYS.join('|');
 
     return text
       // Escape HTML first
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      // Highlight JSON elements (same order as map-viewer.js)
-      .replace(/"([^"]+)"\s*:/g, '<span class="json-key">"$1"</span>:') // Keys
-      .replace(/:\s*"([^"]*)"/g, ': <span class="json-string">"$1"</span>') // String values
+      // GeoJSON structural keys (before generic keys)
+      .replace(new RegExp(`"(${geojsonKeysPattern})"\\s*:`, 'g'), '<span class="geojson-key">"$1"</span>:')
+      // Generic JSON keys
+      .replace(/"([^"]+)"\s*:/g, (match, key) => {
+        // Skip if already highlighted (has span)
+        if (match.includes('<span')) return match;
+        return `<span class="json-key">"${key}"</span>:`;
+      })
+      // GeoJSON "type" values - highlight valid types distinctly (others stay as normal strings)
+      .replace(/<span class="geojson-key">"type"<\/span>:\s*"([^"]*)"/g, (match, typeValue) => {
+        if (GeoJsonEditor.GEOJSON_TYPES_ALL.includes(typeValue)) {
+          return `<span class="geojson-key">"type"</span>: <span class="geojson-type">"${typeValue}"</span>`;
+        }
+        // Not a GeoJSON type - will be colored as normal string by next rule
+        return match;
+      })
+      // Generic string values
+      .replace(/:\s*"([^"]*)"/g, (match, value) => {
+        // Skip if already highlighted (has span)
+        if (match.includes('<span')) return match;
+        return `: <span class="json-string">"${value}"</span>`;
+      })
       .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>') // Numbers after colon
       .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>') // Booleans
       .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>') // Null
@@ -1302,15 +1361,29 @@ class GeoJsonEditor extends HTMLElement {
     try {
       const parsed = JSON.parse(fullValue);
 
-      // Emit change event with parsed object
-      this.dispatchEvent(new CustomEvent('change', {
-        detail: {
-          timestamp: new Date().toISOString(),
-          value: parsed  // Parsed JSON object
-        },
-        bubbles: true,
-        composed: true
-      }));
+      // Validate GeoJSON types
+      const validationErrors = this.validateGeoJSON(parsed);
+
+      if (validationErrors.length > 0) {
+        // Emit error event for GeoJSON validation errors
+        this.dispatchEvent(new CustomEvent('error', {
+          detail: {
+            timestamp: new Date().toISOString(),
+            error: `GeoJSON validation: ${validationErrors.join('; ')}`,
+            errors: validationErrors,
+            content: editorContent
+          },
+          bubbles: true,
+          composed: true
+        }));
+      } else {
+        // Emit change event with parsed GeoJSON directly
+        this.dispatchEvent(new CustomEvent('change', {
+          detail: parsed,
+          bubbles: true,
+          composed: true
+        }));
+      }
     } catch (e) {
       // Emit error event for invalid JSON
       this.dispatchEvent(new CustomEvent('error', {
@@ -1323,6 +1396,59 @@ class GeoJsonEditor extends HTMLElement {
         composed: true
       }));
     }
+  }
+
+  // Validate GeoJSON structure and types
+  // context: 'root' | 'geometry' | 'properties'
+  validateGeoJSON(obj, path = '', context = 'root') {
+    const errors = [];
+
+    if (!obj || typeof obj !== 'object') {
+      return errors;
+    }
+
+    // Check for invalid type values based on context
+    if (context !== 'properties' && obj.type !== undefined) {
+      const typeValue = obj.type;
+      if (typeof typeValue === 'string') {
+        if (context === 'geometry') {
+          // In geometry: must be a geometry type
+          if (!GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(typeValue)) {
+            errors.push(`Invalid geometry type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.join(', ')})`);
+          }
+        } else {
+          // At root or in features: must be Feature or FeatureCollection
+          if (!GeoJsonEditor.GEOJSON_TYPES_FEATURE.includes(typeValue)) {
+            errors.push(`Invalid type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON_TYPES_FEATURE.join(', ')})`);
+          }
+        }
+      }
+    }
+
+    // Recursively validate nested objects
+    if (Array.isArray(obj)) {
+      obj.forEach((item, index) => {
+        errors.push(...this.validateGeoJSON(item, `${path}[${index}]`, context));
+      });
+    } else {
+      for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === 'object' && value !== null) {
+          const newPath = path ? `${path}.${key}` : key;
+          // Determine context for nested objects
+          let newContext = context;
+          if (key === 'properties') {
+            newContext = 'properties';
+          } else if (key === 'geometry' || key === 'geometries') {
+            newContext = 'geometry';
+          } else if (key === 'features') {
+            newContext = 'root'; // features contains Feature objects
+          }
+          errors.push(...this.validateGeoJSON(value, newPath, newContext));
+        }
+      }
+    }
+
+    return errors;
   }
 
   autoFormatContentWithCursor() {
@@ -1737,6 +1863,9 @@ class GeoJsonEditor extends HTMLElement {
         --collapse-btn: ${this.themes.light.collapseButton};
         --collapse-btn-bg: ${this.themes.light.collapseButtonBg};
         --collapse-btn-border: ${this.themes.light.collapseButtonBorder};
+        --geojson-key: ${this.themes.light.geojsonKey};
+        --geojson-type: ${this.themes.light.geojsonType};
+        --geojson-type-invalid: ${this.themes.light.geojsonTypeInvalid};
       }
 
       ${darkRule} {
@@ -1754,6 +1883,9 @@ class GeoJsonEditor extends HTMLElement {
         --collapse-btn: ${this.themes.dark.collapseButton};
         --collapse-btn-bg: ${this.themes.dark.collapseButtonBg};
         --collapse-btn-border: ${this.themes.dark.collapseButtonBorder};
+        --geojson-key: ${this.themes.dark.geojsonKey};
+        --geojson-type: ${this.themes.dark.geojsonType};
+        --geojson-type-invalid: ${this.themes.dark.geojsonTypeInvalid};
       }
     `;
 
@@ -1797,7 +1929,10 @@ class GeoJsonEditor extends HTMLElement {
         jsonPunctuation: '#d4d4d4',
         collapseButton: '#c586c0',
         collapseButtonBg: '#3e3e42',
-        collapseButtonBorder: '#555'
+        collapseButtonBorder: '#555',
+        geojsonKey: '#c586c0',
+        geojsonType: '#4ec9b0',
+        geojsonTypeInvalid: '#f44747'
       },
       light: {
         background: '#ffffff',
@@ -1813,7 +1948,10 @@ class GeoJsonEditor extends HTMLElement {
         jsonPunctuation: '#333333',
         collapseButton: '#a31515',
         collapseButtonBg: '#e0e0e0',
-        collapseButtonBorder: '#999'
+        collapseButtonBorder: '#999',
+        geojsonKey: '#af00db',
+        geojsonType: '#267f99',
+        geojsonTypeInvalid: '#d32f2f'
       }
     };
 

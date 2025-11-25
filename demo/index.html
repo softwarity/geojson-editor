@@ -358,9 +358,9 @@
           <div class="control-group">
             <label for="frameworkSelect">Framework</label>
             <select id="frameworkSelect">
-              <option value="custom" selected>Custom (.dark / .light on component)</option>
-              <option value="tailwind">Tailwind CSS (html.dark)</option>
-              <option value="bootstrap">Bootstrap (html[data-bs-theme])</option>
+              <option value="custom" selected>Custom</option>
+              <option value="tailwind">Tailwind CSS</option>
+              <option value="bootstrap">Bootstrap</option>
             </select>
           </div>
           <div class="control-group">
@@ -371,11 +371,13 @@
             </select>
           </div>
         </div>
+        <div id="frameworkDescription" style="background: #e8f4fd; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.85rem; color: #1a5276; border-left: 3px solid #3498db;">
+          <strong>Custom:</strong> Dark mode is detected via a <code>.dark</code> class directly on the <code>&lt;geojson-editor&gt;</code> component itself.
+        </div>
         <div class="controls-grid">
           <div class="control-group">
             <label for="selectorPreview">Dark Selector</label>
             <input type="text" id="selectorPreview" value="dark-selector='.dark'" readonly style="font-size: 0.8rem; background: #e9e9e9;">
-            <small style="color: #666; font-size: 0.85rem;">CSS selector used to detect dark mode. Changes with framework selection.</small>
           </div>
         </div>
       </div>
@@ -392,23 +394,6 @@
       </div>
 
       <div class="controls-section">
-        <h4>Content Wrapper</h4>
-        <small style="color: #666; font-size: 0.85rem; display: block; margin-bottom: 0.75rem;">
-          Prefix and suffix wrap the editable content to form a complete JSON structure. They appear grayed out and cannot be edited.
-        </small>
-        <div class="controls-grid">
-          <div class="control-group">
-            <label for="prefixInput">Prefix</label>
-            <input type="text" id="prefixInput" value='{"type": "FeatureCollection", "features": ['>
-          </div>
-          <div class="control-group">
-            <label for="suffixInput">Suffix</label>
-            <input type="text" id="suffixInput" value="]}">
-          </div>
-        </div>
-      </div>
-
-      <div class="controls-section">
         <h4>Editor Options</h4>
         <div class="control-group" style="margin-bottom: 1rem;">
           <label for="placeholderInput">Placeholder Text</label>
@@ -416,6 +401,11 @@
           <small style="color: #666; font-size: 0.85rem;">Shown when editor is empty</small>
         </div>
         <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
+          <div class="checkbox-group">
+            <input type="checkbox" id="featureCollectionCheck" checked>
+            <label for="featureCollectionCheck">FeatureCollection mode</label>
+            <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— wrap features in FeatureCollection</small>
+          </div>
           <div class="checkbox-group">
             <input type="checkbox" id="autoFormatCheck" checked>
             <label for="autoFormatCheck">Auto-format JSON</label>
@@ -437,9 +427,7 @@
     <div class="output">
       <h3>Change Events:</h3>
       <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
-        The component emits <code>change</code> events with:
-        <strong>timestamp</strong>,
-        <strong>value</strong> (parsed JSON object, including prefix/suffix)
+        The component emits <code>change</code> events with <code>e.detail</code> containing the parsed GeoJSON object directly.
       </p>
       <pre id="eventLog">Waiting for change events...</pre>
     </div>
@@ -483,8 +471,6 @@
     const editor = document.getElementById('editor');
     const eventLog = document.getElementById('eventLog');
     const errorLog = document.getElementById('errorLog');
-    const prefixInput = document.getElementById('prefixInput');
-    const suffixInput = document.getElementById('suffixInput');
     const placeholderInput = document.getElementById('placeholderInput');
     const collapsedInput = document.getElementById('collapsedInput');
     const frameworkSelect = document.getElementById('frameworkSelect');
@@ -492,6 +478,7 @@
     const selectorPreview = document.getElementById('selectorPreview');
     const readonlyCheck = document.getElementById('readonlyCheck');
     const autoFormatCheck = document.getElementById('autoFormatCheck');
+    const featureCollectionCheck = document.getElementById('featureCollectionCheck');
     const themeEditor = document.getElementById('themeEditor');
     const themeTextarea = document.getElementById('themeTextarea');
     const htmlCode = document.getElementById('htmlCode');
@@ -507,12 +494,22 @@
       bootstrap: 'html[data-bs-theme=dark]'
     };
 
+    // Framework descriptions
+    const frameworkDescriptions = {
+      custom: '<strong>Custom:</strong> Dark mode is detected via a <code>.dark</code> class directly on the <code>&lt;geojson-editor&gt;</code> component itself.',
+      tailwind: '<strong>Tailwind CSS:</strong> Dark mode is detected via the <code>.dark</code> class on the <code>&lt;html&gt;</code> element, following Tailwind\'s dark mode convention.',
+      bootstrap: '<strong>Bootstrap:</strong> Dark mode is detected via the <code>data-bs-theme="dark"</code> attribute on the <code>&lt;html&gt;</code> element.'
+    };
+
+    const frameworkDescription = document.getElementById('frameworkDescription');
+
     // Handle framework selection
     frameworkSelect.addEventListener('change', (e) => {
       const preset = frameworkPresets[e.target.value];
       if (preset) {
         darkSelector = preset;
         selectorPreview.value = `dark-selector="${darkSelector}"`;
+        frameworkDescription.innerHTML = frameworkDescriptions[e.target.value];
         updateEditor();
         applyColorScheme(); // Apply the current color scheme to the new target
       }
@@ -591,11 +588,15 @@
 
     // Update editor attributes from inputs
     function updateEditor() {
-      editor.setAttribute('prefix', prefixInput.value);
-      editor.setAttribute('suffix', suffixInput.value);
       editor.setAttribute('placeholder', placeholderInput.value);
       editor.setAttribute('collapsed', collapsedInput.value);
       editor.setAttribute('dark-selector', darkSelector);
+
+      if (featureCollectionCheck.checked) {
+        editor.setAttribute('feature-collection', '');
+      } else {
+        editor.removeAttribute('feature-collection');
+      }
 
       if (autoFormatCheck.checked) {
         editor.setAttribute('auto-format', '');
@@ -614,19 +615,17 @@
 
     // Update HTML code display
     function updateHTMLCode() {
-      const prefix = prefixInput.value;
-      const suffix = suffixInput.value;
       const placeholder = placeholderInput.value;
       const collapsed = collapsedInput.value;
       const readonly = readonlyCheck.checked;
       const autoFormat = autoFormatCheck.checked;
+      const featureCollection = featureCollectionCheck.checked;
       const framework = frameworkSelect.value;
       const scheme = colorSchemeSelect.value;
 
       // Build component attributes
       let attrs = [];
-      if (prefix) attrs.push(`prefix='${prefix.replace(/'/g, "\\'")}'`);
-      if (suffix) attrs.push(`suffix='${suffix.replace(/'/g, "\\'")}'`);
+      if (featureCollection) attrs.push('feature-collection');
       if (collapsed && collapsed !== '[]') attrs.push(`collapsed='${collapsed.replace(/'/g, "\\'")}'`);
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (autoFormat) attrs.push('auto-format');
@@ -652,38 +651,37 @@
       code += '<head>\n';
       code += '  <meta charset="UTF-8">\n';
       code += '  <title>GeoJSON Editor</title>\n';
+      code += '  <!-- Load the GeoJSON Editor web component -->\n';
+      code += '  <script type="module" src="https://unpkg.com/@softwarity/geojson-editor"><\/script>\n';
       code += '</head>\n';
       code += '<body>\n';
       code += `  <geojson-editor${componentClass}\n`;
       code += '    ' + attrs.join('\n    ') + '\n';
       code += '  ></geojson-editor>\n\n';
       code += '  <script type="module">\n';
-      code += '    import \'@softwarity/geojson-editor\';\n\n';
       code += '    const editor = document.querySelector(\'geojson-editor\');\n\n';
-      code += '    // Valid JSON - emits parsed object\n';
+      code += '    // Valid GeoJSON - emits parsed object directly\n';
       code += '    editor.addEventListener(\'change\', (e) => {\n';
-      code += '      console.log(\'Timestamp:\', e.detail.timestamp);\n';
-      code += '      console.log(\'Parsed Value:\', e.detail.value);\n';
+      code += '      console.log(\'GeoJSON:\', e.detail);\n';
       code += '    });\n\n';
-      code += '    // Invalid JSON - emits error\n';
+      code += '    // Invalid JSON or GeoJSON validation error\n';
       code += '    editor.addEventListener(\'error\', (e) => {\n';
       code += '      console.error(\'Error:\', e.detail.error);\n';
-      code += '      console.log(\'Content:\', e.detail.content);\n';
       code += '    });\n\n';
 
       // Add theme toggle example based on framework
       if (framework === 'custom') {
-        code += '    // Toggle dark mode by adding/removing .dark class\n';
+        code += '    // Toggle dark mode by adding/removing .dark class on the component\n';
         code += '    function toggleDarkMode() {\n';
         code += '      editor.classList.toggle(\'dark\');\n';
         code += '    }\n';
       } else if (framework === 'tailwind') {
-        code += '    // Toggle dark mode (Tailwind style)\n';
+        code += '    // Toggle dark mode (Tailwind style - class on html)\n';
         code += '    function toggleDarkMode() {\n';
         code += '      document.documentElement.classList.toggle(\'dark\');\n';
         code += '    }\n';
       } else if (framework === 'bootstrap') {
-        code += '    // Toggle theme (Bootstrap style)\n';
+        code += '    // Toggle theme (Bootstrap style - attribute on html)\n';
         code += '    function toggleDarkMode() {\n';
         code += '      const html = document.documentElement;\n';
         code += '      const current = html.getAttribute(\'data-bs-theme\');\n';
@@ -714,10 +712,14 @@
     });
 
     // Listen to input changes
-    prefixInput.addEventListener('input', updateEditor);
-    suffixInput.addEventListener('input', updateEditor);
     placeholderInput.addEventListener('input', updateEditor);
     collapsedInput.addEventListener('input', updateEditor);
+
+    // Handle feature-collection mode toggle: reload sample data in appropriate format
+    featureCollectionCheck.addEventListener('change', () => {
+      updateEditor();
+      loadSampleData();
+    });
     readonlyCheck.addEventListener('change', updateEditor);
     autoFormatCheck.addEventListener('change', updateEditor);
 
@@ -762,84 +764,50 @@
       alert('Theme reset to default!');
     }
 
-    // Sample data
+    // Sample features array
+    const sampleFeaturesArray = [
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [166.4581, -22.2758] },
+        properties: { name: "Noumea Airport", type: "airport", color: "#3498db", category: "airport" }
+      },
+      {
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: [[166.4, -22.2], [167.0, -22.5], [167.5, -23.0]] },
+        properties: { name: "Flight Path", color: "#e74c3c", width: 2 }
+      },
+      {
+        type: "Feature",
+        geometry: {
+          type: "Polygon",
+          coordinates: [[[166.0, -22.0], [167.0, -22.0], [167.0, -23.0], [166.0, -23.0], [166.0, -22.0]]]
+        },
+        properties: { name: "Coverage Area", fill: "#2ecc71", stroke: "#27ae60", opacity: 0.5 }
+      }
+    ];
+
+    // Load sample data in appropriate format based on mode
     function loadSampleData() {
-      const sampleFeatures = `{
-  "type": "Feature",
-  "geometry": {
-    "type": "Point",
-    "coordinates": [166.4581, -22.2758]
-  },
-  "properties": {
-    "name": "Noumea Airport",
-    "color": "#3498db",
-    "category": "airport"
-  }
-},
-{
-  "type": "Feature",
-  "geometry": {
-    "type": "LineString",
-    "coordinates": [
-      [166.4, -22.2],
-      [167.0, -22.5],
-      [167.5, -23.0]
-    ]
-  },
-  "properties": {
-    "name": "Flight Path",
-    "color": "#e74c3c",
-    "width": 2
-  }
-},
-{
-  "type": "Feature",
-  "geometry": {
-    "type": "Polygon",
-    "coordinates": [
-      [
-        [166.0, -22.0],
-        [167.0, -22.0],
-        [167.0, -23.0],
-        [166.0, -23.0],
-        [166.0, -22.0]
-      ]
-    ]
-  },
-  "properties": {
-    "name": "Coverage Area",
-    "fill": "#2ecc71",
-    "stroke": "#27ae60",
-    "opacity": 0.5
-  }
-}`;
-      editor.setAttribute('value', sampleFeatures);
+      if (featureCollectionCheck.checked) {
+        // Feature-collection mode: just the features (comma-separated)
+        const featuresStr = sampleFeaturesArray.map(f => JSON.stringify(f, null, 2)).join(',\n');
+        editor.setAttribute('value', featuresStr);
+      } else {
+        // Standalone mode: full FeatureCollection
+        const featureCollection = { type: "FeatureCollection", features: sampleFeaturesArray };
+        editor.setAttribute('value', JSON.stringify(featureCollection, null, 2));
+      }
     }
 
     function clearEditor() {
-      const textarea = editor.shadowRoot.getElementById('textarea');
-      if (textarea) {
-        textarea.value = '';
-        editor.updateHighlight();
-      }
+      editor.setAttribute('value', '');
     }
 
     // Load initial sample automatically after component is ready
     customElements.whenDefined('geojson-editor').then(() => {
-      // Wait for next frame to ensure component is fully rendered
-      requestAnimationFrame(() => {
-        // Initialize editor with current input values
-        updateEditor();
-
-        // Wait one more frame to ensure CSS is generated
-        requestAnimationFrame(() => {
-          // Apply initial color scheme (will add .dark class to component for custom framework)
-          applyColorScheme();
-
-          // Load sample data
-          loadSampleData();
-        });
-      });
+      updateEditor();
+      applyColorScheme();
+      loadSampleData();
     });
   </script>
   <script type="module" src="../src/geojson-editor.js"></script>

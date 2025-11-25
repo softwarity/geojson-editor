@@ -6,36 +6,84 @@ A feature-rich, framework-agnostic Web Component for editing GeoJSON features wi
 
 ## Features
 
+- **GeoJSON-Aware Highlighting** - Distinct colors for GeoJSON keywords (`type`, `coordinates`, `geometry`, etc.)
+- **GeoJSON Type Validation** - Valid types (`Point`, `LineString`, `Polygon`, etc.) highlighted distinctly; invalid types (`LinearRing`, unknown types) shown with error styling (colors configurable via theme)
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
 - **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`)
 - **Color Picker** - Built-in color picker for color properties in left gutter
 - **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
-- **Auto-format** - Optional automatic JSON formatting
+- **Auto-format** - Optional automatic JSON formatting in real-time
+- **Readonly Mode** - Visual indicator with diagonal stripes when editing is disabled
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
 - **Smart Copy/Paste** - Copy includes expanded content even from collapsed nodes
-- **Prefix/Suffix** - Configurable text before/after editor content for wrapping (e.g., FeatureCollection wrapper)
+- **FeatureCollection Mode** - Optional mode to auto-wrap features in a FeatureCollection structure
 - **CSS Isolation** - Complete Shadow DOM isolation from external CSS frameworks
 
 ## Installation
+
+### Option 1: CDN (No build step required)
+
+Simply add a script tag to your HTML file:
+
+```html
+<!-- Using unpkg -->
+<script type="module" src="https://unpkg.com/@softwarity/geojson-editor"></script>
+
+<!-- Or using jsDelivr -->
+<script type="module" src="https://cdn.jsdelivr.net/npm/@softwarity/geojson-editor"></script>
+```
+
+You can also specify a version:
+
+```html
+<!-- Specific version -->
+<script type="module" src="https://unpkg.com/@softwarity/geojson-editor@1.0.0"></script>
+
+<!-- Latest minor/patch of v1 -->
+<script type="module" src="https://unpkg.com/@softwarity/geojson-editor@1"></script>
+```
+
+### Option 2: NPM (With bundler)
+
+If you're using a bundler (Vite, Webpack, Rollup, etc.):
 
 ```bash
 npm install @softwarity/geojson-editor
 ```
 
+Then import in your JavaScript:
+
+```javascript
+import '@softwarity/geojson-editor';
+```
+
 ## Usage
 
-### Basic Usage
+### Basic Usage (FeatureCollection mode)
 
 ```html
-<script type="module">
-  import '@softwarity/geojson-editor';
-</script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script type="module" src="https://unpkg.com/@softwarity/geojson-editor"></script>
+</head>
+<body>
+  <!-- User edits features, component wraps in FeatureCollection -->
+  <geojson-editor
+    feature-collection
+    collapsed='["coordinates"]'
+    placeholder="Enter GeoJSON features here..."
+  ></geojson-editor>
+</body>
+</html>
+```
 
+### Standalone Mode (Full GeoJSON)
+
+```html
+<!-- User edits a complete GeoJSON object (Feature or FeatureCollection) -->
 <geojson-editor
-  prefix='{"type": "FeatureCollection", "features": ['
-  suffix=']}'
-  collapsed='["coordinates"]'
-  placeholder="Enter GeoJSON features here..."
+  placeholder="Enter GeoJSON here..."
 ></geojson-editor>
 ```
 
@@ -43,8 +91,7 @@ npm install @softwarity/geojson-editor
 
 ```html
 <geojson-editor
-  prefix='{"type": "FeatureCollection", "features": ['
-  suffix=']}'
+  feature-collection
   dark-selector="html.dark"
   auto-format
 ></geojson-editor>
@@ -55,16 +102,15 @@ npm install @softwarity/geojson-editor
 ```javascript
 const editor = document.querySelector('geojson-editor');
 
-// Valid JSON emits change event with parsed object
+// Valid GeoJSON emits change event with parsed object directly
 editor.addEventListener('change', (e) => {
-  console.log('Timestamp:', e.detail.timestamp);
-  console.log('Parsed value:', e.detail.value); // Parsed JSON object
+  console.log('GeoJSON:', e.detail); // Parsed GeoJSON object
 });
 
-// Invalid JSON emits error event
+// Invalid JSON or GeoJSON validation error emits error event
 editor.addEventListener('error', (e) => {
   console.error('Error:', e.detail.error);
-  console.log('Content:', e.detail.content); // Raw content for debugging
+  console.log('Errors:', e.detail.errors); // Array of validation errors (if GeoJSON validation)
 });
 ```
 
@@ -72,14 +118,13 @@ editor.addEventListener('error', (e) => {
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `value` | `string` | `""` | Initial value (editor content only, without prefix/suffix) |
+| `value` | `string` | `""` | Initial editor content |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
 | `collapsed` | `string[]` (JSON) | `[]` | List of keys that start collapsed (all nodes are collapsible) |
 | `auto-format` | `boolean` | `false` | Auto-format JSON on input |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
-| `prefix` | `string` | `""` | Text displayed before editor (used for validation) |
-| `suffix` | `string` | `""` | Text displayed after editor (used for validation) |
+| `feature-collection` | `boolean` | `false` | When set, wraps editor content in a FeatureCollection for validation/events |
 
 ### Dark Selector Syntax
 
@@ -114,31 +159,39 @@ const value = editor.querySelector('#textarea').value; // via Shadow DOM
 
 ### `change`
 
-Fired when content changes and JSON is valid (debounced 150ms).
+Fired when content changes and GeoJSON is valid (debounced 150ms).
 
 ```javascript
 editor.addEventListener('change', (e) => {
-  console.log(e.detail.timestamp);  // ISO timestamp
-  console.log(e.detail.value);      // Parsed JSON object (includes prefix/suffix)
+  console.log(e.detail);  // Parsed GeoJSON object directly
 });
 ```
 
-**Event detail properties:**
+**Event detail:** The parsed GeoJSON object directly. In `feature-collection` mode, the wrapper is included.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `timestamp` | `string` | ISO timestamp of the change |
-| `value` | `object` | Parsed JSON object including prefix and suffix |
+**Example with FeatureCollection mode:**
+
+```html
+<geojson-editor feature-collection></geojson-editor>
+```
+
+```javascript
+// User edits features only, but change event includes the FeatureCollection wrapper
+editor.addEventListener('change', (e) => {
+  console.log(e.detail);
+  // → { type: "FeatureCollection", features: [{ type: "Feature", ... }] }
+});
+```
 
 ### `error`
 
-Fired when content changes but JSON is invalid (debounced 150ms).
+Fired when content changes but JSON is invalid or GeoJSON validation fails (debounced 150ms).
 
 ```javascript
 editor.addEventListener('error', (e) => {
-  console.error(e.detail.error);    // Error message
-  console.log(e.detail.content);    // Raw content for debugging
-  console.log(e.detail.timestamp);  // ISO timestamp
+  console.error(e.detail.error);   // Error message
+  console.log(e.detail.errors);    // Array of validation errors (GeoJSON validation only)
+  console.log(e.detail.content);   // Raw content for debugging
 });
 ```
 
@@ -146,26 +199,13 @@ editor.addEventListener('error', (e) => {
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `timestamp` | `string` | ISO timestamp of the change |
-| `error` | `string` | Error message from JSON.parse |
+| `error` | `string` | Error message (JSON parse error or GeoJSON validation summary) |
+| `errors` | `string[]` | Array of validation errors with paths (GeoJSON validation only) |
 | `content` | `string` | Raw editor content (for debugging) |
 
-**Example with custom prefix/suffix:**
-
-```html
-<geojson-editor
-  prefix='{"type": "FeatureCollection", "features": ['
-  suffix=']}'
-></geojson-editor>
-```
-
-```javascript
-editor.addEventListener('change', (e) => {
-  console.log(e.detail.value);
-  // → { type: "FeatureCollection", features: [{ type: "Feature", ... }] }
-  // Already parsed as JSON object
-});
-```
+**GeoJSON validation errors include:**
+- Invalid types (e.g., `"LinearRing"`)
+- Unknown types (any `type` value not in the GeoJSON specification)
 
 ## Styling
 
