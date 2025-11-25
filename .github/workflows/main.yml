@@ -38,6 +38,7 @@ jobs:
         with:
           files: coverage/lcov.info
           fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
       - name: Build package
         run: npm run build
