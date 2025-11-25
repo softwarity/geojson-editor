@@ -10,9 +10,6 @@
   <a href="https://www.npmjs.com/package/@softwarity/geojson-editor">
     <img src="https://img.shields.io/npm/v/@softwarity/geojson-editor?color=blue&label=npm" alt="npm version">
   </a>
-  <a href="https://www.npmjs.com/package/@softwarity/geojson-editor">
-    <img src="https://img.shields.io/npm/dm/@softwarity/geojson-editor?color=green" alt="npm downloads">
-  </a>
   <a href="https://bundlephobia.com/package/@softwarity/geojson-editor">
     <img src="https://img.shields.io/bundlephobia/minzip/@softwarity/geojson-editor?label=size" alt="bundle size">
   </a>
