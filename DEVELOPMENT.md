@@ -74,7 +74,7 @@ The demo page (`demo/index.html`) includes comprehensive examples:
 1. Start dev server: `npm run dev`
 2. Open `http://localhost:5173`
 3. Test features:
-   - Mode switching (JSON/Array)
+   - FeatureCollection mode
    - Color scheme (Dark/Light)
    - Readonly mode
    - Auto-format
@@ -110,8 +110,8 @@ cat > index.html << 'EOF'
   <h1>Testing @softwarity/geojson-editor</h1>
 
   <geojson-editor
-    mode="array"
-    placeholder="Enter GeoJSON..."
+    feature-collection
+    placeholder="Enter GeoJSON features..."
     auto-format
   ></geojson-editor>
 
@@ -119,9 +119,15 @@ cat > index.html << 'EOF'
     import '@softwarity/geojson-editor';
 
     const editor = document.querySelector('geojson-editor');
+
+    // Valid GeoJSON emits change event with parsed object directly
     editor.addEventListener('change', (e) => {
-      console.log('Valid:', e.detail.valid);
-      console.log('Value:', e.detail.value);
+      console.log('GeoJSON:', e.detail); // Parsed GeoJSON object
+    });
+
+    // Invalid JSON/GeoJSON emits error event
+    editor.addEventListener('error', (e) => {
+      console.error('Error:', e.detail.error);
     });
   </script>
 </body>
@@ -213,11 +219,17 @@ Edit `demo/index.html` to test edge cases:
 <!-- Test readonly -->
 <geojson-editor readonly></geojson-editor>
 
-<!-- Test with prefix/suffix -->
+<!-- Test FeatureCollection mode with auto-format -->
 <geojson-editor
-  mode="array"
-  prefix="const features = ["
-  suffix="];"
+  feature-collection
+  auto-format
+  placeholder="Enter GeoJSON features..."
+></geojson-editor>
+
+<!-- Test with dark theme detection (Tailwind style) -->
+<geojson-editor
+  dark-selector="html.dark"
+  feature-collection
 ></geojson-editor>
 ```
 
@@ -284,10 +296,11 @@ Before submitting changes, verify:
 - [ ] `dist/geojson-editor.js` exists and is not empty
 - [ ] No console errors in browser DevTools
 - [ ] Works in both dark and light themes
-- [ ] Works in both JSON and array modes
+- [ ] FeatureCollection mode works correctly
 - [ ] Auto-format works correctly
 - [ ] Readonly mode works
-- [ ] Change events fire correctly
+- [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
+- [ ] `error` events fire with invalid JSON/GeoJSON
 
 ## Making Changes
 

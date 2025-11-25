@@ -41,9 +41,9 @@ class GeoJsonEditor extends HTMLElement {
       jsonBoolean: '#569cd6',
       jsonNull: '#569cd6',
       jsonPunctuation: '#d4d4d4',
-      collapseButton: '#c586c0',
-      collapseButtonBg: '#3e3e42',
-      collapseButtonBorder: '#555',
+      controlColor: '#c586c0',
+      controlBg: '#3e3e42',
+      controlBorder: '#555',
       geojsonKey: '#c586c0',
       geojsonType: '#4ec9b0',
       geojsonTypeInvalid: '#f44747',
@@ -61,9 +61,9 @@ class GeoJsonEditor extends HTMLElement {
       jsonBoolean: '#0000ff',
       jsonNull: '#0000ff',
       jsonPunctuation: '#333333',
-      collapseButton: '#a31515',
-      collapseButtonBg: '#e0e0e0',
-      collapseButtonBorder: '#999',
+      controlColor: '#a31515',
+      controlBg: '#e0e0e0',
+      controlBorder: '#999',
       geojsonKey: '#af00db',
       geojsonType: '#267f99',
       geojsonTypeInvalid: '#d32f2f',
@@ -106,14 +106,11 @@ class GeoJsonEditor extends HTMLElement {
     // Setup theme CSS
     this.updateThemeCSS();
 
-    // Initial highlight
+    // Initialize textarea with value attribute (attributeChangedCallback fires before render)
     if (this.value) {
-      this.updateHighlight();
-      // Auto-collapse coordinates nodes after initial rendering
-      requestAnimationFrame(() => {
-        this.applyAutoCollapsed();
-      });
+      this.updateValue(this.value);
     }
+    this.updatePlaceholderContent();
   }
 
   attributeChangedCallback(name, oldValue, newValue) {
@@ -124,8 +121,7 @@ class GeoJsonEditor extends HTMLElement {
     } else if (name === 'readonly') {
       this.updateReadonly();
     } else if (name === 'placeholder') {
-      const textarea = this.shadowRoot.querySelector('textarea');
-      if (textarea) textarea.placeholder = newValue || '';
+      this.updatePlaceholderContent();
     } else if (name === 'dark-selector') {
       this.updateThemeCSS();
     } else if (name === 'feature-collection') {
@@ -284,10 +280,10 @@ class GeoJsonEditor extends HTMLElement {
         .collapse-button {
           width: 12px;
           height: 12px;
-          background: var(--collapse-btn-bg);
-          border: 1px solid var(--collapse-btn-border);
+          background: var(--control-bg);
+          border: 1px solid var(--control-border);
           border-radius: 2px;
-          color: var(--collapse-btn);
+          color: var(--control-color);
           font-size: 8px;
           font-weight: bold;
           cursor: pointer;
@@ -300,8 +296,8 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         .collapse-button:hover {
-          background: var(--collapse-btn-bg);
-          border-color: var(--collapse-btn);
+          background: var(--control-bg);
+          border-color: var(--control-color);
           transform: scale(1.1);
         }
 
@@ -383,12 +379,27 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         textarea::placeholder {
-          color: #6a6a6a;
+          color: transparent;
+        }
+
+        .placeholder-layer {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          padding: 8px 12px;
           font-family: 'Courier New', Courier, monospace;
           font-size: 13px;
           font-weight: normal;
           font-style: normal;
-          opacity: 1;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          color: #6a6a6a;
+          pointer-events: none;
+          z-index: 0;
+          overflow: hidden;
         }
 
         textarea:disabled {
@@ -466,23 +477,29 @@ class GeoJsonEditor extends HTMLElement {
           border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        /* Scrollbar styling */
+        /* Scrollbar styling - WebKit (Chrome, Safari, Edge) */
         textarea::-webkit-scrollbar {
           width: 10px;
           height: 10px;
         }
 
         textarea::-webkit-scrollbar-track {
-          background: #1e1e1e;
+          background: var(--control-bg);
         }
 
         textarea::-webkit-scrollbar-thumb {
-          background: #424242;
+          background: var(--control-border);
           border-radius: 5px;
         }
 
         textarea::-webkit-scrollbar-thumb:hover {
-          background: #4e4e4e;
+          background: var(--control-color);
+        }
+
+        /* Scrollbar styling - Firefox */
+        textarea {
+          scrollbar-width: thin;
+          scrollbar-color: var(--control-border) var(--control-bg);
         }
       </style>
     `;
@@ -494,6 +511,7 @@ class GeoJsonEditor extends HTMLElement {
           <div class="gutter-content" id="gutterContent"></div>
         </div>
         <div class="editor-content">
+          <div class="placeholder-layer" id="placeholderLayer">${this.escapeHtml(this.placeholder)}</div>
           <div class="highlight-layer" id="highlightLayer"></div>
           <textarea
             id="textarea"
@@ -501,7 +519,6 @@ class GeoJsonEditor extends HTMLElement {
             autocomplete="off"
             autocorrect="off"
             autocapitalize="off"
-            placeholder="${this.placeholder}"
           ></textarea>
         </div>
       </div>
@@ -524,6 +541,9 @@ class GeoJsonEditor extends HTMLElement {
 
     // Input handling with debounced highlight and auto-format
     textarea.addEventListener('input', () => {
+      // Update placeholder visibility immediately (no debounce)
+      this.updatePlaceholderVisibility();
+
       clearTimeout(this.highlightTimer);
       this.highlightTimer = setTimeout(() => {
         // Auto-format if enabled and JSON is valid
@@ -542,6 +562,7 @@ class GeoJsonEditor extends HTMLElement {
 
       // Use a short delay to let the paste complete
       setTimeout(() => {
+        this.updatePlaceholderVisibility();
         // Auto-format if enabled and JSON is valid
         if (this.autoFormat) {
           this.autoFormatContentWithCursor();
@@ -604,6 +625,30 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
+  escapeHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  updatePlaceholderVisibility() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    const placeholderLayer = this.shadowRoot.getElementById('placeholderLayer');
+    if (textarea && placeholderLayer) {
+      placeholderLayer.style.display = textarea.value ? 'none' : 'block';
+    }
+  }
+
+  updatePlaceholderContent() {
+    const placeholderLayer = this.shadowRoot.getElementById('placeholderLayer');
+    if (placeholderLayer) {
+      placeholderLayer.textContent = this.placeholder;
+    }
+    this.updatePlaceholderVisibility();
+  }
+
   updateValue(newValue) {
     const textarea = this.shadowRoot.getElementById('textarea');
     if (textarea && textarea.value !== newValue) {
@@ -644,6 +689,7 @@ class GeoJsonEditor extends HTMLElement {
       }
 
       this.updateHighlight();
+      this.updatePlaceholderVisibility();
 
       // Auto-collapse coordinates nodes after value is set
       if (textarea.value) {
@@ -1359,6 +1405,7 @@ class GeoJsonEditor extends HTMLElement {
       textarea.value = value.substring(0, start) + value.substring(end);
       textarea.selectionStart = textarea.selectionEnd = start;
       this.updateHighlight();
+      this.updatePlaceholderVisibility();
       this.emitChange();
     }
   }
@@ -1757,9 +1804,9 @@ class GeoJsonEditor extends HTMLElement {
         --json-boolean: ${this.themes.light.jsonBoolean};
         --json-null: ${this.themes.light.jsonNull};
         --json-punct: ${this.themes.light.jsonPunctuation};
-        --collapse-btn: ${this.themes.light.collapseButton};
-        --collapse-btn-bg: ${this.themes.light.collapseButtonBg};
-        --collapse-btn-border: ${this.themes.light.collapseButtonBorder};
+        --control-color: ${this.themes.light.controlColor};
+        --control-bg: ${this.themes.light.controlBg};
+        --control-border: ${this.themes.light.controlBorder};
         --geojson-key: ${this.themes.light.geojsonKey};
         --geojson-type: ${this.themes.light.geojsonType};
         --geojson-type-invalid: ${this.themes.light.geojsonTypeInvalid};
@@ -1778,9 +1825,9 @@ class GeoJsonEditor extends HTMLElement {
         --json-boolean: ${this.themes.dark.jsonBoolean};
         --json-null: ${this.themes.dark.jsonNull};
         --json-punct: ${this.themes.dark.jsonPunctuation};
-        --collapse-btn: ${this.themes.dark.collapseButton};
-        --collapse-btn-bg: ${this.themes.dark.collapseButtonBg};
-        --collapse-btn-border: ${this.themes.dark.collapseButtonBorder};
+        --control-color: ${this.themes.dark.controlColor};
+        --control-bg: ${this.themes.dark.controlBg};
+        --control-border: ${this.themes.dark.controlBorder};
         --geojson-key: ${this.themes.dark.geojsonKey};
         --geojson-type: ${this.themes.dark.geojsonType};
         --geojson-type-invalid: ${this.themes.dark.geojsonTypeInvalid};

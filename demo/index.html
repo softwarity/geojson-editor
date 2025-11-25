@@ -117,7 +117,8 @@
     .control-group label { font-weight: 600; color: var(--text-secondary); font-size: 0.9rem; }
 
     .control-group select,
-    .control-group input[type="text"] {
+    .control-group input[type="text"],
+    .control-group textarea {
       padding: 0.5rem;
       border: 1px solid var(--border-default);
       border-radius: 4px;
@@ -127,7 +128,8 @@
       color: var(--text-secondary);
     }
     .control-group select:focus,
-    .control-group input[type="text"]:focus {
+    .control-group input[type="text"]:focus,
+    .control-group textarea:focus {
       outline: none;
       border-color: var(--accent-blue);
     }
@@ -357,8 +359,11 @@
       <div class="controls-section">
         <h4>Editor Options</h4>
         <div class="control-group" style="margin-bottom: 1rem;">
-          <label for="placeholderInput">Placeholder Text</label>
-          <input type="text" id="placeholderInput" value="Enter GeoJSON features here...">
+          <label for="placeholderInput">Placeholder Text (supports multi-line)</label>
+          <textarea id="placeholderInput" rows="4">Enter GeoJSON features here...
+
+Example:
+{ "type": "Feature", "geometry": {...} }</textarea>
           <small style="color: #666; font-size: 0.85rem;">Shown when editor is empty</small>
         </div>
         <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
@@ -470,7 +475,7 @@
           gutterBackground: '#252526', gutterBorder: '#3e3e42',
           jsonKey: '#9cdcfe', jsonString: '#ce9178', jsonNumber: '#b5cea8',
           jsonBoolean: '#569cd6', jsonNull: '#569cd6', jsonPunctuation: '#d4d4d4',
-          collapseButton: '#c586c0', collapseButtonBg: '#3e3e42', collapseButtonBorder: '#555',
+          controlColor: '#c586c0', controlBg: '#3e3e42', controlBorder: '#555',
           geojsonKey: '#c586c0', geojsonType: '#4ec9b0', geojsonTypeInvalid: '#f44747', jsonKeyInvalid: '#f44747'
         },
         light: {
@@ -478,7 +483,7 @@
           gutterBackground: '#f5f5f5', gutterBorder: '#ddd',
           jsonKey: '#0000ff', jsonString: '#a31515', jsonNumber: '#098658',
           jsonBoolean: '#0000ff', jsonNull: '#0000ff', jsonPunctuation: '#333333',
-          collapseButton: '#a31515', collapseButtonBg: '#e0e0e0', collapseButtonBorder: '#999',
+          controlColor: '#a31515', controlBg: '#e0e0e0', controlBorder: '#999',
           geojsonKey: '#af00db', geojsonType: '#267f99', geojsonTypeInvalid: '#d32f2f', jsonKeyInvalid: '#d32f2f'
         }
       },
@@ -488,7 +493,7 @@
           gutterBackground: '#161b22', gutterBorder: '#30363d',
           jsonKey: '#79c0ff', jsonString: '#a5d6ff', jsonNumber: '#79c0ff',
           jsonBoolean: '#ff7b72', jsonNull: '#ff7b72', jsonPunctuation: '#c9d1d9',
-          collapseButton: '#d2a8ff', collapseButtonBg: '#30363d', collapseButtonBorder: '#484f58',
+          controlColor: '#d2a8ff', controlBg: '#30363d', controlBorder: '#484f58',
           geojsonKey: '#d2a8ff', geojsonType: '#7ee787', geojsonTypeInvalid: '#f85149', jsonKeyInvalid: '#f85149'
         },
         light: {
@@ -496,7 +501,7 @@
           gutterBackground: '#f6f8fa', gutterBorder: '#d0d7de',
           jsonKey: '#0550ae', jsonString: '#0a3069', jsonNumber: '#0550ae',
           jsonBoolean: '#cf222e', jsonNull: '#cf222e', jsonPunctuation: '#24292f',
-          collapseButton: '#8250df', collapseButtonBg: '#eaeef2', collapseButtonBorder: '#afb8c1',
+          controlColor: '#8250df', controlBg: '#eaeef2', controlBorder: '#afb8c1',
           geojsonKey: '#8250df', geojsonType: '#116329', geojsonTypeInvalid: '#cf222e', jsonKeyInvalid: '#cf222e'
         }
       },
@@ -506,7 +511,7 @@
           gutterBackground: '#21252b', gutterBorder: '#3e4451',
           jsonKey: '#e06c75', jsonString: '#98c379', jsonNumber: '#d19a66',
           jsonBoolean: '#d19a66', jsonNull: '#d19a66', jsonPunctuation: '#abb2bf',
-          collapseButton: '#c678dd', collapseButtonBg: '#3e4451', collapseButtonBorder: '#4b5263',
+          controlColor: '#c678dd', controlBg: '#3e4451', controlBorder: '#4b5263',
           geojsonKey: '#c678dd', geojsonType: '#56b6c2', geojsonTypeInvalid: '#e06c75', jsonKeyInvalid: '#e06c75'
         },
         light: {
@@ -514,7 +519,7 @@
           gutterBackground: '#f0f0f0', gutterBorder: '#e0e0e0',
           jsonKey: '#e45649', jsonString: '#50a14f', jsonNumber: '#986801',
           jsonBoolean: '#986801', jsonNull: '#986801', jsonPunctuation: '#383a42',
-          collapseButton: '#a626a4', collapseButtonBg: '#e0e0e0', collapseButtonBorder: '#999',
+          controlColor: '#a626a4', controlBg: '#e0e0e0', controlBorder: '#999',
           geojsonKey: '#a626a4', geojsonType: '#0184bc', geojsonTypeInvalid: '#e45649', jsonKeyInvalid: '#e45649'
         }
       },
@@ -524,7 +529,7 @@
           gutterBackground: '#073642', gutterBorder: '#094652',
           jsonKey: '#268bd2', jsonString: '#2aa198', jsonNumber: '#d33682',
           jsonBoolean: '#cb4b16', jsonNull: '#cb4b16', jsonPunctuation: '#839496',
-          collapseButton: '#6c71c4', collapseButtonBg: '#073642', collapseButtonBorder: '#586e75',
+          controlColor: '#6c71c4', controlBg: '#073642', controlBorder: '#586e75',
           geojsonKey: '#6c71c4', geojsonType: '#859900', geojsonTypeInvalid: '#dc322f', jsonKeyInvalid: '#dc322f'
         },
         light: {
@@ -532,7 +537,7 @@
           gutterBackground: '#eee8d5', gutterBorder: '#e0dbc8',
           jsonKey: '#268bd2', jsonString: '#2aa198', jsonNumber: '#d33682',
           jsonBoolean: '#cb4b16', jsonNull: '#cb4b16', jsonPunctuation: '#657b83',
-          collapseButton: '#6c71c4', collapseButtonBg: '#eee8d5', collapseButtonBorder: '#93a1a1',
+          controlColor: '#6c71c4', controlBg: '#eee8d5', controlBorder: '#93a1a1',
           geojsonKey: '#6c71c4', geojsonType: '#859900', geojsonTypeInvalid: '#dc322f', jsonKeyInvalid: '#dc322f'
         }
       }
