@@ -1,6 +1,12 @@
-# GeoJSON Editor Web Component
+<p align="center">
+  <a href="https://www.softwarity.io/">
+    <img src="https://www.softwarity.io/img/softwarity.svg" alt="Softwarity" height="60">
+  </a>
+</p>
 
-A feature-rich, framework-agnostic Web Component for editing GeoJSON features with syntax highlighting, collapsible nodes, and integrated color picker.
+# @softwarity/geojson-editor
+
+A feature-rich, framework-agnostic **Web Component** for editing GeoJSON features with syntax highlighting, collapsible nodes, and integrated color picker.
 
 **[🚀 Try the Live Demo](https://softwarity.github.io/geojson-editor/)**
 

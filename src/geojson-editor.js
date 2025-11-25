@@ -30,8 +30,6 @@ class GeoJsonEditor extends HTMLElement {
     return ['readonly', 'value', 'placeholder', 'auto-format', 'dark-selector', 'feature-collection'];
   }
 
-  // Nodes that are always collapsed by default when content is loaded
-  static AUTO_COLLAPSED_KEYS = ['coordinates'];
 
   // Default theme values
   static DEFAULT_THEMES = {
@@ -216,7 +214,7 @@ class GeoJsonEditor extends HTMLElement {
           position: relative;
           width: 100%;
           flex: 1;
-          background: var(--bg-color, #1e1e1e);
+          background: var(--bg-color);
           display: flex;
           font-family: 'Courier New', Courier, monospace;
           font-size: 13px;
@@ -226,8 +224,8 @@ class GeoJsonEditor extends HTMLElement {
         .gutter {
           width: 24px;
           height: 100%;
-          background: var(--gutter-bg, #252526);
-          border-right: 1px solid var(--gutter-border, #3e3e42);
+          background: var(--gutter-bg);
+          border-right: 1px solid var(--gutter-border);
           overflow: hidden;
           flex-shrink: 0;
           position: relative;
@@ -269,10 +267,10 @@ class GeoJsonEditor extends HTMLElement {
         .collapse-button {
           width: 12px;
           height: 12px;
-          background: var(--collapse-btn-bg, #3e3e42);
-          border: 1px solid var(--collapse-btn-border, #555);
+          background: var(--collapse-btn-bg);
+          border: 1px solid var(--collapse-btn-border);
           border-radius: 2px;
-          color: var(--collapse-btn, #c586c0);
+          color: var(--collapse-btn);
           font-size: 8px;
           font-weight: bold;
           cursor: pointer;
@@ -285,8 +283,8 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         .collapse-button:hover {
-          background: var(--collapse-btn-bg, #4e4e4e);
-          border-color: var(--collapse-btn, #c586c0);
+          background: var(--collapse-btn-bg);
+          border-color: var(--collapse-btn);
           transform: scale(1.1);
         }
 
@@ -330,7 +328,7 @@ class GeoJsonEditor extends HTMLElement {
           overflow: auto;
           pointer-events: none;
           z-index: 1;
-          color: var(--text-color, #d4d4d4);
+          color: var(--text-color);
         }
 
         .highlight-layer::-webkit-scrollbar {
@@ -349,7 +347,7 @@ class GeoJsonEditor extends HTMLElement {
           outline: none;
           background: transparent;
           color: transparent;
-          caret-color: var(--caret-color, #fff);
+          caret-color: var(--caret-color);
           font-family: 'Courier New', Courier, monospace;
           font-size: 13px;
           font-weight: normal;
@@ -383,55 +381,55 @@ class GeoJsonEditor extends HTMLElement {
 
         /* Syntax highlighting colors */
         .json-key {
-          color: var(--json-key, #9cdcfe);
+          color: var(--json-key);
         }
 
         .json-string {
-          color: var(--json-string, #ce9178);
+          color: var(--json-string);
         }
 
         .json-number {
-          color: var(--json-number, #b5cea8);
+          color: var(--json-number);
         }
 
         .json-boolean {
-          color: var(--json-boolean, #569cd6);
+          color: var(--json-boolean);
         }
 
         .json-null {
-          color: var(--json-null, #569cd6);
+          color: var(--json-null);
         }
 
         .json-punctuation {
-          color: var(--json-punct, #d4d4d4);
+          color: var(--json-punct);
         }
 
         /* GeoJSON-specific highlighting */
         .geojson-key {
-          color: var(--geojson-key, #c586c0);
+          color: var(--geojson-key);
           font-weight: 600;
         }
 
         .geojson-type {
-          color: var(--geojson-type, #4ec9b0);
+          color: var(--geojson-type);
           font-weight: 600;
         }
 
         .geojson-type-invalid {
-          color: var(--geojson-type-invalid, #f44747);
+          color: var(--geojson-type-invalid);
           font-weight: 600;
         }
 
         .json-key-invalid {
-          color: var(--json-key-invalid, #f44747);
+          color: var(--json-key-invalid);
         }
 
         /* Prefix and suffix styling */
         .editor-prefix,
         .editor-suffix {
           padding: 4px 12px;
-          color: var(--text-color, #d4d4d4);
-          background: var(--bg-color, #1e1e1e);
+          color: var(--text-color);
+          background: var(--bg-color);
           user-select: none;
           white-space: pre-wrap;
           word-wrap: break-word;
@@ -725,25 +723,8 @@ class GeoJsonEditor extends HTMLElement {
             isCollapsed: true
           });
         } else {
-          // Not collapsed - check if it closes on same line
-          const openBracket = nodeMatch[3];
-          const closeBracket = openBracket === '{' ? '}' : ']';
-          const bracketPos = line.indexOf(openBracket);
-          const restOfLine = line.substring(bracketPos + 1);
-          let depth = 1;
-          let closesOnSameLine = false;
-
-          for (const char of restOfLine) {
-            if (char === openBracket) depth++;
-            if (char === closeBracket) depth--;
-            if (depth === 0) {
-              closesOnSameLine = true;
-              break;
-            }
-          }
-
-          // Only add toggle button if it doesn't close on same line
-          if (!closesOnSameLine) {
+          // Not collapsed - only add toggle button if it doesn't close on same line
+          if (!this.bracketClosesOnSameLine(line, nodeMatch[3])) {
             toggles.push({
               line: lineIndex,
               nodeKey,
@@ -755,7 +736,7 @@ class GeoJsonEditor extends HTMLElement {
 
       // Highlight the line with context
       const context = contextMap.get(lineIndex);
-      highlightedLines.push(this.highlightLine(line, context));
+      highlightedLines.push(this.highlightSyntax(line, context));
     });
 
     return {
@@ -763,11 +744,6 @@ class GeoJsonEditor extends HTMLElement {
       colors,
       toggles
     };
-  }
-
-  highlightLine(line, context) {
-    // Highlight syntax with context for validation
-    return this.highlightSyntax(line, context);
   }
 
   // GeoJSON type constants
@@ -1013,22 +989,11 @@ class GeoJsonEditor extends HTMLElement {
       const openBracket = match[3];
       const closeBracket = openBracket === '{' ? '}' : ']';
 
-      // Check if bracket closes on same line
-      const bracketPos = currentLine.indexOf(openBracket);
-      const restOfLine = currentLine.substring(bracketPos + 1);
-      let depth = 1;
-
-      for (const char of restOfLine) {
-        if (char === openBracket) depth++;
-        if (char === closeBracket) depth--;
-        if (depth === 0) {
-          // Closes on same line - can't be collapsed
-          return;
-        }
-      }
+      // Check if bracket closes on same line - can't collapse
+      if (this.bracketClosesOnSameLine(currentLine, openBracket)) return;
 
       // Find closing bracket in following lines
-      depth = 1;
+      let depth = 1;
       let endLine = line;
       const content = [];
 
@@ -1075,7 +1040,6 @@ class GeoJsonEditor extends HTMLElement {
     const textarea = this.shadowRoot.getElementById('textarea');
     if (!textarea || !textarea.value) return;
 
-    const autoCollapsedKeys = GeoJsonEditor.AUTO_COLLAPSED_KEYS;
     const lines = textarea.value.split('\n');
 
     // Iterate backwards to avoid index issues when collapsing
@@ -1086,30 +1050,14 @@ class GeoJsonEditor extends HTMLElement {
       if (match) {
         const nodeKey = match[2];
 
-        // Check if this node should be auto-collapsed (coordinates)
-        if (autoCollapsedKeys.includes(nodeKey)) {
+        // Check if this node should be auto-collapsed (coordinates only)
+        if (nodeKey === 'coordinates') {
           const indent = match[1];
           const openBracket = match[3];
           const closeBracket = openBracket === '{' ? '}' : ']';
 
-          // Check if bracket closes on same line (skip if so)
-          const bracketPos = line.indexOf(openBracket);
-          const restOfLine = line.substring(bracketPos + 1);
-          let checkDepth = 1;
-          let closesOnSameLine = false;
-
-          for (const char of restOfLine) {
-            if (char === openBracket) checkDepth++;
-            if (char === closeBracket) checkDepth--;
-            if (checkDepth === 0) {
-              closesOnSameLine = true;
-              break;
-            }
-          }
-
-          if (closesOnSameLine) {
-            continue; // Skip this node, go to next line in main loop
-          }
+          // Skip if bracket closes on same line
+          if (this.bracketClosesOnSameLine(line, openBracket)) continue;
 
           // Find closing bracket in following lines
           let depth = 1;
@@ -1492,6 +1440,21 @@ class GeoJsonEditor extends HTMLElement {
     return errors;
   }
 
+  // Helper: Check if bracket closes on same line
+  bracketClosesOnSameLine(line, openBracket) {
+    const closeBracket = openBracket === '{' ? '}' : ']';
+    const bracketPos = line.indexOf(openBracket);
+    if (bracketPos === -1) return false;
+    const restOfLine = line.substring(bracketPos + 1);
+    let depth = 1;
+    for (const char of restOfLine) {
+      if (char === openBracket) depth++;
+      if (char === closeBracket) depth--;
+      if (depth === 0) return true;
+    }
+    return false;
+  }
+
   // Helper: Expand all collapsed markers and return expanded content
   expandAllCollapsed(content) {
     while (content.includes('{...}') || content.includes('[...]')) {
@@ -1667,24 +1630,8 @@ class GeoJsonEditor extends HTMLElement {
           const openBracket = match[3];
           const closeBracket = openBracket === '{' ? '}' : ']';
 
-          // Check if closes on same line
-          const bracketPos = line.indexOf(openBracket);
-          const restOfLine = line.substring(bracketPos + 1);
-          let checkDepth = 1;
-          let closesOnSameLine = false;
-
-          for (const char of restOfLine) {
-            if (char === openBracket) checkDepth++;
-            if (char === closeBracket) checkDepth--;
-            if (checkDepth === 0) {
-              closesOnSameLine = true;
-              break;
-            }
-          }
-
-          if (closesOnSameLine) {
-            continue;
-          }
+          // Skip if closes on same line
+          if (this.bracketClosesOnSameLine(line, openBracket)) continue;
 
           // Find closing bracket
           let depth = 1;

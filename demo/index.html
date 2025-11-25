@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GeoJSON Editor Demo</title>
+  <title>@softwarity/geojson-editor - Demo</title>
   <style>
     :root {
       --bg-canvas: #0d1117;
@@ -22,6 +22,21 @@
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* Palette icon using CSS mask */
+    .icon-palette {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background-color: currentColor;
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-156t88-127Q256-817 330-848.5T488-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T880-518q0 115-70 176.5T640-280h-74q-9 0-12.5 5t-3.5 11q0 12 15 34.5t15 51.5q0 50-27.5 74T480-80Zm0-400Zm-220 40q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm120-160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm200 0q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm120 160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17ZM480-160q9 0 14.5-5t5.5-13q0-14-15-33t-15-57q0-42 29-67t71-25h70q66 0 113-38.5T800-518q0-121-92.5-201.5T488-800q-136 0-232 93t-96 227q0 133 93.5 226.5T480-160Z'/%3E%3C/svg%3E");
+      mask-size: contain;
+      mask-repeat: no-repeat;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='M480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-83 32.5-156t88-127Q256-817 330-848.5T488-880q80 0 151 27.5t124.5 76q53.5 48.5 85 115T880-518q0 115-70 176.5T640-280h-74q-9 0-12.5 5t-3.5 11q0 12 15 34.5t15 51.5q0 50-27.5 74T480-80Zm0-400Zm-220 40q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm120-160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm200 0q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17Zm120 160q26 0 43-17t17-43q0-26-17-43t-43-17q-26 0-43 17t-17 43q0 26 17 43t43 17ZM480-160q9 0 14.5-5t5.5-13q0-14-15-33t-15-57q0-42 29-67t71-25h70q66 0 113-38.5T800-518q0-121-92.5-201.5T488-800q-136 0-232 93t-96 227q0 133 93.5 226.5T480-160Z'/%3E%3C/svg%3E");
+      -webkit-mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+    }
+    .icon-palette.large { width: 20px; height: 20px; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -243,20 +258,35 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>GeoJSON Editor Component Demo</h1>
-      <a href="https://github.com/softwarity/geojson-editor" target="_blank" rel="noopener noreferrer" class="github-link">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-        </svg>
-        View on GitHub
-      </a>
+      <div style="display: flex; align-items: center; gap: 1rem;">
+        <a href="https://www.softwarity.io/" target="_blank" rel="noopener noreferrer" title="Softwarity">
+          <img src="https://www.softwarity.io/img/softwarity.svg" alt="Softwarity" style="height: 40px;">
+        </a>
+        <h1>@softwarity/geojson-editor</h1>
+      </div>
+      <div style="display: flex; gap: 1rem; align-items: center;">
+        <a href="https://github.com/softwarity/geojson-editor#readme" target="_blank" rel="noopener noreferrer" class="github-link">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M0 1.75A.75.75 0 01.75 1h4.253c1.227 0 2.317.59 3 1.501A3.744 3.744 0 0111.006 1h4.245a.75.75 0 01.75.75v10.5a.75.75 0 01-.75.75h-4.507a2.25 2.25 0 00-1.591.659l-.622.621a.75.75 0 01-1.06 0l-.622-.621A2.25 2.25 0 005.258 13H.75a.75.75 0 01-.75-.75V1.75zm8.755 3a2.25 2.25 0 012.25-2.25H14.5v9h-3.757c-.71 0-1.4.201-1.992.572l.004-7.322zm-1.504 7.324l.004-5.073-.002-2.253A2.25 2.25 0 005.003 2.5H1.5v9h3.757a3.75 3.75 0 011.994.574z"></path>
+          </svg>
+          Documentation
+        </a>
+        <a href="https://github.com/softwarity/geojson-editor" target="_blank" rel="noopener noreferrer" class="github-link">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+          </svg>
+          GitHub
+        </a>
+        <a href="https://www.softwarity.io/" target="_blank" rel="noopener noreferrer" class="github-link">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773l.627 2.197a.75.75 0 0 1-.724.949H4.25a.75.75 0 0 1 0-1.5h.846l-.313-1.097a.75.75 0 0 1 1.446-.424l.15.525Zm5.742.424a.75.75 0 0 0-1.446.424l.15.525-.313 1.097h-.847a.75.75 0 0 0 0 1.5h2.033a.75.75 0 0 0 .724-.949l-.627-2.197-.001-.001a.75.75 0 0 0 .327-.399Z"></path>
+          </svg>
+          Softwarity
+        </a>
+      </div>
     </div>
     <div class="description">
-      This demo showcases the &lt;geojson-editor&gt; Web Component with syntax highlighting,
-      collapsible nodes, and automatic color picker detection.
-      <br><br>
-      <strong>Color Detection:</strong> The editor automatically detects hex colors (#RRGGBB) in any JSON string value
-      and displays a color indicator in the gutter. Click it to open a color picker!
+      A feature-rich <strong>Web Component</strong> for editing GeoJSON with syntax highlighting, collapsible nodes, and color picker.
     </div>
 
     <div class="controls">
@@ -279,7 +309,7 @@
                 <option value="onedark">One Dark / One Light</option>
                 <option value="solarized">Solarized</option>
               </select>
-              <button onclick="openThemeModal()" title="Edit theme" style="padding: 0.5rem 0.75rem;">✏️</button>
+              <button onclick="openThemeModal()" title="Edit theme" style="padding: 0.5rem 0.75rem; display: flex; align-items: center;"><span class="icon-palette"></span></button>
             </div>
           </div>
         </div>
@@ -376,7 +406,7 @@
     <div class="modal-backdrop" onclick="closeThemeModal()"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h3>✏️ Theme Editor</h3>
+        <h3 style="display: flex; align-items: center; gap: 0.5rem;"><span class="icon-palette large"></span> Theme Editor</h3>
         <button class="modal-close" onclick="closeThemeModal()">×</button>
       </div>
       <div class="modal-body">
@@ -392,9 +422,16 @@
         </div>
       </div>
     </div>
+    <!-- Footer -->
+    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-default); text-align: center;">
+      <a href="https://www.softwarity.io/" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+        <img src="https://www.softwarity.io/img/softwarity.svg" alt="Softwarity" style="height: 20px; opacity: 0.7;">
+        <span>Made by Softwarity</span>
+      </a>
+    </div>
   </div>
 
-  
+
   <script>
     const editor = document.getElementById('editor');
     const eventLog = document.getElementById('eventLog');
