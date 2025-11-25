@@ -38,7 +38,8 @@ class GeoJsonEditor extends HTMLElement {
         collapseButtonBorder: '#555',
         geojsonKey: '#c586c0',
         geojsonType: '#4ec9b0',
-        geojsonTypeInvalid: '#f44747'
+        geojsonTypeInvalid: '#f44747',
+        jsonKeyInvalid: '#f44747'
       },
       light: {
         background: '#ffffff',
@@ -57,14 +58,18 @@ class GeoJsonEditor extends HTMLElement {
         collapseButtonBorder: '#999',
         geojsonKey: '#af00db',
         geojsonType: '#267f99',
-        geojsonTypeInvalid: '#d32f2f'
+        geojsonTypeInvalid: '#d32f2f',
+        jsonKeyInvalid: '#d32f2f'
       }
     };
   }
 
   static get observedAttributes() {
-    return ['readonly', 'collapsed', 'value', 'placeholder', 'auto-format', 'dark-selector', 'feature-collection'];
+    return ['readonly', 'value', 'placeholder', 'auto-format', 'dark-selector', 'feature-collection'];
   }
+
+  // Nodes that are always collapsed by default when content is loaded
+  static AUTO_COLLAPSED_KEYS = ['coordinates'];
 
   // FeatureCollection wrapper constants
   static FEATURE_COLLECTION_PREFIX = '{"type": "FeatureCollection", "features": [';
@@ -83,12 +88,10 @@ class GeoJsonEditor extends HTMLElement {
     // Initial highlight
     if (this.value) {
       this.updateHighlight();
-      // Apply default collapsed nodes after initial rendering
-      if (this.defaultCollapsed.length > 0) {
-        requestAnimationFrame(() => {
-          this.applyDefaultCollapsed();
-        });
-      }
+      // Auto-collapse coordinates nodes after initial rendering
+      requestAnimationFrame(() => {
+        this.applyAutoCollapsed();
+      });
     }
   }
 
@@ -106,15 +109,6 @@ class GeoJsonEditor extends HTMLElement {
       this.updateThemeCSS();
     } else if (name === 'feature-collection') {
       this.updatePrefixSuffix();
-    } else if (name === 'collapsed') {
-      // Only apply if textarea exists (component is initialized)
-      const textarea = this.shadowRoot?.getElementById('textarea');
-      if (textarea && textarea.value) {
-        // First expand nodes that are no longer in collapsed list
-        this.expandNodesNotInCollapsed();
-        // Then apply new collapsed nodes
-        this.applyDefaultCollapsed();
-      }
     } else if (name === 'auto-format') {
       // When auto-format is enabled, format the current content
       const textarea = this.shadowRoot?.getElementById('textarea');
@@ -130,15 +124,6 @@ class GeoJsonEditor extends HTMLElement {
     return this.hasAttribute('readonly');
   }
 
-  get defaultCollapsed() {
-    const attr = this.getAttribute('collapsed');
-    if (!attr) return [];
-    try {
-      return JSON.parse(attr);
-    } catch {
-      return [];
-    }
-  }
 
   get value() {
     return this.getAttribute('value') || '';
@@ -428,8 +413,11 @@ class GeoJsonEditor extends HTMLElement {
 
         .geojson-type-invalid {
           color: var(--geojson-type-invalid, #f44747);
-          text-decoration: wavy underline var(--geojson-type-invalid, #f44747);
           font-weight: 600;
+        }
+
+        .json-key-invalid {
+          color: var(--json-key-invalid, #f44747);
         }
 
         /* Prefix and suffix styling */
@@ -636,10 +624,10 @@ class GeoJsonEditor extends HTMLElement {
 
       this.updateHighlight();
 
-      // Apply default collapsed nodes after value is set
-      if (this.defaultCollapsed.length > 0 && textarea.value) {
+      // Auto-collapse coordinates nodes after value is set
+      if (textarea.value) {
         requestAnimationFrame(() => {
-          this.applyDefaultCollapsed();
+          this.applyAutoCollapsed();
         });
       }
     }
@@ -699,6 +687,9 @@ class GeoJsonEditor extends HTMLElement {
     const toggles = [];
     let highlightedLines = [];
 
+    // Build context map for validation
+    const contextMap = this.buildContextMap(text);
+
     lines.forEach((line, lineIndex) => {
       // Detect any hex color (6 digits) in string values
       // Matches: "attributeName": "#RRGGBB"
@@ -756,8 +747,9 @@ class GeoJsonEditor extends HTMLElement {
         }
       }
 
-      // Highlight the line
-      highlightedLines.push(this.highlightLine(line));
+      // Highlight the line with context
+      const context = contextMap.get(lineIndex);
+      highlightedLines.push(this.highlightLine(line, context));
     });
 
     return {
@@ -767,42 +759,185 @@ class GeoJsonEditor extends HTMLElement {
     };
   }
 
-  highlightLine(line) {
-    // Just highlight syntax, no buttons in the text
-    return this.highlightSyntax(line);
+  highlightLine(line, context) {
+    // Highlight syntax with context for validation
+    return this.highlightSyntax(line, context);
   }
 
-  // GeoJSON-specific keywords (excluding 'type' which is too ambiguous - could be in properties)
-  static GEOJSON_KEYS = ['coordinates', 'geometry', 'geometries', 'properties', 'features', 'bbox', 'crs'];
+  // GeoJSON type constants
   static GEOJSON_TYPES_FEATURE = ['Feature', 'FeatureCollection'];
   static GEOJSON_TYPES_GEOMETRY = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection'];
   static GEOJSON_TYPES_ALL = [...GeoJsonEditor.GEOJSON_TYPES_FEATURE, ...GeoJsonEditor.GEOJSON_TYPES_GEOMETRY];
 
-  highlightSyntax(text) {
+  // Valid keys per context (null = any key is valid)
+  static VALID_KEYS_BY_CONTEXT = {
+    Feature: ['type', 'geometry', 'properties', 'id', 'bbox'],
+    FeatureCollection: ['type', 'features', 'bbox', 'properties'],
+    Point: ['type', 'coordinates', 'bbox'],
+    MultiPoint: ['type', 'coordinates', 'bbox'],
+    LineString: ['type', 'coordinates', 'bbox'],
+    MultiLineString: ['type', 'coordinates', 'bbox'],
+    Polygon: ['type', 'coordinates', 'bbox'],
+    MultiPolygon: ['type', 'coordinates', 'bbox'],
+    GeometryCollection: ['type', 'geometries', 'bbox'],
+    properties: null,  // Any key valid in properties
+    geometry: ['type', 'coordinates', 'geometries', 'bbox'],  // Generic geometry context
+  };
+
+  // Keys that change context for their value
+  static CONTEXT_CHANGING_KEYS = {
+    geometry: 'geometry',
+    properties: 'properties',
+    features: 'Feature',      // Array of Features
+    geometries: 'geometry',   // Array of geometries
+  };
+
+  // Build context map for each line by analyzing JSON structure
+  buildContextMap(text) {
+    const lines = text.split('\n');
+    const contextMap = new Map();  // line index -> context
+    const contextStack = [];       // Stack of {context, isArray}
+    let pendingContext = null;     // Context for next object/array
+
+    // Determine root context based on feature-collection mode
+    const rootContext = this.featureCollection ? 'Feature' : null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Record context at START of line (for key validation)
+      const lineContext = contextStack.length > 0
+        ? contextStack[contextStack.length - 1]?.context
+        : rootContext;
+      contextMap.set(i, lineContext);
+
+      // Process each character to track brackets for subsequent lines
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+
+        // Check for key that changes context: "keyName":
+        if (char === '"') {
+          const keyMatch = line.substring(j).match(/^"([^"]+)"\s*:/);
+          if (keyMatch) {
+            const keyName = keyMatch[1];
+            if (GeoJsonEditor.CONTEXT_CHANGING_KEYS[keyName]) {
+              pendingContext = GeoJsonEditor.CONTEXT_CHANGING_KEYS[keyName];
+            }
+            j += keyMatch[0].length - 1;  // Skip past the key
+            continue;
+          }
+        }
+
+        // Check for type value to refine context: "type": "Point"
+        if (char === '"' && contextStack.length > 0) {
+          const typeMatch = line.substring(0, j).match(/"type"\s*:\s*$/);
+          if (typeMatch) {
+            const valueMatch = line.substring(j).match(/^"([^"]+)"/);
+            if (valueMatch && GeoJsonEditor.GEOJSON_TYPES_ALL.includes(valueMatch[1])) {
+              // Update current context to the specific type
+              const currentCtx = contextStack[contextStack.length - 1];
+              if (currentCtx) {
+                currentCtx.context = valueMatch[1];
+              }
+            }
+          }
+        }
+
+        // Opening bracket - push context
+        if (char === '{' || char === '[') {
+          let newContext;
+          if (pendingContext) {
+            newContext = pendingContext;
+            pendingContext = null;
+          } else if (contextStack.length === 0) {
+            // Root level
+            newContext = rootContext;
+          } else {
+            // Inherit from parent if in array
+            const parent = contextStack[contextStack.length - 1];
+            if (parent && parent.isArray) {
+              newContext = parent.context;
+            } else {
+              newContext = null;
+            }
+          }
+          contextStack.push({ context: newContext, isArray: char === '[' });
+        }
+
+        // Closing bracket - pop context
+        if (char === '}' || char === ']') {
+          if (contextStack.length > 0) {
+            contextStack.pop();
+          }
+        }
+      }
+    }
+
+    return contextMap;
+  }
+
+  // All known GeoJSON structural keys (always valid in GeoJSON)
+  static GEOJSON_STRUCTURAL_KEYS = ['type', 'geometry', 'properties', 'features', 'geometries', 'coordinates', 'bbox', 'id', 'crs'];
+
+  highlightSyntax(text, context) {
     if (!text.trim()) return '';
 
-    const geojsonKeysPattern = GeoJsonEditor.GEOJSON_KEYS.join('|');
+    // Get valid keys for current context
+    const validKeys = context ? GeoJsonEditor.VALID_KEYS_BY_CONTEXT[context] : null;
+
+    // Helper to check if a key is valid in current context
+    const isKeyValid = (key) => {
+      // GeoJSON structural keys are always valid
+      if (GeoJsonEditor.GEOJSON_STRUCTURAL_KEYS.includes(key)) return true;
+      // No context or null validKeys means all keys are valid
+      if (!context || validKeys === null || validKeys === undefined) return true;
+      return validKeys.includes(key);
+    };
+
+    // Helper to check if a type value is valid in current context
+    const isTypeValid = (typeValue) => {
+      // Unknown context - don't validate (could be inside misspelled properties, etc.)
+      if (!context) return true;
+      if (context === 'properties') return true;  // Any type in properties
+      if (context === 'geometry' || GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(context)) {
+        return GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(typeValue);
+      }
+      // Only validate as GeoJSON type in known Feature/FeatureCollection context
+      if (context === 'Feature' || context === 'FeatureCollection') {
+        return GeoJsonEditor.GEOJSON_TYPES_ALL.includes(typeValue);
+      }
+      return true;  // Unknown context - accept any type
+    };
 
     return text
       // Escape HTML first
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
-      // GeoJSON structural keys (before generic keys)
-      .replace(new RegExp(`"(${geojsonKeysPattern})"\\s*:`, 'g'), '<span class="geojson-key">"$1"</span>:')
-      // Generic JSON keys
+      // All JSON keys - validate against context
       .replace(/"([^"]+)"\s*:/g, (match, key) => {
-        // Skip if already highlighted (has span)
-        if (match.includes('<span')) return match;
-        return `<span class="json-key">"${key}"</span>:`;
-      })
-      // GeoJSON "type" values - highlight valid types distinctly (others stay as normal strings)
-      .replace(/<span class="geojson-key">"type"<\/span>:\s*"([^"]*)"/g, (match, typeValue) => {
-        if (GeoJsonEditor.GEOJSON_TYPES_ALL.includes(typeValue)) {
-          return `<span class="geojson-key">"type"</span>: <span class="geojson-type">"${typeValue}"</span>`;
+        // Inside properties - all keys are regular user keys
+        if (context === 'properties') {
+          return `<span class="json-key">"${key}"</span>:`;
         }
-        // Not a GeoJSON type - will be colored as normal string by next rule
-        return match;
+        // GeoJSON structural keys - highlighted as geojson-key
+        if (GeoJsonEditor.GEOJSON_STRUCTURAL_KEYS.includes(key)) {
+          return `<span class="geojson-key">"${key}"</span>:`;
+        }
+        // Regular key - validate against context
+        if (isKeyValid(key)) {
+          return `<span class="json-key">"${key}"</span>:`;
+        } else {
+          return `<span class="json-key-invalid">"${key}"</span>:`;
+        }
+      })
+      // GeoJSON "type" values - validate based on context
+      .replace(/<span class="geojson-key">"type"<\/span>:\s*"([^"]*)"/g, (match, typeValue) => {
+        if (isTypeValid(typeValue)) {
+          return `<span class="geojson-key">"type"</span>: <span class="geojson-type">"${typeValue}"</span>`;
+        } else {
+          return `<span class="geojson-key">"type"</span>: <span class="geojson-type-invalid">"${typeValue}"</span>`;
+        }
       })
       // Generic string values
       .replace(/:\s*"([^"]*)"/g, (match, value) => {
@@ -930,59 +1065,11 @@ class GeoJsonEditor extends HTMLElement {
     this.updateHighlight();
   }
 
-  expandNodesNotInCollapsed() {
+  applyAutoCollapsed() {
     const textarea = this.shadowRoot.getElementById('textarea');
     if (!textarea || !textarea.value) return;
 
-    const defaultCollapsed = this.defaultCollapsed;
-    const lines = textarea.value.split('\n');
-    let modified = false;
-
-    // Check all collapsed nodes
-    for (const [key, data] of this.collapsedData.entries()) {
-      const nodeKey = data.nodeKey;
-
-      // If this nodeKey is no longer in the collapsed list, expand it
-      if (!defaultCollapsed.includes(nodeKey)) {
-        // Find the line with the marker
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const hasMarker = line.includes('{...}') || line.includes('[...]');
-
-          if (hasMarker) {
-            // Check if this is the right node by matching indent and position
-            const currentIndent = line.match(/^(\s*)/)[1].length;
-            if (currentIndent === data.indent && line.includes(`"${nodeKey}"`)) {
-              // Expand this node
-              // Restore original line
-              lines[i] = data.originalLine;
-
-              // Insert content lines
-              lines.splice(i + 1, 0, ...data.content);
-
-              // Remove from collapsedData
-              this.collapsedData.delete(key);
-              modified = true;
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (modified) {
-      textarea.value = lines.join('\n');
-      this.updateHighlight();
-    }
-  }
-
-  applyDefaultCollapsed() {
-    const textarea = this.shadowRoot.getElementById('textarea');
-    if (!textarea || !textarea.value) return;
-
-    const defaultCollapsed = this.defaultCollapsed;
-    if (defaultCollapsed.length === 0) return;
-
+    const autoCollapsedKeys = GeoJsonEditor.AUTO_COLLAPSED_KEYS;
     const lines = textarea.value.split('\n');
 
     // Iterate backwards to avoid index issues when collapsing
@@ -993,8 +1080,8 @@ class GeoJsonEditor extends HTMLElement {
       if (match) {
         const nodeKey = match[2];
 
-        // Check if this node should be collapsed by default
-        if (defaultCollapsed.includes(nodeKey)) {
+        // Check if this node should be auto-collapsed (coordinates)
+        if (autoCollapsedKeys.includes(nodeKey)) {
           const indent = match[1];
           const openBracket = match[3];
           const closeBracket = openBracket === '{' ? '}' : ']';
@@ -1866,6 +1953,7 @@ class GeoJsonEditor extends HTMLElement {
         --geojson-key: ${this.themes.light.geojsonKey};
         --geojson-type: ${this.themes.light.geojsonType};
         --geojson-type-invalid: ${this.themes.light.geojsonTypeInvalid};
+        --json-key-invalid: ${this.themes.light.jsonKeyInvalid};
       }
 
       ${darkRule} {
@@ -1886,6 +1974,7 @@ class GeoJsonEditor extends HTMLElement {
         --geojson-key: ${this.themes.dark.geojsonKey};
         --geojson-type: ${this.themes.dark.geojsonType};
         --geojson-type-invalid: ${this.themes.dark.geojsonTypeInvalid};
+        --json-key-invalid: ${this.themes.dark.jsonKeyInvalid};
       }
     `;
 

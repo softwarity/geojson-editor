@@ -14,29 +14,34 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       padding: 2rem;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       min-height: 100vh;
     }
 
     .container {
       max-width: 1200px;
       margin: 0 auto;
-      background: white;
+      background: #161b22;
       border-radius: 12px;
       padding: 2rem;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      border: 1px solid #30363d;
     }
 
     h1 {
-      color: #333;
+      color: #e6edf3;
       margin-bottom: 1rem;
       font-size: 2rem;
     }
 
     .description {
-      color: #666;
+      color: #8b949e;
       margin-bottom: 2rem;
       line-height: 1.6;
+    }
+
+    .description strong {
+      color: #c9d1d9;
     }
 
     .controls {
@@ -45,8 +50,9 @@
       gap: 1.5rem;
       margin-bottom: 2rem;
       padding: 1.5rem;
-      background: #f5f5f5;
+      background: #21262d;
       border-radius: 8px;
+      border: 1px solid #30363d;
     }
 
     .controls-section {
@@ -57,10 +63,14 @@
 
     .controls-section h4 {
       margin: 0;
-      color: #333;
+      color: #e6edf3;
       font-size: 1rem;
-      border-bottom: 2px solid #667eea;
+      border-bottom: 2px solid #58a6ff;
       padding-bottom: 0.5rem;
+    }
+
+    .controls-section > p {
+      color: #8b949e;
     }
 
     .controls-grid {
@@ -77,7 +87,7 @@
 
     .control-group label {
       font-weight: 600;
-      color: #555;
+      color: #c9d1d9;
       font-size: 0.9rem;
     }
 
@@ -85,10 +95,19 @@
     .control-group input[type="text"],
     .control-group textarea {
       padding: 0.5rem;
-      border: 1px solid #ddd;
+      border: 1px solid #30363d;
       border-radius: 4px;
       font-size: 0.9rem;
       font-family: 'Courier New', monospace;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+
+    .control-group select:focus,
+    .control-group input[type="text"]:focus,
+    .control-group textarea:focus {
+      outline: none;
+      border-color: #58a6ff;
     }
 
     .control-group textarea {
@@ -104,30 +123,50 @@
 
     .checkbox-group label {
       margin: 0;
+      color: #c9d1d9;
+    }
+
+    .checkbox-group small {
+      color: #8b949e !important;
     }
 
     .editor-container {
       margin-top: 2rem;
-      border: 2px solid #e0e0e0;
+      border: 2px solid #58a6ff;
       border-radius: 8px;
       overflow: hidden;
+      box-shadow: 0 0 20px rgba(88, 166, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .editor-label {
+      background: linear-gradient(90deg, #58a6ff, #a371f7);
+      color: white;
+      padding: 0.5rem 1rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
     }
 
     .output {
       margin-top: 2rem;
       padding: 1rem;
-      background: #f9f9f9;
+      background: #21262d;
       border-radius: 8px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #30363d;
     }
 
     .output h3 {
-      color: #333;
+      color: #e6edf3;
       margin-bottom: 0.5rem;
     }
 
+    .output p {
+      color: #8b949e;
+    }
+
     .output pre {
-      background: white;
+      background: #0d1117;
+      color: #c9d1d9;
       padding: 1rem;
       border-radius: 4px;
       max-height: 400px;
@@ -135,11 +174,12 @@
       overflow-y: auto;
       font-family: 'Courier New', monospace;
       font-size: 0.85rem;
+      border: 1px solid #30363d;
     }
 
     button {
       padding: 0.5rem 1rem;
-      background: #667eea;
+      background: #238636;
       color: white;
       border: none;
       border-radius: 4px;
@@ -149,45 +189,9 @@
     }
 
     button:hover {
-      background: #5568d3;
+      background: #2ea043;
     }
 
-    .theme-editor {
-      margin-top: 2rem;
-      padding: 1.5rem;
-      background: #f9f9f9;
-      border-radius: 8px;
-      border: 1px solid #e0e0e0;
-    }
-
-    .theme-editor h3 {
-      margin-top: 0;
-      color: #333;
-    }
-
-    .theme-controls label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 0.5rem;
-      color: #555;
-    }
-
-    #themeTextarea {
-      width: 100%;
-      padding: 1rem;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      font-family: 'Courier New', monospace;
-      font-size: 0.9rem;
-      background: white;
-      resize: vertical;
-    }
-
-    .theme-actions {
-      margin-top: 1rem;
-      display: flex;
-      gap: 1rem;
-    }
 
     .header {
       display: flex;
@@ -208,17 +212,18 @@
       align-items: center;
       gap: 0.5rem;
       padding: 0.5rem 1rem;
-      background: #24292e;
-      color: white;
+      background: #21262d;
+      color: #c9d1d9;
       text-decoration: none;
       border-radius: 6px;
       font-weight: 600;
       font-size: 0.9rem;
       transition: background 0.2s;
+      border: 1px solid #30363d;
     }
 
     .github-link:hover {
-      background: #1b1f23;
+      background: #30363d;
     }
 
     .github-link svg {
@@ -230,18 +235,22 @@
     .code-example {
       margin-top: 2rem;
       padding: 1rem;
-      background: #f9f9f9;
+      background: #21262d;
       border-radius: 8px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #30363d;
     }
 
     .code-example h3 {
-      color: #333;
+      color: #e6edf3;
       margin-bottom: 0.5rem;
     }
 
+    .code-example p {
+      color: #8b949e;
+    }
+
     .code-example pre {
-      background: #1e1e1e;
+      background: #0d1117;
       padding: 1rem;
       border-radius: 4px;
       overflow-x: auto;
@@ -249,85 +258,143 @@
       font-size: 0.85rem;
       line-height: 1.5;
       margin: 0;
-      color: #d4d4d4;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
     }
 
-    /* Prism.js VSCode Dark theme (default) */
-    .code-example.theme-dark .token.comment,
-    .code-example.theme-dark .token.prolog,
-    .code-example.theme-dark .token.doctype { color: #6a9955; }
+    /* Prism.js syntax highlighting */
+    .code-example .token.comment,
+    .code-example .token.prolog,
+    .code-example .token.doctype { color: #8b949e; }
 
-    .code-example.theme-dark .token.punctuation { color: #d4d4d4; }
+    .code-example .token.punctuation { color: #c9d1d9; }
 
-    .code-example.theme-dark .token.property,
-    .code-example.theme-dark .token.tag,
-    .code-example.theme-dark .token.boolean,
-    .code-example.theme-dark .token.number,
-    .code-example.theme-dark .token.constant,
-    .code-example.theme-dark .token.symbol { color: #569cd6; }
+    .code-example .token.property,
+    .code-example .token.tag,
+    .code-example .token.boolean,
+    .code-example .token.number,
+    .code-example .token.constant,
+    .code-example .token.symbol { color: #79c0ff; }
 
-    .code-example.theme-dark .token.selector,
-    .code-example.theme-dark .token.attr-name,
-    .code-example.theme-dark .token.string,
-    .code-example.theme-dark .token.char,
-    .code-example.theme-dark .token.builtin { color: #ce9178; }
+    .code-example .token.selector,
+    .code-example .token.attr-name,
+    .code-example .token.string,
+    .code-example .token.char,
+    .code-example .token.builtin { color: #a5d6ff; }
 
-    .code-example.theme-dark .token.operator,
-    .code-example.theme-dark .token.entity,
-    .code-example.theme-dark .token.url,
-    .code-example.theme-dark .token.variable { color: #d4d4d4; }
+    .code-example .token.operator,
+    .code-example .token.entity,
+    .code-example .token.url,
+    .code-example .token.variable { color: #c9d1d9; }
 
-    .code-example.theme-dark .token.atrule,
-    .code-example.theme-dark .token.attr-value,
-    .code-example.theme-dark .token.keyword { color: #569cd6; }
+    .code-example .token.atrule,
+    .code-example .token.attr-value,
+    .code-example .token.keyword { color: #ff7b72; }
 
-    .code-example.theme-dark .token.function { color: #dcdcaa; }
+    .code-example .token.function { color: #d2a8ff; }
 
-    .code-example.theme-dark .token.regex,
-    .code-example.theme-dark .token.important { color: #d16969; }
+    .code-example .token.regex,
+    .code-example .token.important { color: #ffa657; }
 
-    /* Prism.js VSCode Light theme */
-    .code-example.theme-light {
-      background: #ffffff;
+    /* Modal styles */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    .code-example.theme-light pre {
-      background: #ffffff;
-      color: #000000;
+    .modal-backdrop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
     }
 
-    .code-example.theme-light .token.comment,
-    .code-example.theme-light .token.prolog,
-    .code-example.theme-light .token.doctype { color: #008000; }
+    .modal-content {
+      position: relative;
+      background: #161b22;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      border: 1px solid #30363d;
+    }
 
-    .code-example.theme-light .token.punctuation { color: #000000; }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid #30363d;
+      background: #21262d;
+    }
 
-    .code-example.theme-light .token.property,
-    .code-example.theme-light .token.tag,
-    .code-example.theme-light .token.boolean,
-    .code-example.theme-light .token.number,
-    .code-example.theme-light .token.constant,
-    .code-example.theme-light .token.symbol { color: #0000ff; }
+    .modal-header h3 {
+      margin: 0;
+      color: #e6edf3;
+    }
 
-    .code-example.theme-light .token.selector,
-    .code-example.theme-light .token.attr-name,
-    .code-example.theme-light .token.string,
-    .code-example.theme-light .token.char,
-    .code-example.theme-light .token.builtin { color: #a31515; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #8b949e;
+      padding: 0;
+      line-height: 1;
+    }
 
-    .code-example.theme-light .token.operator,
-    .code-example.theme-light .token.entity,
-    .code-example.theme-light .token.url,
-    .code-example.theme-light .token.variable { color: #000000; }
+    .modal-close:hover {
+      color: #e6edf3;
+    }
 
-    .code-example.theme-light .token.atrule,
-    .code-example.theme-light .token.attr-value,
-    .code-example.theme-light .token.keyword { color: #0000ff; }
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+      max-height: calc(90vh - 60px);
+    }
 
-    .code-example.theme-light .token.function { color: #795e26; }
+    .modal-body p {
+      color: #8b949e;
+    }
 
-    .code-example.theme-light .token.regex,
-    .code-example.theme-light .token.important { color: #ff0000; }
+    .modal .theme-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .modal .theme-actions button {
+      padding: 0.5rem 1rem;
+    }
+
+    #themeTextarea {
+      width: 100%;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      padding: 1rem;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      resize: vertical;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+
+    #themeTextarea:focus {
+      outline: none;
+      border-color: #58a6ff;
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
@@ -353,16 +420,8 @@
 
     <div class="controls">
       <div class="controls-section">
-        <h4>Theme Detection</h4>
+        <h4>Theme</h4>
         <div class="controls-grid">
-          <div class="control-group">
-            <label for="frameworkSelect">Framework</label>
-            <select id="frameworkSelect">
-              <option value="custom" selected>Custom</option>
-              <option value="tailwind">Tailwind CSS</option>
-              <option value="bootstrap">Bootstrap</option>
-            </select>
-          </div>
           <div class="control-group">
             <label for="colorSchemeSelect">Color Scheme</label>
             <select id="colorSchemeSelect">
@@ -370,26 +429,43 @@
               <option value="light">Light</option>
             </select>
           </div>
-        </div>
-        <div id="frameworkDescription" style="background: #e8f4fd; padding: 0.75rem; border-radius: 4px; margin-bottom: 1rem; font-size: 0.85rem; color: #1a5276; border-left: 3px solid #3498db;">
-          <strong>Custom:</strong> Dark mode is detected via a <code>.dark</code> class directly on the <code>&lt;geojson-editor&gt;</code> component itself.
-        </div>
-        <div class="controls-grid">
           <div class="control-group">
-            <label for="selectorPreview">Dark Selector</label>
-            <input type="text" id="selectorPreview" value="dark-selector='.dark'" readonly style="font-size: 0.8rem; background: #e9e9e9;">
+            <label for="themePresetMainSelect">Theme Preset</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <select id="themePresetMainSelect" style="flex: 1;">
+                <option value="vscode" selected>VSCode (Default)</option>
+                <option value="github">GitHub</option>
+                <option value="onedark">One Dark / One Light</option>
+                <option value="solarized">Solarized</option>
+              </select>
+              <button onclick="openThemeModal()" title="Edit theme" style="padding: 0.5rem 0.75rem;">✏️</button>
+            </div>
           </div>
         </div>
       </div>
 
       <div class="controls-section">
-        <h4>Collapsed Nodes</h4>
+        <h4>Dark Mode Detection</h4>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
+          The <code>dark-selector</code> attribute lets you specify a CSS selector. The component watches for this selector
+          to match, and when it does, applies its dark theme. You can use any valid CSS selector.
+        </p>
         <div class="controls-grid">
           <div class="control-group">
-            <label for="collapsedInput">Initially Collapsed Keys</label>
-            <input type="text" id="collapsedInput" value='["coordinates"]'>
-            <small style="color: #666; font-size: 0.85rem;">JSON array of property keys to collapse on load (e.g., <code>["coordinates", "properties"]</code>)</small>
+            <label for="darkSelectorExampleSelect">Examples</label>
+            <select id="darkSelectorExampleSelect">
+              <option value=".dark">Self</option>
+              <option value="html.dark">Tailwind CSS</option>
+              <option value="html[data-bs-theme=dark]">Bootstrap</option>
+            </select>
           </div>
+          <div class="control-group">
+            <label for="selectorPreview">Attribute Value</label>
+            <input type="text" id="selectorPreview" value="dark-selector='.dark'" readonly style="font-size: 0.8rem; background: #0d1117; border-color: #30363d;">
+          </div>
+        </div>
+        <div id="selectorDescription" style="background: #0d1117; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: #8b949e; border-left: 3px solid #58a6ff;">
+          <strong>Example:</strong> <code>.dark</code> — The component watches for a <code>dark</code> class on itself. When present, dark theme is applied.
         </div>
       </div>
 
@@ -421,6 +497,7 @@
     </div>
 
     <div class="editor-container">
+      <div class="editor-label">▶ GeoJSON Editor Component</div>
       <geojson-editor id="editor"></geojson-editor>
     </div>
 
@@ -432,8 +509,8 @@
       <pre id="eventLog">Waiting for change events...</pre>
     </div>
 
-    <div class="output" style="background: #fff5f5; border-color: #ffcccc;">
-      <h3 style="color: #c53030;">Error Events:</h3>
+    <div class="output" style="background: #21262d; border-color: #f8514966;">
+      <h3 style="color: #f85149;">Error Events:</h3>
       <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
         When JSON is invalid, the component emits <code>error</code> events with:
         <strong>timestamp</strong>,
@@ -443,7 +520,7 @@
       <pre id="errorLog">No errors</pre>
     </div>
 
-    <div class="code-example theme-dark" id="codeExample">
+    <div class="code-example">
       <h3>HTML Code:</h3>
       <p style="color: #666; font-size: 0.85rem; margin-bottom: 0.5rem;">
         Copy this code to use the component in your own page (updates automatically with your settings)
@@ -451,16 +528,26 @@
       <pre id="htmlCode"></pre>
     </div>
 
-    <div class="theme-editor" id="themeEditor" style="display: none;">
-      <h3>Theme Editor</h3>
-      <div class="theme-controls">
-        <label>
-          Edit theme colors (JSON format):
-          <textarea id="themeTextarea" rows="15" spellcheck="false"></textarea>
-        </label>
+  </div>
+
+  <!-- Theme Editor Modal -->
+  <div id="themeModal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeThemeModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>✏️ Theme Editor</h3>
+        <button class="modal-close" onclick="closeThemeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
+          Customize the current theme. Edit the JSON below and click "Apply" to preview.<br>
+          Use "Copy Code" to get the JavaScript snippet for your implementation.
+        </p>
+        <textarea id="themeTextarea" rows="20" spellcheck="false"></textarea>
         <div class="theme-actions">
-          <button onclick="applyTheme()">Apply Theme</button>
-          <button onclick="resetTheme()">Reset to Default</button>
+          <button onclick="applyTheme()">✓ Apply</button>
+          <button onclick="resetTheme()">↺ Reset to Default</button>
+          <button onclick="copyTheme()">📋 Copy Code</button>
         </div>
       </div>
     </div>
@@ -472,47 +559,111 @@
     const eventLog = document.getElementById('eventLog');
     const errorLog = document.getElementById('errorLog');
     const placeholderInput = document.getElementById('placeholderInput');
-    const collapsedInput = document.getElementById('collapsedInput');
-    const frameworkSelect = document.getElementById('frameworkSelect');
+    const darkSelectorExampleSelect = document.getElementById('darkSelectorExampleSelect');
     const colorSchemeSelect = document.getElementById('colorSchemeSelect');
     const selectorPreview = document.getElementById('selectorPreview');
+    const selectorDescription = document.getElementById('selectorDescription');
     const readonlyCheck = document.getElementById('readonlyCheck');
     const autoFormatCheck = document.getElementById('autoFormatCheck');
     const featureCollectionCheck = document.getElementById('featureCollectionCheck');
-    const themeEditor = document.getElementById('themeEditor');
+    const themeModal = document.getElementById('themeModal');
     const themeTextarea = document.getElementById('themeTextarea');
+    const themePresetMainSelect = document.getElementById('themePresetMainSelect');
+
+    // Pre-defined theme presets
+    const themePresets = {
+      vscode: {
+        dark: {
+          background: '#1e1e1e', textColor: '#d4d4d4', caretColor: '#fff',
+          gutterBackground: '#252526', gutterBorder: '#3e3e42',
+          jsonKey: '#9cdcfe', jsonString: '#ce9178', jsonNumber: '#b5cea8',
+          jsonBoolean: '#569cd6', jsonNull: '#569cd6', jsonPunctuation: '#d4d4d4',
+          collapseButton: '#c586c0', collapseButtonBg: '#3e3e42', collapseButtonBorder: '#555',
+          geojsonKey: '#c586c0', geojsonType: '#4ec9b0', geojsonTypeInvalid: '#f44747', jsonKeyInvalid: '#f44747'
+        },
+        light: {
+          background: '#ffffff', textColor: '#333333', caretColor: '#000',
+          gutterBackground: '#f5f5f5', gutterBorder: '#ddd',
+          jsonKey: '#0000ff', jsonString: '#a31515', jsonNumber: '#098658',
+          jsonBoolean: '#0000ff', jsonNull: '#0000ff', jsonPunctuation: '#333333',
+          collapseButton: '#a31515', collapseButtonBg: '#e0e0e0', collapseButtonBorder: '#999',
+          geojsonKey: '#af00db', geojsonType: '#267f99', geojsonTypeInvalid: '#d32f2f', jsonKeyInvalid: '#d32f2f'
+        }
+      },
+      github: {
+        dark: {
+          background: '#0d1117', textColor: '#c9d1d9', caretColor: '#c9d1d9',
+          gutterBackground: '#161b22', gutterBorder: '#30363d',
+          jsonKey: '#79c0ff', jsonString: '#a5d6ff', jsonNumber: '#79c0ff',
+          jsonBoolean: '#ff7b72', jsonNull: '#ff7b72', jsonPunctuation: '#c9d1d9',
+          collapseButton: '#d2a8ff', collapseButtonBg: '#30363d', collapseButtonBorder: '#484f58',
+          geojsonKey: '#d2a8ff', geojsonType: '#7ee787', geojsonTypeInvalid: '#f85149', jsonKeyInvalid: '#f85149'
+        },
+        light: {
+          background: '#ffffff', textColor: '#24292f', caretColor: '#24292f',
+          gutterBackground: '#f6f8fa', gutterBorder: '#d0d7de',
+          jsonKey: '#0550ae', jsonString: '#0a3069', jsonNumber: '#0550ae',
+          jsonBoolean: '#cf222e', jsonNull: '#cf222e', jsonPunctuation: '#24292f',
+          collapseButton: '#8250df', collapseButtonBg: '#eaeef2', collapseButtonBorder: '#afb8c1',
+          geojsonKey: '#8250df', geojsonType: '#116329', geojsonTypeInvalid: '#cf222e', jsonKeyInvalid: '#cf222e'
+        }
+      },
+      onedark: {
+        dark: {
+          background: '#282c34', textColor: '#abb2bf', caretColor: '#528bff',
+          gutterBackground: '#21252b', gutterBorder: '#3e4451',
+          jsonKey: '#e06c75', jsonString: '#98c379', jsonNumber: '#d19a66',
+          jsonBoolean: '#d19a66', jsonNull: '#d19a66', jsonPunctuation: '#abb2bf',
+          collapseButton: '#c678dd', collapseButtonBg: '#3e4451', collapseButtonBorder: '#4b5263',
+          geojsonKey: '#c678dd', geojsonType: '#56b6c2', geojsonTypeInvalid: '#e06c75', jsonKeyInvalid: '#e06c75'
+        },
+        light: {
+          background: '#fafafa', textColor: '#383a42', caretColor: '#526fff',
+          gutterBackground: '#f0f0f0', gutterBorder: '#e0e0e0',
+          jsonKey: '#e45649', jsonString: '#50a14f', jsonNumber: '#986801',
+          jsonBoolean: '#986801', jsonNull: '#986801', jsonPunctuation: '#383a42',
+          collapseButton: '#a626a4', collapseButtonBg: '#e0e0e0', collapseButtonBorder: '#999',
+          geojsonKey: '#a626a4', geojsonType: '#0184bc', geojsonTypeInvalid: '#e45649', jsonKeyInvalid: '#e45649'
+        }
+      },
+      solarized: {
+        dark: {
+          background: '#002b36', textColor: '#839496', caretColor: '#839496',
+          gutterBackground: '#073642', gutterBorder: '#094652',
+          jsonKey: '#268bd2', jsonString: '#2aa198', jsonNumber: '#d33682',
+          jsonBoolean: '#cb4b16', jsonNull: '#cb4b16', jsonPunctuation: '#839496',
+          collapseButton: '#6c71c4', collapseButtonBg: '#073642', collapseButtonBorder: '#586e75',
+          geojsonKey: '#6c71c4', geojsonType: '#859900', geojsonTypeInvalid: '#dc322f', jsonKeyInvalid: '#dc322f'
+        },
+        light: {
+          background: '#fdf6e3', textColor: '#657b83', caretColor: '#657b83',
+          gutterBackground: '#eee8d5', gutterBorder: '#e0dbc8',
+          jsonKey: '#268bd2', jsonString: '#2aa198', jsonNumber: '#d33682',
+          jsonBoolean: '#cb4b16', jsonNull: '#cb4b16', jsonPunctuation: '#657b83',
+          collapseButton: '#6c71c4', collapseButtonBg: '#eee8d5', collapseButtonBorder: '#93a1a1',
+          geojsonKey: '#6c71c4', geojsonType: '#859900', geojsonTypeInvalid: '#dc322f', jsonKeyInvalid: '#dc322f'
+        }
+      }
+    };
     const htmlCode = document.getElementById('htmlCode');
-    const codeExample = document.getElementById('codeExample');
 
     // Internal dark selector value
     let darkSelector = '.dark';
 
-    // Framework presets (only dark selector needed)
-    const frameworkPresets = {
-      custom: '.dark',
-      tailwind: 'html.dark',
-      bootstrap: 'html[data-bs-theme=dark]'
+    // Selector descriptions explaining what each selector does
+    const selectorDescriptions = {
+      '.dark': '<strong>Example:</strong> <code>.dark</code> — The component watches for a <code>dark</code> class on itself. When present, dark theme is applied.',
+      'html.dark': '<strong>Example:</strong> <code>html.dark</code> — The component watches for a <code>dark</code> class on the <code>&lt;html&gt;</code> element. Useful when your page uses a global dark mode class.',
+      'html[data-bs-theme=dark]': '<strong>Example:</strong> <code>html[data-bs-theme=dark]</code> — The component watches for a <code>data-bs-theme="dark"</code> attribute on the <code>&lt;html&gt;</code> element.'
     };
 
-    // Framework descriptions
-    const frameworkDescriptions = {
-      custom: '<strong>Custom:</strong> Dark mode is detected via a <code>.dark</code> class directly on the <code>&lt;geojson-editor&gt;</code> component itself.',
-      tailwind: '<strong>Tailwind CSS:</strong> Dark mode is detected via the <code>.dark</code> class on the <code>&lt;html&gt;</code> element, following Tailwind\'s dark mode convention.',
-      bootstrap: '<strong>Bootstrap:</strong> Dark mode is detected via the <code>data-bs-theme="dark"</code> attribute on the <code>&lt;html&gt;</code> element.'
-    };
-
-    const frameworkDescription = document.getElementById('frameworkDescription');
-
-    // Handle framework selection
-    frameworkSelect.addEventListener('change', (e) => {
-      const preset = frameworkPresets[e.target.value];
-      if (preset) {
-        darkSelector = preset;
-        selectorPreview.value = `dark-selector="${darkSelector}"`;
-        frameworkDescription.innerHTML = frameworkDescriptions[e.target.value];
-        updateEditor();
-        applyColorScheme(); // Apply the current color scheme to the new target
-      }
+    // Handle dark selector example selection
+    darkSelectorExampleSelect.addEventListener('change', (e) => {
+      darkSelector = e.target.value;
+      selectorPreview.value = `dark-selector="${darkSelector}"`;
+      selectorDescription.innerHTML = selectorDescriptions[darkSelector];
+      updateEditor();
+      applyColorScheme();
     });
 
     // Parse dark selector to determine target element
@@ -581,15 +732,11 @@
         }
       }
 
-      // Update code example theme
-      codeExample.classList.remove('theme-dark', 'theme-light');
-      codeExample.classList.add(`theme-${scheme}`);
     }
 
     // Update editor attributes from inputs
     function updateEditor() {
       editor.setAttribute('placeholder', placeholderInput.value);
-      editor.setAttribute('collapsed', collapsedInput.value);
       editor.setAttribute('dark-selector', darkSelector);
 
       if (featureCollectionCheck.checked) {
@@ -616,34 +763,37 @@
     // Update HTML code display
     function updateHTMLCode() {
       const placeholder = placeholderInput.value;
-      const collapsed = collapsedInput.value;
       const readonly = readonlyCheck.checked;
       const autoFormat = autoFormatCheck.checked;
       const featureCollection = featureCollectionCheck.checked;
-      const framework = frameworkSelect.value;
       const scheme = colorSchemeSelect.value;
+      const isDark = scheme === 'dark';
+
+      // Parse selector to understand its type
+      const selectorTarget = parseSelector(darkSelector);
 
       // Build component attributes
       let attrs = [];
       if (featureCollection) attrs.push('feature-collection');
-      if (collapsed && collapsed !== '[]') attrs.push(`collapsed='${collapsed.replace(/'/g, "\\'")}'`);
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (autoFormat) attrs.push('auto-format');
       if (readonly) attrs.push('readonly');
       if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
 
-      // Build HTML tag attributes based on framework and scheme
+      // Build HTML tag attributes based on selector type
       let htmlAttrs = 'lang="en"';
-      if (framework === 'tailwind' && scheme === 'dark') {
-        htmlAttrs += ' class="dark"';
-      } else if (framework === 'bootstrap') {
-        htmlAttrs += ` data-bs-theme="${scheme}"`;
-      }
-
-      // Build component class attribute for custom framework (only add dark class)
       let componentClass = '';
-      if (framework === 'custom' && scheme === 'dark') {
-        componentClass = ' class="dark"';
+
+      if (selectorTarget) {
+        if (selectorTarget.target === 'html') {
+          if (selectorTarget.type === 'class' && isDark) {
+            htmlAttrs += ` class="${selectorTarget.value}"`;
+          } else if (selectorTarget.type === 'attribute') {
+            htmlAttrs += ` ${selectorTarget.attr}="${scheme}"`;
+          }
+        } else if (selectorTarget.target === 'component' && isDark) {
+          componentClass = ` class="${selectorTarget.value}"`;
+        }
       }
 
       let code = '<!DOCTYPE html>\n';
@@ -651,13 +801,6 @@
       code += '<head>\n';
       code += '  <meta charset="UTF-8">\n';
       code += '  <title>GeoJSON Editor</title>\n';
-      code += '  <!-- Load the GeoJSON Editor web component -->\n';
-      code += '  <script type="module" src="https://unpkg.com/@softwarity/geojson-editor"><\/script>\n';
-      code += '</head>\n';
-      code += '<body>\n';
-      code += `  <geojson-editor${componentClass}\n`;
-      code += '    ' + attrs.join('\n    ') + '\n';
-      code += '  ></geojson-editor>\n\n';
       code += '  <script type="module">\n';
       code += '    const editor = document.querySelector(\'geojson-editor\');\n\n';
       code += '    // Valid GeoJSON - emits parsed object directly\n';
@@ -667,29 +810,14 @@
       code += '    // Invalid JSON or GeoJSON validation error\n';
       code += '    editor.addEventListener(\'error\', (e) => {\n';
       code += '      console.error(\'Error:\', e.detail.error);\n';
-      code += '    });\n\n';
-
-      // Add theme toggle example based on framework
-      if (framework === 'custom') {
-        code += '    // Toggle dark mode by adding/removing .dark class on the component\n';
-        code += '    function toggleDarkMode() {\n';
-        code += '      editor.classList.toggle(\'dark\');\n';
-        code += '    }\n';
-      } else if (framework === 'tailwind') {
-        code += '    // Toggle dark mode (Tailwind style - class on html)\n';
-        code += '    function toggleDarkMode() {\n';
-        code += '      document.documentElement.classList.toggle(\'dark\');\n';
-        code += '    }\n';
-      } else if (framework === 'bootstrap') {
-        code += '    // Toggle theme (Bootstrap style - attribute on html)\n';
-        code += '    function toggleDarkMode() {\n';
-        code += '      const html = document.documentElement;\n';
-        code += '      const current = html.getAttribute(\'data-bs-theme\');\n';
-        code += '      html.setAttribute(\'data-bs-theme\', current === \'dark\' ? \'light\' : \'dark\');\n';
-        code += '    }\n';
-      }
-
+      code += '    });\n';
       code += '  <\/script>\n';
+      code += '</head>\n';
+      code += '<body>\n';
+      code += `  <geojson-editor${componentClass}\n`;
+      code += '    ' + attrs.join('\n    ') + '\n';
+      code += '  ></geojson-editor>\n\n';
+      code += '  <script type="module" src="https://unpkg.com/@softwarity/geojson-editor"><\/script>\n';
       code += '</body>\n';
       code += '</html>';
 
@@ -708,12 +836,11 @@
     // Listen to editor error events (invalid JSON)
     editor.addEventListener('error', (e) => {
       errorLog.textContent = JSON.stringify(e.detail, null, 2);
-      errorLog.style.color = '#c53030';
+      errorLog.style.color = '#f85149';
     });
 
     // Listen to input changes
     placeholderInput.addEventListener('input', updateEditor);
-    collapsedInput.addEventListener('input', updateEditor);
 
     // Handle feature-collection mode toggle: reload sample data in appropriate format
     featureCollectionCheck.addEventListener('change', () => {
@@ -729,16 +856,33 @@
       updateHTMLCode(); // Update the generated HTML code to reflect the new scheme
     });
 
-    // Toggle theme editor
-    function toggleThemeEditor() {
-      const isVisible = themeEditor.style.display !== 'none';
-      if (isVisible) {
-        themeEditor.style.display = 'none';
-      } else {
-        themeEditor.style.display = 'block';
-        loadCurrentTheme();
+    // Apply preset theme directly from main selector
+    themePresetMainSelect.addEventListener('change', () => {
+      const presetName = themePresetMainSelect.value;
+      if (presetName && themePresets[presetName]) {
+        editor.setTheme(themePresets[presetName]);
       }
+    });
+
+    // Open theme modal
+    function openThemeModal() {
+      loadCurrentTheme();
+      themeModal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
     }
+
+    // Close theme modal
+    function closeThemeModal() {
+      themeModal.style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && themeModal.style.display === 'flex') {
+        closeThemeModal();
+      }
+    });
 
     // Load current theme into textarea
     function loadCurrentTheme() {
@@ -751,17 +895,53 @@
       try {
         const theme = JSON.parse(themeTextarea.value);
         editor.setTheme(theme);
-        alert('Theme applied successfully!');
+        showThemeMessage('✓ Theme applied!', 'success');
       } catch (e) {
-        alert('Invalid JSON: ' + e.message);
+        showThemeMessage('✗ Invalid JSON: ' + e.message, 'error');
       }
     }
 
-    // Reset to default theme
+    // Reset to default theme (VSCode)
     function resetTheme() {
-      editor.resetTheme();
+      themePresetMainSelect.value = 'vscode';
+      editor.setTheme(themePresets.vscode);
       loadCurrentTheme();
-      alert('Theme reset to default!');
+      showThemeMessage('↺ Theme reset to VSCode default', 'success');
+    }
+
+    // Copy theme to clipboard
+    function copyTheme() {
+      const themeCode = `// Apply custom theme to GeoJSON Editor
+const editor = document.querySelector('geojson-editor');
+editor.setTheme(${themeTextarea.value});`;
+
+      navigator.clipboard.writeText(themeCode).then(() => {
+        showThemeMessage('📋 Theme code copied to clipboard!', 'success');
+      }).catch(() => {
+        showThemeMessage('✗ Failed to copy', 'error');
+      });
+    }
+
+    // Show feedback message in theme modal
+    function showThemeMessage(message, type) {
+      const modalBody = themeModal.querySelector('.modal-body');
+      const existing = modalBody.querySelector('.theme-message');
+      if (existing) existing.remove();
+
+      const msg = document.createElement('div');
+      msg.className = 'theme-message';
+      msg.style.cssText = `
+        padding: 0.5rem 1rem;
+        margin-top: 0.5rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        background: ${type === 'success' ? '#d4edda' : '#f8d7da'};
+        color: ${type === 'success' ? '#155724' : '#721c24'};
+      `;
+      msg.textContent = message;
+      modalBody.querySelector('.theme-actions').appendChild(msg);
+
+      setTimeout(() => msg.remove(), 3000);
     }
 
     // Sample features array

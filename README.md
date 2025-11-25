@@ -9,7 +9,7 @@ A feature-rich, framework-agnostic Web Component for editing GeoJSON features wi
 - **GeoJSON-Aware Highlighting** - Distinct colors for GeoJSON keywords (`type`, `coordinates`, `geometry`, etc.)
 - **GeoJSON Type Validation** - Valid types (`Point`, `LineString`, `Polygon`, etc.) highlighted distinctly; invalid types (`LinearRing`, unknown types) shown with error styling (colors configurable via theme)
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
-- **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`)
+- **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); `coordinates` auto-collapsed on load
 - **Color Picker** - Built-in color picker for color properties in left gutter
 - **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
 - **Auto-format** - Optional automatic JSON formatting in real-time
@@ -17,7 +17,6 @@ A feature-rich, framework-agnostic Web Component for editing GeoJSON features wi
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
 - **Smart Copy/Paste** - Copy includes expanded content even from collapsed nodes
 - **FeatureCollection Mode** - Optional mode to auto-wrap features in a FeatureCollection structure
-- **CSS Isolation** - Complete Shadow DOM isolation from external CSS frameworks
 
 ## Installation
 
@@ -71,7 +70,6 @@ import '@softwarity/geojson-editor';
   <!-- User edits features, component wraps in FeatureCollection -->
   <geojson-editor
     feature-collection
-    collapsed='["coordinates"]'
     placeholder="Enter GeoJSON features here..."
   ></geojson-editor>
 </body>
@@ -121,10 +119,11 @@ editor.addEventListener('error', (e) => {
 | `value` | `string` | `""` | Initial editor content |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
-| `collapsed` | `string[]` (JSON) | `[]` | List of keys that start collapsed (all nodes are collapsible) |
 | `auto-format` | `boolean` | `false` | Auto-format JSON on input |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
 | `feature-collection` | `boolean` | `false` | When set, wraps editor content in a FeatureCollection for validation/events |
+
+**Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. All nodes can be manually expanded/collapsed by clicking the toggle button.
 
 ### Dark Selector Syntax
 
