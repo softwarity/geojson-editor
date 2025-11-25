@@ -1,6 +1,6 @@
 {
   "name": "@softwarity/geojson-editor",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A feature-rich GeoJSON editor Web Component with syntax highlighting, collapsible nodes, and color picker",
   "type": "module",
   "main": "./dist/geojson-editor.js",
