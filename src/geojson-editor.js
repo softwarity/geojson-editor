@@ -19,6 +19,10 @@ class GeoJsonEditor extends HTMLElement {
     // Debounce timer for syntax highlighting
     this.highlightTimer = null;
 
+    // Cached computed styles (avoid repeated getComputedStyle calls)
+    this._cachedLineHeight = null;
+    this._cachedPaddingTop = null;
+
     // Initialize themes from defaults
     this.themes = {
       dark: { ...GeoJsonEditor.DEFAULT_THEMES.dark },
@@ -78,6 +82,27 @@ class GeoJsonEditor extends HTMLElement {
   // FeatureCollection wrapper constants
   static FEATURE_COLLECTION_PREFIX = '{"type": "FeatureCollection", "features": [';
   static FEATURE_COLLECTION_SUFFIX = ']}';
+
+  // Pre-compiled regex patterns (avoid recompilation on each call)
+  static REGEX = {
+    // HTML escaping
+    ampersand: /&/g,
+    lessThan: /</g,
+    greaterThan: />/g,
+    // JSON structure
+    jsonKey: /"([^"]+)"\s*:/g,
+    typeValue: /<span class="geojson-key">"type"<\/span>:\s*"([^"]*)"/g,
+    stringValue: /:\s*"([^"]*)"/g,
+    numberAfterColon: /:\s*(-?\d+\.?\d*)/g,
+    boolean: /:\s*(true|false)/g,
+    nullValue: /:\s*(null)/g,
+    allNumbers: /\b(-?\d+\.?\d*)\b/g,
+    punctuation: /([{}[\],])/g,
+    // Highlighting detection
+    colorInLine: /"(\w+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g,
+    collapsibleNode: /^(\s*)"(\w+)"\s*:\s*([{\[])/,
+    collapsedMarker: /^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/
+  };
 
   connectedCallback() {
     this.render();
@@ -696,10 +721,10 @@ class GeoJsonEditor extends HTMLElement {
 
     lines.forEach((line, lineIndex) => {
       // Detect any hex color (6 digits) in string values
-      // Matches: "attributeName": "#RRGGBB"
-      const colorRegex = /"(\w+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g;
+      const R = GeoJsonEditor.REGEX;
+      R.colorInLine.lastIndex = 0; // Reset for global regex
       let colorMatch;
-      while ((colorMatch = colorRegex.exec(line)) !== null) {
+      while ((colorMatch = R.colorInLine.exec(line)) !== null) {
         colors.push({
           line: lineIndex,
           color: colorMatch[2],  // The hex color
@@ -708,7 +733,7 @@ class GeoJsonEditor extends HTMLElement {
       }
 
       // Detect collapsible nodes (all nodes are collapsible)
-      const nodeMatch = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])/);
+      const nodeMatch = line.match(R.collapsibleNode);
       if (nodeMatch) {
         const nodeKey = nodeMatch[2];
 
@@ -891,13 +916,15 @@ class GeoJsonEditor extends HTMLElement {
       return true;  // Unknown context - accept any type
     };
 
+    const R = GeoJsonEditor.REGEX;
+
     return text
       // Escape HTML first
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+      .replace(R.ampersand, '&amp;')
+      .replace(R.lessThan, '&lt;')
+      .replace(R.greaterThan, '&gt;')
       // All JSON keys - validate against context
-      .replace(/"([^"]+)"\s*:/g, (match, key) => {
+      .replace(R.jsonKey, (match, key) => {
         // Inside properties - all keys are regular user keys
         if (context === 'properties') {
           return `<span class="json-key">"${key}"</span>:`;
@@ -914,7 +941,7 @@ class GeoJsonEditor extends HTMLElement {
         }
       })
       // GeoJSON "type" values - validate based on context
-      .replace(/<span class="geojson-key">"type"<\/span>:\s*"([^"]*)"/g, (match, typeValue) => {
+      .replace(R.typeValue, (match, typeValue) => {
         if (isTypeValid(typeValue)) {
           return `<span class="geojson-key">"type"</span>: <span class="geojson-type">"${typeValue}"</span>`;
         } else {
@@ -922,17 +949,16 @@ class GeoJsonEditor extends HTMLElement {
         }
       })
       // Generic string values
-      .replace(/:\s*"([^"]*)"/g, (match, value) => {
+      .replace(R.stringValue, (match, value) => {
         // Skip if already highlighted (has span)
         if (match.includes('<span')) return match;
         return `: <span class="json-string">"${value}"</span>`;
       })
-      .replace(/:\s*(-?\d+\.?\d*)/g, ': <span class="json-number">$1</span>') // Numbers after colon
-      .replace(/:\s*(true|false)/g, ': <span class="json-boolean">$1</span>') // Booleans
-      .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>') // Null
-      // Highlight standalone numbers (including in arrays)
-      .replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>') // All numbers
-      .replace(/([{}[\],])/g, '<span class="json-punctuation">$1</span>'); // Punctuation (last!)
+      .replace(R.numberAfterColon, ': <span class="json-number">$1</span>')
+      .replace(R.boolean, ': <span class="json-boolean">$1</span>')
+      .replace(R.nullValue, ': <span class="json-null">$1</span>')
+      .replace(R.allNumbers, '<span class="json-number">$1</span>')
+      .replace(R.punctuation, '<span class="json-punctuation">$1</span>');
   }
 
   toggleCollapse(nodeKey, line) {
@@ -1112,11 +1138,17 @@ class GeoJsonEditor extends HTMLElement {
 
     if (!textarea) return;
 
-    const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight);
-    const paddingTop = parseFloat(getComputedStyle(textarea).paddingTop);
+    // Use cached computed styles (computed once, reused)
+    if (this._cachedLineHeight === null) {
+      const styles = getComputedStyle(textarea);
+      this._cachedLineHeight = parseFloat(styles.lineHeight);
+      this._cachedPaddingTop = parseFloat(styles.paddingTop);
+    }
+    const lineHeight = this._cachedLineHeight;
+    const paddingTop = this._cachedPaddingTop;
 
     // Clear gutter
-    gutterContent.innerHTML = '';
+    gutterContent.textContent = '';
 
     // Create a map of line -> elements (color, collapse button, or both)
     const lineElements = new Map();
@@ -1137,11 +1169,12 @@ class GeoJsonEditor extends HTMLElement {
       lineElements.get(line).buttons.push({ nodeKey, isCollapsed });
     });
 
-    // Create gutter lines with both elements
+    // Create gutter lines with DocumentFragment (single DOM update)
+    const fragment = document.createDocumentFragment();
+
     lineElements.forEach((elements, line) => {
       const gutterLine = document.createElement('div');
       gutterLine.className = 'gutter-line';
-      // Position at line start - flexbox centers the content automatically
       gutterLine.style.top = `${paddingTop + line * lineHeight}px`;
 
       // Add color indicators
@@ -1167,8 +1200,11 @@ class GeoJsonEditor extends HTMLElement {
         gutterLine.appendChild(button);
       });
 
-      gutterContent.appendChild(gutterLine);
+      fragment.appendChild(gutterLine);
     });
+
+    // Single DOM insertion
+    gutterContent.appendChild(fragment);
   }
 
   showColorPicker(indicator, line, currentColor, attributeName) {
@@ -1457,6 +1493,8 @@ class GeoJsonEditor extends HTMLElement {
 
   // Helper: Expand all collapsed markers and return expanded content
   expandAllCollapsed(content) {
+    const R = GeoJsonEditor.REGEX;
+
     while (content.includes('{...}') || content.includes('[...]')) {
       const lines = content.split('\n');
       let expanded = false;
@@ -1465,7 +1503,7 @@ class GeoJsonEditor extends HTMLElement {
         const line = lines[i];
         if (!line.includes('{...}') && !line.includes('[...]')) continue;
 
-        const match = line.match(/^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/);
+        const match = line.match(R.collapsedMarker);
         if (!match) continue;
 
         const nodeKey = match[2];
