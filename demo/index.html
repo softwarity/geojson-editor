@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>@softwarity/geojson-editor - Demo</title>
+  <!-- MapLibre GL JS - Latest version with globe support -->
+  <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
   <style>
     :root {
       --bg-canvas: #0d1117;
@@ -137,21 +140,52 @@
     .checkbox-group { display: flex; align-items: center; gap: 0.5rem; }
     .checkbox-group label { margin: 0; color: var(--text-secondary); }
 
-    .editor-container {
+    .editor-map-row {
+      display: flex;
+      gap: 1rem;
       margin-top: 2rem;
-      border: 2px solid var(--accent-blue);
+    }
+
+    .editor-container {
+      flex: 1;
+      min-width: 0;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid rgba(88, 166, 255, 0.4);
       border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(88, 166, 255, 0.15), 0 8px 32px rgba(0, 0, 0, 0.3);
     }
 
     .editor-label {
-      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-      color: white;
-      padding: 0.5rem 1rem;
+      margin: 0 0 0.5rem 0;
+      color: var(--text-primary);
       font-weight: 600;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
+    }
+
+    .map-container {
+      flex: 1;
+      min-width: 0;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border: 1px solid rgba(163, 113, 247, 0.4);
+      border-radius: 8px;
+    }
+
+    .map-label {
+      margin: 0 0 0.5rem 0;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    #map {
+      width: 100%;
+      height: 400px;
+      border-radius: 4px;
+    }
+
+    @media (max-width: 900px) {
+      .editor-map-row {
+        flex-direction: column;
+      }
     }
 
     .output pre { max-height: 400px; }
@@ -304,7 +338,7 @@
       </div>
     </div>
     <div class="description">
-      A lightweight <strong>~10 KB</strong> Web Component for editing GeoJSON — with built-in validation, contextual type highlighting, and auto-collapse coordinates.
+      A lightweight <strong>~12 KB</strong> Web Component for editing GeoJSON — with built-in validation, contextual type highlighting, auto-collapse coordinates, and feature visibility toggle (👁️ eye icon to hide/show features from events).
       <span style="color: var(--text-muted);">No Monaco (2.5 MB), no CodeMirror (150 KB), just what you need for GeoJSON.</span>
     </div>
 
@@ -376,11 +410,6 @@ Example:
             <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— wrap features in FeatureCollection</small>
           </div>
           <div class="checkbox-group">
-            <input type="checkbox" id="autoFormatCheck" checked>
-            <label for="autoFormatCheck">Auto-format JSON</label>
-            <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— indent in real-time</small>
-          </div>
-          <div class="checkbox-group">
             <input type="checkbox" id="readonlyCheck">
             <label for="readonlyCheck">Readonly mode</label>
             <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— disable editing</small>
@@ -389,9 +418,15 @@ Example:
       </div>
     </div>
 
-    <div class="editor-container">
-      <div class="editor-label">GeoJSON Editor Component</div>
-      <geojson-editor id="editor"></geojson-editor>
+    <div class="editor-map-row">
+      <div class="editor-container">
+        <div class="editor-label">GeoJSON Editor</div>
+        <geojson-editor id="editor"></geojson-editor>
+      </div>
+      <div class="map-container">
+        <div class="map-label">MapLibre Preview</div>
+        <div id="map"></div>
+      </div>
     </div>
 
     <div class="section-box output">
@@ -464,11 +499,155 @@ Example:
     const selectorPreview = document.getElementById('selectorPreview');
     const selectorDescription = document.getElementById('selectorDescription');
     const readonlyCheck = document.getElementById('readonlyCheck');
-    const autoFormatCheck = document.getElementById('autoFormatCheck');
     const featureCollectionCheck = document.getElementById('featureCollectionCheck');
     const themeModal = document.getElementById('themeModal');
     const themeTextarea = document.getElementById('themeTextarea');
     const themePresetMainSelect = document.getElementById('themePresetMainSelect');
+
+    // Initialize MapLibre map with globe projection
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://demotiles.maplibre.org/style.json',
+      center: [29.8, -3.4],
+      zoom: 2
+    });
+
+    // Add navigation controls
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+    // Store pending GeoJSON if map not ready yet
+    let pendingGeojson = null;
+
+    // Setup map when loaded
+    map.on('load', () => {
+      // Set globe projection for 3D Earth view
+      map.setProjection({ type: 'globe' });
+
+      // Add GeoJSON source
+      map.addSource('geojson-data', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
+      // Polygon fill layer
+      map.addLayer({
+        id: 'geojson-fill',
+        type: 'fill',
+        source: 'geojson-data',
+        filter: ['==', '$type', 'Polygon'],
+        paint: {
+          'fill-color': ['coalesce', ['get', 'fill-color'], '#58a6ff'],
+          'fill-opacity': ['coalesce', ['get', 'fill-opacity'], 0.4]
+        }
+      });
+
+      // Polygon outline layer
+      map.addLayer({
+        id: 'geojson-outline',
+        type: 'line',
+        source: 'geojson-data',
+        filter: ['==', '$type', 'Polygon'],
+        paint: {
+          'line-color': ['coalesce', ['get', 'stroke-color'], '#58a6ff'],
+          'line-width': ['coalesce', ['get', 'stroke-width'], 2]
+        }
+      });
+
+      // LineString layer
+      map.addLayer({
+        id: 'geojson-line',
+        type: 'line',
+        source: 'geojson-data',
+        filter: ['==', '$type', 'LineString'],
+        paint: {
+          'line-color': ['coalesce', ['get', 'stroke-color'], '#a371f7'],
+          'line-width': ['coalesce', ['get', 'stroke-width'], 3]
+        }
+      });
+
+      // Point layer
+      map.addLayer({
+        id: 'geojson-point',
+        type: 'circle',
+        source: 'geojson-data',
+        filter: ['==', '$type', 'Point'],
+        paint: {
+          'circle-radius': 8,
+          'circle-color': ['coalesce', ['get', 'fill-color'], '#f85149'],
+          'circle-stroke-color': ['coalesce', ['get', 'stroke-color'], '#ffffff'],
+          'circle-stroke-width': ['coalesce', ['get', 'stroke-width'], 2]
+        }
+      });
+
+      // Label layer for features with 'label' property
+      map.addLayer({
+        id: 'geojson-labels',
+        type: 'symbol',
+        source: 'geojson-data',
+        filter: ['has', 'label'],
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-size': ['coalesce', ['get', 'label-size'], 14],
+          'text-anchor': 'center',
+          'text-allow-overlap': false
+        },
+        paint: {
+          'text-color': ['coalesce', ['get', 'label-color'], '#ffffff'],
+          'text-halo-color': ['coalesce', ['get', 'label-halo-color'], '#000000'],
+          'text-halo-width': ['coalesce', ['get', 'label-halo-width'], 1.5]
+        }
+      });
+
+      // Apply pending GeoJSON if data was loaded before map was ready
+      if (pendingGeojson) {
+        updateMap(pendingGeojson);
+        pendingGeojson = null;
+      }
+    });
+
+    // Function to update map with GeoJSON data
+    function updateMap(geojson) {
+      if (!map.getSource('geojson-data')) {
+        // Map not ready, store for later
+        pendingGeojson = geojson;
+        return;
+      }
+
+      try {
+        map.getSource('geojson-data').setData(geojson);
+
+        // Fit bounds to data if there are features
+        if (geojson.features && geojson.features.length > 0) {
+          const bounds = new maplibregl.LngLatBounds();
+          let hasValidCoords = false;
+
+          geojson.features.forEach(feature => {
+            if (!feature.geometry) return;
+            const addCoords = (coords) => {
+              if (Array.isArray(coords[0])) {
+                coords.forEach(addCoords);
+              } else if (coords.length >= 2) {
+                bounds.extend([coords[0], coords[1]]);
+                hasValidCoords = true;
+              }
+            };
+            if (feature.geometry.coordinates) {
+              addCoords(feature.geometry.coordinates);
+            }
+          });
+
+          if (hasValidCoords) {
+            map.fitBounds(bounds, {
+              padding: 50,
+              maxZoom: 12,
+              duration: 1000
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to update map:', e);
+      }
+    }
 
     // Pre-defined theme presets
     const themePresets = {
@@ -645,12 +824,6 @@ Example:
         editor.removeAttribute('feature-collection');
       }
 
-      if (autoFormatCheck.checked) {
-        editor.setAttribute('auto-format', '');
-      } else {
-        editor.removeAttribute('auto-format');
-      }
-
       if (readonlyCheck.checked) {
         editor.setAttribute('readonly', '');
       } else {
@@ -664,7 +837,6 @@ Example:
     function updateHTMLCode() {
       const placeholder = placeholderInput.value;
       const readonly = readonlyCheck.checked;
-      const autoFormat = autoFormatCheck.checked;
       const featureCollection = featureCollectionCheck.checked;
       const scheme = colorSchemeSelect.value;
       const isDark = scheme === 'dark';
@@ -676,7 +848,6 @@ Example:
       let attrs = [];
       if (featureCollection) attrs.push('feature-collection');
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
-      if (autoFormat) attrs.push('auto-format');
       if (readonly) attrs.push('readonly');
       if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
 
@@ -731,6 +902,8 @@ Example:
       // Clear error log on successful parse
       errorLog.textContent = 'No errors';
       errorLog.style.color = '';
+      // Update map with the GeoJSON data
+      updateMap(e.detail);
     });
 
     // Listen to editor error events (invalid JSON)
@@ -748,7 +921,6 @@ Example:
       loadSampleData();
     });
     readonlyCheck.addEventListener('change', updateEditor);
-    autoFormatCheck.addEventListener('change', updateEditor);
 
     // Color scheme change - applies to the selector target and updates HTML code
     colorSchemeSelect.addEventListener('change', () => {
@@ -844,25 +1016,47 @@ editor.setTheme(${themeTextarea.value});`;
       setTimeout(() => msg.remove(), 3000);
     }
 
-    // Sample features array
+    // Sample features array with styling properties
     const sampleFeaturesArray = [
       {
         type: "Feature",
-        geometry: { type: "Point", coordinates: [166.4581, -22.2758] },
-        properties: { name: "Noumea Airport", type: "airport", color: "#3498db", category: "airport" }
-      },
-      {
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: [[166.4, -22.2], [167.0, -22.5], [167.5, -23.0]] },
-        properties: { name: "Flight Path", color: "#e74c3c", width: 2 }
-      },
-      {
-        type: "Feature",
         geometry: {
-          type: "Polygon",
-          coordinates: [[[166.0, -22.0], [167.0, -22.0], [167.0, -23.0], [166.0, -23.0], [166.0, -22.0]]]
+          type: "MultiPolygon",
+          coordinates: [[[[30.42472267,-2.31472206],[30.44166756,-2.30805588],[30.46166801,-2.3488884],[30.50499916,-2.38111114],[30.57333183,-2.39916611],[30.5233326,-2.45777702],[30.50152891,-2.52458305],[30.47972298,-2.5913887],[30.43305397,-2.64777756],[30.43083382,-2.67111015],[30.45722389,-2.68583298],[30.52277946,-2.64888763],[30.48999977,-2.70722198],[30.46333504,-2.71527862],[30.44027901,-2.74722099],[30.44833183,-2.77750015],[30.42749977,-2.80527687],[30.41750145,-2.8619442],[30.47055626,-2.90416717],[30.4849987,-2.94722176],[30.51055717,-2.94361114],[30.56333351,-2.89305496],[30.60611053,-2.91916738],[30.64888954,-2.94527817],[30.6661129,-2.97638893],[30.70305443,-2.96750069],[30.75444603,-2.99138832],[30.79961236,-2.98370168],[30.84477806,-2.97601318],[30.79555702,-3.04861069],[30.8338871,-3.08555603],[30.83194542,-3.12416649],[30.85222054,-3.14527702],[30.84222221,-3.20027733],[30.8227787,-3.22194481],[30.83500099,-3.25694466],[30.76749992,-3.29999924],[30.74083519,-3.27861023],[30.73027611,-3.3022213],[30.65166664,-3.33250046],[30.62220192,-3.37011337],[30.66361046,-3.38666534],[30.66222191,-3.41888809],[30.62833214,-3.45388794],[30.58138935,-3.47152826],[30.53444481,-3.48916626],[30.51972389,-3.51555633],[30.49138832,-3.50722122],[30.44916725,-3.54722214],[30.44360924,-3.61249924],[30.41750098,-3.66180458],[30.39138985,-3.71110916],[30.40083504,-3.78610992],[30.34610939,-3.7705555],[30.32111168,-3.78666687],[30.29583168,-3.85055542],[30.26194538,-3.88930579],[30.22805595,-3.92805481],[30.21916822,-3.97499948],[30.21027946,-4.02194405],[30.17222405,-4.08666611],[30.12750053,-4.13833427],[30.0727787,-4.16666603],[30.04944574,-4.21805512],[30.0261097,-4.26944351],[29.98403113,-4.29486384],[29.94194976,-4.32028186],[29.89986557,-4.34569755],[29.85777855,-4.37111092],[29.81277657,-4.36027718],[29.78250137,-4.41069474],[29.75222206,-4.46111107],[29.70488876,-4.45280131],[29.65755653,-4.44448853],[29.59913943,-4.44538712],[29.54072218,-4.4462811],[29.48230478,-4.44717049],[29.42388725,-4.44805527],[29.41249493,-4.36944462],[29.40110501,-4.29083381],[29.38971742,-4.21222283],[29.37833214,-4.13361168],[29.35874826,-4.08736157],[29.33916664,-4.04111099],[29.28777305,-3.97861259],[29.23638725,-3.91611099],[29.22999907,-3.8527775],[29.22361183,-3.78944397],[29.22944642,-3.7406941],[29.23528036,-3.6919442],[29.24111367,-3.64319426],[29.24694634,-3.59444427],[29.23729107,-3.52374998],[29.22763728,-3.45305558],[29.21798492,-3.38236108],[29.20833397,-3.31166649],[29.23696709,-3.27186584],[29.21055412,-3.23666573],[29.21277809,-3.15194511],[29.24055672,-3.11777687],[29.23777962,-3.05805588],[29.21916771,-3.02111053],[29.17500114,-3.0177784],[29.14861107,-2.99611092],[29.14055443,-2.95833206],[29.08416557,-2.92472267],[29.07944298,-2.88360977],[29.04083443,-2.81888771],[29.00277901,-2.82277679],[28.98388863,-2.80027771],[28.99305534,-2.76166534],[29.03888893,-2.73361015],[29.0522213,-2.70583343],[29.0529156,-2.65972233],[29.05360985,-2.61361122],[29.07139015,-2.59638786],[29.14055443,-2.58916664],[29.17666817,-2.6147213],[29.25277782,-2.63416808],[29.32888985,-2.65361023],[29.32583427,-2.68332863],[29.35666847,-2.72138786],[29.33722115,-2.76361084],[29.36722374,-2.82500076],[29.44389153,-2.79583359],[29.48874988,-2.81097307],[29.53360939,-2.82611084],[29.5850001,-2.80291765],[29.63638878,-2.77972221],[29.68055534,-2.80388832],[29.73638725,-2.80361175],[29.76527595,-2.75833321],[29.81583214,-2.7733326],[29.85083199,-2.75972176],[29.90749931,-2.69305611],[29.92194557,-2.65277862],[29.92263988,-2.58583355],[29.92333412,-2.51888847],[29.95472145,-2.47500038],[29.94499932,-2.42291645],[29.93527794,-2.37083244],[29.95222282,-2.30944443],[29.98305702,-2.34055519],[30.02083397,-2.33722305],[30.05888836,-2.374723],[30.09694481,-2.41222191],[30.15361214,-2.43055534],[30.1863907,-2.39805547],[30.21916771,-2.36555481],[30.22972298,-2.33638763],[30.28594399,-2.35598755],[30.35639,-2.33638763],[30.38110924,-2.2994442],[30.42472267,-2.31472206]]]]
         },
-        properties: { name: "Coverage Area", fill: "#2ecc71", stroke: "#27ae60", opacity: 0.5 }
+        properties: {
+          label: "HBBA FIR",
+          "label-color": "#ffffff",
+          "label-size": 16,
+          "label-halo-color": "#1a5c1d",
+          "label-halo-width": 2,
+          "fill-color": "#277A2B",
+          "fill-opacity": 0.4,
+          "stroke-color": "#9e293a",
+          "stroke-width": 3
+        }
+      },
+      {
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [29.3189, -3.3240] },
+        properties: {
+          label: "HBBA",
+          "label-color": "#ffffff",
+          "label-size": 12,
+          "fill-color": "#e74c3c",
+          "stroke-color": "#ffffff",
+          "stroke-width": 2
+        }
+      },
+      {
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: [[29.3189, -3.3240], [30.1, -2.8], [30.5, -2.5]] },
+        properties: {
+          label: "Airway",
+          "label-color": "#3498db",
+          "stroke-color": "#3498db",
+          "stroke-width": 2
+        }
       }
     ];
 

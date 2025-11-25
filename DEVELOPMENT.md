@@ -67,6 +67,66 @@ This serves the production build at `http://localhost:4173`
 
 ## Testing the Component
 
+### Unit Tests
+
+The project uses [@web/test-runner](https://modern-web.dev/docs/test-runner/overview/) with Playwright for unit testing.
+
+```bash
+# Run all tests once
+npm test
+
+# Run tests in watch mode (re-runs on file changes)
+npm run test:watch
+```
+
+**Test output example:**
+```
+test/geojson-editor.test.js:
+  ✓ GeoJsonEditor - Basic > should render with default state
+  ✓ GeoJsonEditor - Formatting > should always format JSON on input
+  ✓ GeoJsonEditor - Feature Visibility > should show visibility buttons for Features
+  ...
+
+Chromium: 47 passed, 0 failed
+Finished running tests in 4s, all tests passed! 🎉
+```
+
+### Coverage Report
+
+Coverage is automatically generated in CI. To run locally with coverage:
+
+```bash
+# Run tests with coverage report
+npx web-test-runner --coverage
+
+# Coverage report will be in coverage/ directory
+# Open coverage/lcov-report/index.html in browser
+```
+
+**Coverage configuration** is in `web-test-runner.config.js`.
+
+### Writing Tests
+
+Tests are located in `test/geojson-editor.test.js`. Example test structure:
+
+```javascript
+import { fixture, html, expect } from '@open-wc/testing';
+import '../src/geojson-editor.js';
+
+describe('GeoJsonEditor - MyFeature', () => {
+  it('should do something', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    // Wait for async operations
+    await new Promise(r => setTimeout(r, 150));
+
+    // Access shadow DOM
+    const textarea = el.shadowRoot.querySelector('textarea');
+    expect(textarea).to.exist;
+  });
+});
+```
+
 ### Test in Demo Page
 
 The demo page (`demo/index.html`) includes comprehensive examples:
@@ -77,9 +137,9 @@ The demo page (`demo/index.html`) includes comprehensive examples:
    - FeatureCollection mode
    - Color scheme (Dark/Light)
    - Readonly mode
-   - Auto-format
    - Collapsible nodes
    - Color picker
+   - Feature visibility toggle
    - Theme customization
 
 ### Test as npm Package (Local)
@@ -112,7 +172,6 @@ cat > index.html << 'EOF'
   <geojson-editor
     feature-collection
     placeholder="Enter GeoJSON features..."
-    auto-format
   ></geojson-editor>
 
   <script type="module">
@@ -158,18 +217,23 @@ Now changes to the source will be reflected immediately.
 geojson-editor/
 ├── src/
 │   └── geojson-editor.js       # Main Web Component source
+├── test/
+│   └── geojson-editor.test.js  # Unit tests
 ├── demo/
 │   └── index.html              # Interactive demo page
 ├── dist/                       # Built output (generated)
 │   └── geojson-editor.js       # Production bundle
+├── coverage/                   # Coverage reports (generated)
+│   └── lcov-report/            # HTML coverage report
 ├── .github/
 │   └── workflows/
-│       ├── main.yml            # CI build on all branches
+│       ├── main.yml            # CI build + tests on all branches
 │       ├── release.yml         # Manual release workflow
 │       ├── tag.yml             # Publish to npm on tag
 │       └── deploy-demo.yml     # Deploy demo to GitHub Pages
 ├── package.json                # Package configuration
-├── vite.config.js             # Vite build configuration
+├── vite.config.js              # Vite build configuration
+├── web-test-runner.config.js   # Test runner configuration
 ├── README.md                   # User documentation
 ├── DEVELOPMENT.md              # This file
 ├── RELEASE.md                  # Release process guide
@@ -219,10 +283,9 @@ Edit `demo/index.html` to test edge cases:
 <!-- Test readonly -->
 <geojson-editor readonly></geojson-editor>
 
-<!-- Test FeatureCollection mode with auto-format -->
+<!-- Test FeatureCollection mode -->
 <geojson-editor
   feature-collection
-  auto-format
   placeholder="Enter GeoJSON features..."
 ></geojson-editor>
 
@@ -289,6 +352,7 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
+- [ ] `npm test` passes all unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work (collapse, color picker, themes, etc.)
@@ -297,7 +361,7 @@ Before submitting changes, verify:
 - [ ] No console errors in browser DevTools
 - [ ] Works in both dark and light themes
 - [ ] FeatureCollection mode works correctly
-- [ ] Auto-format works correctly
+- [ ] Feature visibility toggle works (eye icon)
 - [ ] Readonly mode works
 - [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
 - [ ] `error` events fire with invalid JSON/GeoJSON
@@ -422,6 +486,11 @@ npm run build        # Build for production
 npm run preview      # Preview production build
 
 # Testing
+npm test                        # Run unit tests once
+npm run test:watch              # Run tests in watch mode
+npx web-test-runner --coverage  # Run tests with coverage report
+
+# Package testing
 npm link             # Link package globally
 npm run build        # Build before testing
 

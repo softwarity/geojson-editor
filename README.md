@@ -32,12 +32,13 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 
 | | @softwarity/geojson-editor | Monaco Editor | CodeMirror | Prism.js |
 |---|:---:|:---:|:---:|:---:|
-| **Size (gzip)** | ~10 KB | ~2.5 MB | ~150 KB | ~15 KB + plugins |
+| **Size (gzip)** | ~12 KB | ~2.5 MB | ~150 KB | ~15 KB + plugins |
 | **GeoJSON validation** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ None |
 | **Type highlighting** | ✅ Contextual | ⚠️ Generic JSON | ⚠️ Generic JSON | ⚠️ Generic JSON |
 | **Invalid type detection** | ✅ Visual feedback | ❌ | ❌ | ❌ |
 | **Collapsible nodes** | ✅ Native | ✅ | ✅ Plugin | ❌ |
 | **Color picker** | ✅ Integrated | ❌ | ❌ | ❌ |
+| **Feature visibility toggle** | ✅ | ❌ | ❌ | ❌ |
 | **Auto-collapse coordinates** | ✅ | ❌ | ❌ | ❌ |
 | **FeatureCollection mode** | ✅ | ❌ | ❌ | ❌ |
 | **Dark mode detection** | ✅ Auto | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual |
@@ -52,9 +53,10 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **GeoJSON Type Validation** - Valid types (`Point`, `LineString`, `Polygon`, etc.) highlighted distinctly; invalid types (`LinearRing`, unknown types) shown with error styling (colors configurable via theme)
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
 - **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); `coordinates` auto-collapsed on load
+- **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
 - **Color Picker** - Built-in color picker for color properties in left gutter
 - **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
-- **Auto-format** - Optional automatic JSON formatting in real-time
+- **Auto-format** - Automatic JSON formatting in real-time (always enabled)
 - **Readonly Mode** - Visual indicator with diagonal stripes when editing is disabled
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
 - **Smart Copy/Paste** - Copy includes expanded content even from collapsed nodes
@@ -127,13 +129,12 @@ import '@softwarity/geojson-editor';
 ></geojson-editor>
 ```
 
-### With Auto-format and Theme Detection
+### With Theme Detection
 
 ```html
 <geojson-editor
   feature-collection
   dark-selector="html.dark"
-  auto-format
 ></geojson-editor>
 ```
 
@@ -161,7 +162,6 @@ editor.addEventListener('error', (e) => {
 | `value` | `string` | `""` | Initial editor content |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
-| `auto-format` | `boolean` | `false` | Auto-format JSON on input |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
 | `feature-collection` | `boolean` | `false` | When set, wraps editor content in a FeatureCollection for validation/events |
 
@@ -209,6 +209,8 @@ editor.addEventListener('change', (e) => {
 ```
 
 **Event detail:** The parsed GeoJSON object directly. In `feature-collection` mode, the wrapper is included.
+
+**Note:** Hidden features (toggled via the eye icon) are automatically excluded from the emitted GeoJSON. This allows temporary filtering without modifying the actual JSON content.
 
 **Example with FeatureCollection mode:**
 

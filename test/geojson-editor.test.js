@@ -161,10 +161,10 @@ describe('GeoJsonEditor - Placeholder', () => {
   });
 });
 
-describe('GeoJsonEditor - Auto Format', () => {
+describe('GeoJsonEditor - Formatting', () => {
 
-  it('should format JSON when auto-format is enabled', async () => {
-    const el = await fixture(html`<geojson-editor auto-format></geojson-editor>`);
+  it('should always format JSON on input', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
     const textarea = el.shadowRoot.querySelector('textarea');
 
     // Input minified JSON
@@ -176,20 +176,6 @@ describe('GeoJsonEditor - Auto Format', () => {
 
     // Should be formatted with indentation
     expect(textarea.value).to.include('\n');
-  });
-
-  it('should not format when auto-format is disabled', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    const textarea = el.shadowRoot.querySelector('textarea');
-
-    const minified = '{"type":"Feature"}';
-    textarea.value = minified;
-    textarea.dispatchEvent(new Event('input', { bubbles: true }));
-
-    await new Promise(r => setTimeout(r, 200));
-
-    // Should remain minified (no newlines added)
-    expect(textarea.value).to.equal(minified);
   });
 });
 
@@ -629,6 +615,82 @@ describe('GeoJsonEditor - Color Picker', () => {
 
     // The event should contain the updated GeoJSON
     expect(event.detail.properties.color).to.equal('#0000ff');
+  });
+
+  it('should detect color properties with hyphenated names (fill-color)', async () => {
+    const featureWithHyphenatedColor = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { "fill-color": "#3498db" }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithHyphenatedColor}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicators = gutter.querySelectorAll('.color-indicator');
+
+    expect(colorIndicators.length).to.equal(1);
+    expect(colorIndicators[0].dataset.attributeName).to.equal('fill-color');
+    expect(colorIndicators[0].dataset.color).to.equal('#3498db');
+  });
+
+  it('should detect multiple hyphenated color properties', async () => {
+    const featureWithMultipleColors = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: {
+        "fill-color": "#2ecc71",
+        "stroke-color": "#27ae60"
+      }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithMultipleColors}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicators = gutter.querySelectorAll('.color-indicator');
+
+    expect(colorIndicators.length).to.equal(2);
+
+    const attributeNames = Array.from(colorIndicators).map(i => i.dataset.attributeName);
+    expect(attributeNames).to.include('fill-color');
+    expect(attributeNames).to.include('stroke-color');
+  });
+
+  it('should update hyphenated color property value', async () => {
+    const featureWithHyphenatedColor = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { "stroke-color": "#e74c3c" }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithHyphenatedColor}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const textarea = el.shadowRoot.querySelector('textarea');
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicator = gutter.querySelector('.color-indicator');
+
+    expect(colorIndicator).to.exist;
+    expect(colorIndicator.dataset.attributeName).to.equal('stroke-color');
+
+    const line = parseInt(colorIndicator.dataset.line);
+    el.updateColorValue(line, '#9b59b6', 'stroke-color');
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(textarea.value).to.include('#9b59b6');
+    expect(textarea.value).to.not.include('#e74c3c');
   });
 });
 

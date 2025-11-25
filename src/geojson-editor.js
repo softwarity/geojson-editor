@@ -25,7 +25,7 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['readonly', 'value', 'placeholder', 'auto-format', 'dark-selector', 'feature-collection'];
+    return ['readonly', 'value', 'placeholder', 'dark-selector', 'feature-collection'];
   }
 
 
@@ -96,7 +96,7 @@ class GeoJsonEditor extends HTMLElement {
     allNumbers: /\b(-?\d+\.?\d*)\b/g,
     punctuation: /([{}[\],])/g,
     // Highlighting detection
-    colorInLine: /"(\w+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g,
+    colorInLine: /"([\w-]+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g,
     collapsibleNode: /^(\s*)"(\w+)"\s*:\s*([{\[])/,
     collapsedMarker: /^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/
   };
@@ -131,13 +131,6 @@ class GeoJsonEditor extends HTMLElement {
       this.updateThemeCSS();
     } else if (name === 'feature-collection') {
       this.updatePrefixSuffix();
-    } else if (name === 'auto-format') {
-      // When auto-format is enabled, format the current content
-      const textarea = this.shadowRoot?.getElementById('textarea');
-      if (textarea && textarea.value && this.autoFormat) {
-        this.autoFormatContent();
-        this.updateHighlight();
-      }
     }
   }
 
@@ -153,10 +146,6 @@ class GeoJsonEditor extends HTMLElement {
 
   get placeholder() {
     return this.getAttribute('placeholder') || '';
-  }
-
-  get autoFormat() {
-    return this.hasAttribute('auto-format');
   }
 
   get featureCollection() {
@@ -588,10 +577,8 @@ class GeoJsonEditor extends HTMLElement {
 
       clearTimeout(this.highlightTimer);
       this.highlightTimer = setTimeout(() => {
-        // Auto-format if enabled and JSON is valid
-        if (this.autoFormat) {
-          this.autoFormatContentWithCursor();
-        }
+        // Auto-format JSON content
+        this.autoFormatContentWithCursor();
         this.updateHighlight();
         this.emitChange();
       }, 150);
@@ -605,10 +592,8 @@ class GeoJsonEditor extends HTMLElement {
       // Use a short delay to let the paste complete
       setTimeout(() => {
         this.updatePlaceholderVisibility();
-        // Auto-format if enabled and JSON is valid
-        if (this.autoFormat) {
-          this.autoFormatContentWithCursor();
-        }
+        // Auto-format JSON content
+        this.autoFormatContentWithCursor();
         this.updateHighlight();
         this.emitChange();
         // Auto-collapse coordinates after paste
@@ -706,8 +691,8 @@ class GeoJsonEditor extends HTMLElement {
     if (textarea && textarea.value !== newValue) {
       textarea.value = newValue || '';
 
-      // Apply auto-format if enabled
-      if (this.autoFormat && newValue) {
+      // Auto-format JSON content
+      if (newValue) {
         try {
           const prefix = this.prefix;
           const suffix = this.suffix;
