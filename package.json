@@ -16,7 +16,7 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build && terser dist/geojson-editor.js -o dist/geojson-editor.js --compress passes=3 --mangle toplevel=true --format comments=false",
+    "build": "vite build && terser dist/geojson-editor.js -o dist/geojson-editor.js --compress passes=3 --mangle toplevel=true --comments /license/i",
     "preview": "vite preview"
   },
   "repository": {

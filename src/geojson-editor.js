@@ -1,11 +1,3 @@
-/**
- * GeoJSON Editor Web Component
- * Features:
- * - Syntax highlighting for JSON
- * - Collapsible nodes with [-]/[+] buttons
- * - Color picker in left gutter
- * - Support for array and JSON modes
- */
 class GeoJsonEditor extends HTMLElement {
   constructor() {
     super();
