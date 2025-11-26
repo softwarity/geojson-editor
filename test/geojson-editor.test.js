@@ -1356,7 +1356,7 @@ describe('GeoJsonEditor - Features API', () => {
       expect(features[0].properties).to.be.null;
     });
 
-    it('should accept GeometryCollection feature', async () => {
+    it('should reject GeometryCollection feature (not supported)', async () => {
       const el = await fixture(html`<geojson-editor></geojson-editor>`);
 
       const geomCollFeature = {
@@ -1370,23 +1370,7 @@ describe('GeoJsonEditor - Features API', () => {
         },
         properties: {}
       };
-      el.add(geomCollFeature);
-      await new Promise(r => setTimeout(r, 50));
-
-      const features = el.getAll();
-      expect(features.length).to.equal(1);
-      expect(features[0].geometry.type).to.equal('GeometryCollection');
-    });
-
-    it('should throw error for GeometryCollection without geometries array', async () => {
-      const el = await fixture(html`<geojson-editor></geojson-editor>`);
-
-      const badGeomColl = {
-        type: 'Feature',
-        geometry: { type: 'GeometryCollection' },
-        properties: {}
-      };
-      expect(() => el.add(badGeomColl)).to.throw('GeometryCollection must have a "geometries" array');
+      expect(() => el.add(geomCollFeature)).to.throw('Invalid geometry type "GeometryCollection"');
     });
   });
 });

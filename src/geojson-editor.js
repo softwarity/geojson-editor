@@ -855,24 +855,14 @@ class GeoJsonEditor extends HTMLElement {
 
   // GeoJSON type constants (consolidated)
   static GEOJSON = {
-    FEATURE_TYPES: ['Feature', 'FeatureCollection'],
-    GEOMETRY_TYPES: ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection'],
-    ALL_TYPES: ['Feature', 'FeatureCollection', 'Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection']
+    GEOMETRY_TYPES: ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'],
   };
 
   // Valid keys per context (null = any key is valid)
   static VALID_KEYS_BY_CONTEXT = {
-    Feature: ['type', 'geometry', 'properties', 'id', 'bbox'],
-    FeatureCollection: ['type', 'features', 'bbox', 'properties'],
-    Point: ['type', 'coordinates', 'bbox'],
-    MultiPoint: ['type', 'coordinates', 'bbox'],
-    LineString: ['type', 'coordinates', 'bbox'],
-    MultiLineString: ['type', 'coordinates', 'bbox'],
-    Polygon: ['type', 'coordinates', 'bbox'],
-    MultiPolygon: ['type', 'coordinates', 'bbox'],
-    GeometryCollection: ['type', 'geometries', 'bbox'],
+    Feature: ['type', 'geometry', 'properties', 'id'],
     properties: null,  // Any key valid in properties
-    geometry: ['type', 'coordinates', 'geometries', 'bbox'],  // Generic geometry context
+    geometry: ['type', 'coordinates'],  // Generic geometry context
   };
 
   // Keys that change context for their value
@@ -880,7 +870,6 @@ class GeoJsonEditor extends HTMLElement {
     geometry: 'geometry',
     properties: 'properties',
     features: 'Feature',      // Array of Features
-    geometries: 'geometry',   // Array of geometries
   };
 
   // Build context map for each line by analyzing JSON structure
@@ -939,7 +928,8 @@ class GeoJsonEditor extends HTMLElement {
               const typeMatch = line.substring(0, j).match(/"type"\s*:\s*$/);
               if (typeMatch) {
                 const valueMatch = line.substring(j).match(/^"([^"\\]*(?:\\.[^"\\]*)*)"/);
-                if (valueMatch && GeoJsonEditor.GEOJSON.ALL_TYPES.includes(valueMatch[1])) {
+                const validTypes = ['Feature', ...GeoJsonEditor.GEOJSON.GEOMETRY_TYPES];
+                if (valueMatch && validTypes.includes(valueMatch[1])) {
                   const currentCtx = contextStack[contextStack.length - 1];
                   if (currentCtx) {
                     currentCtx.context = valueMatch[1];
@@ -990,7 +980,8 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // All known GeoJSON structural keys (always valid in GeoJSON)
-  static GEOJSON_STRUCTURAL_KEYS = ['type', 'geometry', 'properties', 'features', 'geometries', 'coordinates', 'bbox', 'id', 'crs'];
+  // GeoJSON structural keys that are always valid (not user properties)
+  static GEOJSON_STRUCTURAL_KEYS = ['type', 'geometry', 'properties', 'coordinates', 'id'];
 
   highlightSyntax(text, context) {
     if (!text.trim()) return '';
@@ -1009,15 +1000,15 @@ class GeoJsonEditor extends HTMLElement {
 
     // Helper to check if a type value is valid in current context
     const isTypeValid = (typeValue) => {
-      // Unknown context - don't validate (could be inside misspelled properties, etc.)
+      // Unknown context - don't validate
       if (!context) return true;
       if (context === 'properties') return true;  // Any type in properties
       if (context === 'geometry' || GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(context)) {
         return GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(typeValue);
       }
-      // Only validate as GeoJSON type in known Feature/FeatureCollection context
-      if (context === 'Feature' || context === 'FeatureCollection') {
-        return GeoJsonEditor.GEOJSON.ALL_TYPES.includes(typeValue);
+      // In Feature context: accept Feature or geometry types
+      if (context === 'Feature') {
+        return typeValue === 'Feature' || GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(typeValue);
       }
       return true;  // Unknown context - accept any type
     };
@@ -1443,8 +1434,11 @@ class GeoJsonEditor extends HTMLElement {
       // Filter out hidden features before emitting
       parsed = this.filterHiddenFeatures(parsed);
 
-      // Validate GeoJSON types
-      const validationErrors = this.validateGeoJSON(parsed);
+      // Validate GeoJSON types (validate only features, not the wrapper)
+      let validationErrors = [];
+      parsed.features.forEach((feature, index) => {
+        validationErrors.push(...this.validateGeoJSON(feature, `features[${index}]`, 'root'));
+      });
 
       if (validationErrors.length > 0) {
         // Emit error event for GeoJSON validation errors
@@ -1484,23 +1478,12 @@ class GeoJsonEditor extends HTMLElement {
   filterHiddenFeatures(parsed) {
     if (!parsed || this.hiddenFeatures.size === 0) return parsed;
 
-    if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-      // Filter features array
-      const visibleFeatures = parsed.features.filter(feature => {
-        const key = this.getFeatureKey(feature);
-        return !this.hiddenFeatures.has(key);
-      });
-      return { ...parsed, features: visibleFeatures };
-    } else if (parsed.type === 'Feature') {
-      // Single feature - check if hidden
-      const key = this.getFeatureKey(parsed);
-      if (this.hiddenFeatures.has(key)) {
-        // Return empty FeatureCollection when single feature is hidden
-        return { type: 'FeatureCollection', features: [] };
-      }
-    }
-
-    return parsed;
+    // parsed is always a FeatureCollection (from wrapper)
+    const visibleFeatures = parsed.features.filter((feature) => {
+      const key = this.getFeatureKey(feature);
+      return !this.hiddenFeatures.has(key);
+    });
+    return { ...parsed, features: visibleFeatures };
   }
 
   // ========== Feature Visibility Management ==========
@@ -1515,9 +1498,9 @@ class GeoJsonEditor extends HTMLElement {
     // 2. Use properties.id if present
     if (feature.properties?.id !== undefined) return `prop:${feature.properties.id}`;
 
-    // 3. Fallback: hash based on geometry type + first coordinates
+    // 3. Fallback: hash based on geometry type + ALL coordinates
     const geomType = feature.geometry?.type || 'null';
-    const coords = JSON.stringify(feature.geometry?.coordinates || []).slice(0, 100);
+    const coords = JSON.stringify(feature.geometry?.coordinates || []);
     return `hash:${geomType}:${this.simpleHash(coords)}`;
   }
 
@@ -1562,12 +1545,8 @@ class GeoJsonEditor extends HTMLElement {
       const fullValue = prefix + expandedText + suffix;
       const parsed = JSON.parse(fullValue);
 
-      let features = [];
-      if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-        features = parsed.features;
-      } else if (parsed.type === 'Feature') {
-        features = [parsed];
-      }
+      // parsed is always a FeatureCollection (from wrapper)
+      const features = parsed.features;
 
       // Now find each feature's line range in the text
       const lines = text.split('\n');
@@ -1585,10 +1564,18 @@ class GeoJsonEditor extends HTMLElement {
         const isFeatureTypeLine = /"type"\s*:\s*"Feature"/.test(line);
         if (!inFeature && isFeatureTypeLine) {
           // Find the opening brace for this Feature
-          // Look backwards for the opening brace
+          // Look backwards for a line that starts with just '{' (the Feature's opening brace)
+          // Not a line like '"geometry": {' which contains other content before the brace
           let startLine = i;
           for (let j = i; j >= 0; j--) {
-            if (lines[j].includes('{')) {
+            const trimmed = lines[j].trim();
+            // Line is just '{' or '{' followed by nothing significant (opening brace only)
+            if (trimmed === '{' || trimmed === '{,') {
+              startLine = j;
+              break;
+            }
+            // Also handle case where Feature starts on same line: { "type": "Feature"
+            if (trimmed.startsWith('{') && !trimmed.includes(':')) {
               startLine = j;
               break;
             }
@@ -1671,9 +1658,9 @@ class GeoJsonEditor extends HTMLElement {
             errors.push(`Invalid geometry type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.join(', ')})`);
           }
         } else {
-          // At root or in features: must be Feature or FeatureCollection
-          if (!GeoJsonEditor.GEOJSON.FEATURE_TYPES.includes(typeValue)) {
-            errors.push(`Invalid type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON.FEATURE_TYPES.join(', ')})`);
+          // At root or in features: must be Feature
+          if (typeValue !== 'Feature') {
+            errors.push(`Invalid type "${typeValue}" at ${path || 'root'} (expected: Feature)`);
           }
         }
       }
@@ -2168,14 +2155,9 @@ class GeoJsonEditor extends HTMLElement {
           errors.push(`Invalid geometry type "${feature.geometry.type}" (expected: ${GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.join(', ')})`);
         }
 
-        // Check geometry has coordinates (except GeometryCollection)
-        if (feature.geometry.type !== 'GeometryCollection' && !('coordinates' in feature.geometry)) {
+        // Check geometry has coordinates
+        if (!('coordinates' in feature.geometry)) {
           errors.push('Geometry must have a "coordinates" property');
-        }
-
-        // GeometryCollection must have geometries array
-        if (feature.geometry.type === 'GeometryCollection' && !Array.isArray(feature.geometry.geometries)) {
-          errors.push('GeometryCollection must have a "geometries" array');
         }
       }
     }
