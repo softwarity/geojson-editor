@@ -76,6 +76,31 @@ class GeoJsonEditor extends HTMLElement {
     collapsedMarker: /^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/
   };
 
+  /**
+   * Find collapsed data by line index, nodeKey, and indent
+   * @param {number} lineIndex - Current line index
+   * @param {string} nodeKey - Node key to find
+   * @param {number} indent - Indentation level to match
+   * @returns {{key: string, data: Object}|null} Found key and data, or null
+   * @private
+   */
+  _findCollapsedData(lineIndex, nodeKey, indent) {
+    // Try exact match first
+    const exactKey = `${lineIndex}-${nodeKey}`;
+    if (this.collapsedData.has(exactKey)) {
+      return { key: exactKey, data: this.collapsedData.get(exactKey) };
+    }
+
+    // Search for any key with this nodeKey and matching indent
+    for (const [key, data] of this.collapsedData.entries()) {
+      if (data.nodeKey === nodeKey && data.indent === indent) {
+        return { key, data };
+      }
+    }
+
+    return null;
+  }
+
   connectedCallback() {
     this.render();
     this.setupEventListeners();
@@ -260,25 +285,6 @@ class GeoJsonEditor extends HTMLElement {
     if (!hasChanges) return feature;
 
     return { ...feature, properties: newProps };
-  }
-
-  /**
-   * Apply default properties to all features in a parsed GeoJSON.
-   * Returns a new GeoJSON object (doesn't mutate original).
-   */
-  _applyDefaultProperties(parsed) {
-    if (!parsed || !this._defaultPropertiesRules || this._defaultPropertiesRules.length === 0) {
-      return parsed;
-    }
-
-    if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-      const newFeatures = parsed.features.map(f => this._applyDefaultPropertiesToFeature(f));
-      return { ...parsed, features: newFeatures };
-    } else if (parsed.type === 'Feature') {
-      return this._applyDefaultPropertiesToFeature(parsed);
-    }
-
-    return parsed;
   }
 
   render() {
@@ -849,32 +855,18 @@ class GeoJsonEditor extends HTMLElement {
       // Auto-format JSON content
       if (newValue) {
         try {
-          const prefix = this.prefix;
-          const suffix = this.suffix;
+          // Wrap content in array brackets for validation and formatting
+          const wrapped = '[' + newValue + ']';
+          const parsed = JSON.parse(wrapped);
+          const formatted = JSON.stringify(parsed, null, 2);
 
-          // Check if prefix ends with [ and suffix starts with ]
-          const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
-          const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
-
-          if (prefixEndsWithBracket && suffixStartsWithBracket) {
-            // Wrap content in array brackets for validation and formatting
-            const wrapped = '[' + newValue + ']';
-            const parsed = JSON.parse(wrapped);
-            const formatted = JSON.stringify(parsed, null, 2);
-
-            // Remove first [ and last ] from formatted
-            const lines = formatted.split('\n');
-            if (lines.length > 2) {
-              textarea.value = lines.slice(1, -1).join('\n');
-            } else {
-              textarea.value = '';
-            }
-          } else if (!prefix && !suffix) {
-            // No prefix/suffix - format directly
-            const parsed = JSON.parse(newValue);
-            textarea.value = JSON.stringify(parsed, null, 2);
+          // Remove first [ and last ] from formatted
+          const lines = formatted.split('\n');
+          if (lines.length > 2) {
+            textarea.value = lines.slice(1, -1).join('\n');
+          } else {
+            textarea.value = '';
           }
-          // else: keep as-is for complex cases
         } catch (e) {
           // Invalid JSON, keep as-is
         }
@@ -1011,10 +1003,12 @@ class GeoJsonEditor extends HTMLElement {
     };
   }
 
-  // GeoJSON type constants
-  static GEOJSON_TYPES_FEATURE = ['Feature', 'FeatureCollection'];
-  static GEOJSON_TYPES_GEOMETRY = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection'];
-  static GEOJSON_TYPES_ALL = [...GeoJsonEditor.GEOJSON_TYPES_FEATURE, ...GeoJsonEditor.GEOJSON_TYPES_GEOMETRY];
+  // GeoJSON type constants (consolidated)
+  static GEOJSON = {
+    FEATURE_TYPES: ['Feature', 'FeatureCollection'],
+    GEOMETRY_TYPES: ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection'],
+    ALL_TYPES: ['Feature', 'FeatureCollection', 'Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', 'GeometryCollection']
+  };
 
   // Valid keys per context (null = any key is valid)
   static VALID_KEYS_BY_CONTEXT = {
@@ -1095,7 +1089,7 @@ class GeoJsonEditor extends HTMLElement {
               const typeMatch = line.substring(0, j).match(/"type"\s*:\s*$/);
               if (typeMatch) {
                 const valueMatch = line.substring(j).match(/^"([^"\\]*(?:\\.[^"\\]*)*)"/);
-                if (valueMatch && GeoJsonEditor.GEOJSON_TYPES_ALL.includes(valueMatch[1])) {
+                if (valueMatch && GeoJsonEditor.GEOJSON.ALL_TYPES.includes(valueMatch[1])) {
                   const currentCtx = contextStack[contextStack.length - 1];
                   if (currentCtx) {
                     currentCtx.context = valueMatch[1];
@@ -1168,12 +1162,12 @@ class GeoJsonEditor extends HTMLElement {
       // Unknown context - don't validate (could be inside misspelled properties, etc.)
       if (!context) return true;
       if (context === 'properties') return true;  // Any type in properties
-      if (context === 'geometry' || GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(context)) {
-        return GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(typeValue);
+      if (context === 'geometry' || GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(context)) {
+        return GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(typeValue);
       }
       // Only validate as GeoJSON type in known Feature/FeatureCollection context
       if (context === 'Feature' || context === 'FeatureCollection') {
-        return GeoJsonEditor.GEOJSON_TYPES_ALL.includes(typeValue);
+        return GeoJsonEditor.GEOJSON.ALL_TYPES.includes(typeValue);
       }
       return true;  // Unknown context - accept any type
     };
@@ -1232,35 +1226,16 @@ class GeoJsonEditor extends HTMLElement {
     const hasMarker = currentLine.includes('{...}') || currentLine.includes('[...]');
 
     if (hasMarker) {
-      // Expand: find the correct collapsed data by searching for this nodeKey
-      let foundKey = null;
-      let foundData = null;
+      // Expand: find the correct collapsed data
+      const currentIndent = currentLine.match(/^(\s*)/)[1].length;
+      const found = this._findCollapsedData(line, nodeKey, currentIndent);
 
-      // Try exact match first
-      const exactKey = `${line}-${nodeKey}`;
-      if (this.collapsedData.has(exactKey)) {
-        foundKey = exactKey;
-        foundData = this.collapsedData.get(exactKey);
-      } else {
-        // Search for any key with this nodeKey (line numbers may have shifted)
-        for (const [key, data] of this.collapsedData.entries()) {
-          if (data.nodeKey === nodeKey) {
-            // Check indent to distinguish between multiple nodes with same name
-            const currentIndent = currentLine.match(/^(\s*)/)[1].length;
-            if (data.indent === currentIndent) {
-              foundKey = key;
-              foundData = data;
-              break;
-            }
-          }
-        }
-      }
-
-      if (!foundKey || !foundData) {
+      if (!found) {
         return;
       }
 
-      const {originalLine, content} = foundData;
+      const { key: foundKey, data: foundData } = found;
+      const { originalLine, content } = foundData;
 
       // Restore original line and content
       lines[line] = originalLine;
@@ -1552,44 +1527,29 @@ class GeoJsonEditor extends HTMLElement {
       if (line.includes('{...}') || line.includes('[...]')) {
         const match = line.match(R.collapsedMarker);
         if (match) {
-          const nodeKey = match[2]; // Extract nodeKey from the marker
-          const exactKey = `${absoluteLineNum}-${nodeKey}`;
+          const nodeKey = match[2];
+          const currentIndent = match[1].length;
 
-          // Try exact key match first
-          if (this.collapsedData.has(exactKey)) {
-            const collapsed = this.collapsedData.get(exactKey);
-            expandedLines.push(collapsed.originalLine);
-            expandedLines.push(...collapsed.content);
+          // Try to find collapsed data using helper
+          const found = this._findCollapsedData(absoluteLineNum, nodeKey, currentIndent);
+          if (found) {
+            expandedLines.push(found.data.originalLine);
+            expandedLines.push(...found.data.content);
             return;
           }
 
-          // Fallback: search by line number and nodeKey
-          let found = false;
-          for (const [key, collapsed] of this.collapsedData.entries()) {
-            if (key.endsWith(`-${nodeKey}`)) {
+          // Fallback: search by nodeKey only (line numbers may have shifted)
+          for (const [, collapsed] of this.collapsedData.entries()) {
+            if (collapsed.nodeKey === nodeKey) {
               expandedLines.push(collapsed.originalLine);
               expandedLines.push(...collapsed.content);
-              found = true;
-              break;
+              return;
             }
           }
-          if (found) return;
         }
 
-        // Fallback: search by line number only
-        let found = false;
-        for (const [key, collapsed] of this.collapsedData.entries()) {
-          const collapsedLineNum = parseInt(key.split('-')[0]);
-          if (collapsedLineNum === absoluteLineNum) {
-            expandedLines.push(collapsed.originalLine);
-            expandedLines.push(...collapsed.content);
-            found = true;
-            break;
-          }
-        }
-        if (!found) {
-          expandedLines.push(line);
-        }
+        // Line not found in collapsed data, keep as-is
+        expandedLines.push(line);
       } else {
         expandedLines.push(line);
       }
@@ -1623,10 +1583,8 @@ class GeoJsonEditor extends HTMLElement {
     // Expand ALL collapsed nodes to get full content
     const editorContent = this.expandAllCollapsed(textarea.value);
 
-    // Build complete value with prefix/suffix
-    const prefix = this.prefix;
-    const suffix = this.suffix;
-    const fullValue = prefix + editorContent + suffix;
+    // Build complete value with prefix/suffix (fixed FeatureCollection wrapper)
+    const fullValue = this.prefix + editorContent + this.suffix;
 
     // Try to parse
     try {
@@ -1859,13 +1817,13 @@ class GeoJsonEditor extends HTMLElement {
       if (typeof typeValue === 'string') {
         if (context === 'geometry') {
           // In geometry: must be a geometry type
-          if (!GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(typeValue)) {
-            errors.push(`Invalid geometry type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.join(', ')})`);
+          if (!GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(typeValue)) {
+            errors.push(`Invalid geometry type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.join(', ')})`);
           }
         } else {
           // At root or in features: must be Feature or FeatureCollection
-          if (!GeoJsonEditor.GEOJSON_TYPES_FEATURE.includes(typeValue)) {
-            errors.push(`Invalid type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON_TYPES_FEATURE.join(', ')})`);
+          if (!GeoJsonEditor.GEOJSON.FEATURE_TYPES.includes(typeValue)) {
+            errors.push(`Invalid type "${typeValue}" at ${path || 'root'} (expected: ${GeoJsonEditor.GEOJSON.FEATURE_TYPES.join(', ')})`);
           }
         }
       }
@@ -2041,20 +1999,10 @@ class GeoJsonEditor extends HTMLElement {
 
         const nodeKey = match[2];
         const currentIndent = match[1].length;
-        const exactKey = `${i}-${nodeKey}`;
+        const found = this._findCollapsedData(i, nodeKey, currentIndent);
 
-        let foundKey = this.collapsedData.has(exactKey) ? exactKey : null;
-        if (!foundKey) {
-          for (const [key, data] of this.collapsedData.entries()) {
-            if (data.nodeKey === nodeKey && data.indent === currentIndent) {
-              foundKey = key;
-              break;
-            }
-          }
-        }
-
-        if (foundKey) {
-          const {originalLine, content: nodeContent} = this.collapsedData.get(foundKey);
+        if (found) {
+          const { data: { originalLine, content: nodeContent } } = found;
           lines[i] = originalLine;
           lines.splice(i + 1, 0, ...nodeContent);
           expanded = true;
@@ -2068,34 +2016,20 @@ class GeoJsonEditor extends HTMLElement {
     return content;
   }
 
-  // Helper: Format JSON content respecting prefix/suffix
+  // Helper: Format JSON content (always in FeatureCollection mode)
   // Also applies default properties to features if configured
   formatJSONContent(content) {
-    const prefix = this.prefix;
-    const suffix = this.suffix;
-    const prefixEndsWithBracket = prefix.trimEnd().endsWith('[');
-    const suffixStartsWithBracket = suffix.trimStart().startsWith(']');
-
-    if (prefixEndsWithBracket && suffixStartsWithBracket) {
-      const wrapped = '[' + content + ']';
-      let parsed = JSON.parse(wrapped);
-      
-      // Apply default properties to each feature in the array
-      if (Array.isArray(parsed)) {
-        parsed = parsed.map(f => this._applyDefaultPropertiesToFeature(f));
-      }
-      
-      const formatted = JSON.stringify(parsed, null, 2);
-      const lines = formatted.split('\n');
-      return lines.length > 2 ? lines.slice(1, -1).join('\n') : '';
-    } else if (!prefix && !suffix) {
-      const parsed = JSON.parse(content);
-      return JSON.stringify(parsed, null, 2);
-    } else {
-      const fullValue = prefix + content + suffix;
-      JSON.parse(fullValue); // Validate only
-      return content;
+    const wrapped = '[' + content + ']';
+    let parsed = JSON.parse(wrapped);
+    
+    // Apply default properties to each feature in the array
+    if (Array.isArray(parsed)) {
+      parsed = parsed.map(f => this._applyDefaultPropertiesToFeature(f));
     }
+    
+    const formatted = JSON.stringify(parsed, null, 2);
+    const lines = formatted.split('\n');
+    return lines.length > 2 ? lines.slice(1, -1).join('\n') : '';
   }
 
   autoFormatContentWithCursor() {
@@ -2380,8 +2314,8 @@ class GeoJsonEditor extends HTMLElement {
         // Check geometry has valid type
         if (!('type' in feature.geometry)) {
           errors.push('Geometry must have a "type" property');
-        } else if (!GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(feature.geometry.type)) {
-          errors.push(`Invalid geometry type "${feature.geometry.type}" (expected: ${GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.join(', ')})`);
+        } else if (!GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.includes(feature.geometry.type)) {
+          errors.push(`Invalid geometry type "${feature.geometry.type}" (expected: ${GeoJsonEditor.GEOJSON.GEOMETRY_TYPES.join(', ')})`);
         }
 
         // Check geometry has coordinates (except GeometryCollection)
