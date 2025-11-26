@@ -69,6 +69,29 @@ export const featureWithAllProperties = {
   }
 };
 
+// Feature with boolean properties for checkbox testing
+export const featureWithBooleans = {
+  type: 'Feature',
+  geometry: {
+    type: 'Polygon',
+    coordinates: [[
+      [100.0, 0.0],
+      [101.0, 0.0],
+      [101.0, 1.0],
+      [100.0, 1.0],
+      [100.0, 0.0]
+    ]]
+  },
+  properties: {
+    name: 'Test Polygon',
+    color: '#ff5733',
+    marker: true,
+    visible: false
+  }
+};
+
+export const featureWithBooleansStr = JSON.stringify(featureWithBooleans, null, 2);
+
 // Invalid GeoJSON samples for testing error handling
 
 export const invalidType = {

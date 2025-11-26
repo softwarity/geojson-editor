@@ -777,6 +777,184 @@ describe('GeoJsonEditor - Color Picker', () => {
   });
 });
 
+describe('GeoJsonEditor - Boolean Checkbox', () => {
+
+  it('should show checkbox for boolean properties', async () => {
+    const featureWithBoolean = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { marker: true }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithBoolean}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const checkboxes = gutter.querySelectorAll('.boolean-checkbox');
+
+    expect(checkboxes.length).to.equal(1);
+    expect(checkboxes[0].checked).to.be.true;
+    expect(checkboxes[0].dataset.attributeName).to.equal('marker');
+  });
+
+  it('should show unchecked checkbox for false boolean', async () => {
+    const featureWithBoolean = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { visible: false }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithBoolean}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const checkbox = gutter.querySelector('.boolean-checkbox');
+
+    expect(checkbox).to.exist;
+    expect(checkbox.checked).to.be.false;
+    expect(checkbox.dataset.attributeName).to.equal('visible');
+  });
+
+  it('should detect multiple boolean properties', async () => {
+    const featureWithBooleans = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { marker: true, visible: false, active: true }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithBooleans}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const checkboxes = gutter.querySelectorAll('.boolean-checkbox');
+
+    expect(checkboxes.length).to.equal(3);
+    const attributeNames = Array.from(checkboxes).map(c => c.dataset.attributeName);
+    expect(attributeNames).to.include('marker');
+    expect(attributeNames).to.include('visible');
+    expect(attributeNames).to.include('active');
+  });
+
+  it('should update boolean value when checkbox is toggled', async () => {
+    const featureWithBoolean = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { marker: true }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithBoolean}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const textarea = el.shadowRoot.querySelector('textarea');
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const checkbox = gutter.querySelector('.boolean-checkbox');
+
+    expect(checkbox).to.exist;
+    expect(checkbox.checked).to.be.true;
+
+    const line = parseInt(checkbox.dataset.line);
+
+    // Toggle to false
+    el.updateBooleanValue(line, false, 'marker');
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(textarea.value).to.include('"marker": false');
+    expect(textarea.value).to.not.include('"marker": true');
+  });
+
+  it('should emit change event after boolean toggle', async () => {
+    const featureWithBoolean = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { marker: false }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithBoolean}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const checkbox = gutter.querySelector('.boolean-checkbox');
+    const line = parseInt(checkbox.dataset.line);
+
+    // Listen for change event
+    const changePromise = new Promise(resolve => {
+      el.addEventListener('change', resolve, { once: true });
+    });
+
+    // Toggle to true
+    el.updateBooleanValue(line, true, 'marker');
+
+    const event = await changePromise;
+
+    expect(event.detail.type).to.equal('FeatureCollection');
+    expect(event.detail.features[0].properties.marker).to.equal(true);
+  });
+
+  it('should detect boolean properties with hyphenated names', async () => {
+    const featureWithHyphenatedBoolean = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { "show-marker": true, "is-visible": false }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithHyphenatedBoolean}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const checkboxes = gutter.querySelectorAll('.boolean-checkbox');
+
+    expect(checkboxes.length).to.equal(2);
+    const attributeNames = Array.from(checkboxes).map(c => c.dataset.attributeName);
+    expect(attributeNames).to.include('show-marker');
+    expect(attributeNames).to.include('is-visible');
+  });
+
+  it('should show both color indicator and checkbox for different properties', async () => {
+    const featureWithColorAndBoolean = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { 
+        color: "#ff5733",
+        marker: true
+      }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithColorAndBoolean}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicators = gutter.querySelectorAll('.color-indicator');
+    const checkboxes = gutter.querySelectorAll('.boolean-checkbox');
+
+    // Each on different lines
+    expect(colorIndicators.length).to.equal(1);
+    expect(checkboxes.length).to.equal(1);
+    expect(colorIndicators[0].dataset.attributeName).to.equal('color');
+    expect(checkboxes[0].dataset.attributeName).to.equal('marker');
+  });
+});
+
 describe('GeoJsonEditor - Dark Selector', () => {
 
   it('should apply dark theme when selector matches', async () => {

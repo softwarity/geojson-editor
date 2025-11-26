@@ -6,6 +6,7 @@ class GeoJsonEditor extends HTMLElement {
     // Internal state
     this.collapsedData = new Map(); // nodeKey -> {originalLines: string[], indent: number}
     this.colorPositions = []; // {line, color}
+    this.booleanPositions = []; // {line, value, attributeName}
     this.nodeTogglePositions = []; // {line, nodeKey, isCollapsed, indent}
     this.hiddenFeatures = new Set(); // Set of feature keys (hidden from events)
     this.featureRanges = new Map(); // featureKey -> {startLine, endLine, featureIndex}
@@ -72,6 +73,7 @@ class GeoJsonEditor extends HTMLElement {
     punctuation: /([{}[\],])/g,
     // Highlighting detection
     colorInLine: /"([\w-]+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g,
+    booleanInLine: /"([\w-]+)"\s*:\s*(true|false)/g,
     collapsibleNode: /^(\s*)"(\w+)"\s*:\s*([{\[])/,
     collapsedMarker: /^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/
   };
@@ -359,7 +361,7 @@ class GeoJsonEditor extends HTMLElement {
           justify-content: center;
         }
 
-        .color-indicator, .collapse-button {
+        .color-indicator, .collapse-button, .boolean-checkbox {
           width: 12px;
           height: 12px;
           border-radius: 2px;
@@ -374,6 +376,32 @@ class GeoJsonEditor extends HTMLElement {
         .color-indicator:hover {
           transform: scale(1.2);
           border-color: #fff;
+        }
+
+        .boolean-checkbox {
+          appearance: none;
+          -webkit-appearance: none;
+          background: transparent;
+          border: 1.5px solid var(--control-border, #c0c0c0);
+          border-radius: 2px;
+          margin: 0;
+          position: relative;
+        }
+        .boolean-checkbox:checked {
+          border-color: var(--control-color, #000080);
+        }
+        .boolean-checkbox:checked::after {
+          content: '✔';
+          color: var(--control-color, #000080);
+          font-size: 11px;
+          font-weight: bold;
+          position: absolute;
+          top: -3px;
+          right: -1px;
+        }
+        .boolean-checkbox:hover {
+          transform: scale(1.2);
+          border-color: var(--control-color, #000080);
         }
 
         .collapse-button {
@@ -600,7 +628,7 @@ class GeoJsonEditor extends HTMLElement {
       }, 10);
     });
 
-    // Gutter clicks (color indicators and collapse buttons)
+    // Gutter clicks (color indicators, boolean checkboxes, and collapse buttons)
     const gutterContent = this.shadowRoot.getElementById('gutterContent');
     gutterContent.addEventListener('click', (e) => {
       // Check for visibility button (may click on SVG inside button)
@@ -616,6 +644,11 @@ class GeoJsonEditor extends HTMLElement {
         const color = e.target.dataset.color;
         const attributeName = e.target.dataset.attributeName;
         this.showColorPicker(e.target, line, color, attributeName);
+      } else if (e.target.classList.contains('boolean-checkbox')) {
+        const line = parseInt(e.target.dataset.line);
+        const attributeName = e.target.dataset.attributeName;
+        const newValue = e.target.checked;
+        this.updateBooleanValue(line, newValue, attributeName);
       } else if (e.target.classList.contains('collapse-button')) {
         const nodeKey = e.target.dataset.nodeKey;
         const line = parseInt(e.target.dataset.line);
@@ -766,10 +799,11 @@ class GeoJsonEditor extends HTMLElement {
     const hiddenRanges = this.getHiddenLineRanges();
 
     // Parse and highlight
-    const { highlighted, colors, toggles } = this.highlightJSON(text, hiddenRanges);
+    const { highlighted, colors, booleans, toggles } = this.highlightJSON(text, hiddenRanges);
 
     highlightLayer.innerHTML = highlighted;
     this.colorPositions = colors;
+    this.booleanPositions = booleans;
     this.nodeTogglePositions = toggles;
 
     // Update gutter with color indicators
@@ -778,11 +812,12 @@ class GeoJsonEditor extends HTMLElement {
 
   highlightJSON(text, hiddenRanges = []) {
     if (!text.trim()) {
-      return { highlighted: '', colors: [], toggles: [] };
+      return { highlighted: '', colors: [], booleans: [], toggles: [] };
     }
 
     const lines = text.split('\n');
     const colors = [];
+    const booleans = [];
     const toggles = [];
     let highlightedLines = [];
 
@@ -804,6 +839,17 @@ class GeoJsonEditor extends HTMLElement {
           line: lineIndex,
           color: colorMatch[2],  // The hex color
           attributeName: colorMatch[1]  // The attribute name
+        });
+      }
+
+      // Detect boolean values in properties
+      R.booleanInLine.lastIndex = 0; // Reset for global regex
+      let booleanMatch;
+      while ((booleanMatch = R.booleanInLine.exec(line)) !== null) {
+        booleans.push({
+          line: lineIndex,
+          value: booleanMatch[2] === 'true',  // The boolean value
+          attributeName: booleanMatch[1]  // The attribute name
         });
       }
 
@@ -849,6 +895,7 @@ class GeoJsonEditor extends HTMLElement {
     return {
       highlighted: highlightedLines.join('\n'),
       colors,
+      booleans,
       toggles
     };
   }
@@ -1150,13 +1197,13 @@ class GeoJsonEditor extends HTMLElement {
     // Clear gutter
     gutterContent.textContent = '';
 
-    // Create a map of line -> elements (color, collapse button, visibility button)
+    // Create a map of line -> elements (color, boolean, collapse button, visibility button)
     const lineElements = new Map();
 
     // Helper to ensure line entry exists
     const ensureLine = (line) => {
       if (!lineElements.has(line)) {
-        lineElements.set(line, { colors: [], buttons: [], visibilityButtons: [] });
+        lineElements.set(line, { colors: [], booleans: [], buttons: [], visibilityButtons: [] });
       }
       return lineElements.get(line);
     };
@@ -1164,6 +1211,11 @@ class GeoJsonEditor extends HTMLElement {
     // Add color indicators
     this.colorPositions.forEach(({ line, color, attributeName }) => {
       ensureLine(line).colors.push({ color, attributeName });
+    });
+
+    // Add boolean checkboxes
+    this.booleanPositions.forEach(({ line, value, attributeName }) => {
+      ensureLine(line).booleans.push({ value, attributeName });
     });
 
     // Add collapse buttons
@@ -1205,6 +1257,18 @@ class GeoJsonEditor extends HTMLElement {
         indicator.dataset.attributeName = attributeName;
         indicator.title = `${attributeName}: ${color}`;
         gutterLine.appendChild(indicator);
+      });
+
+      // Add boolean checkboxes
+      elements.booleans.forEach(({ value, attributeName }) => {
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'boolean-checkbox';
+        checkbox.checked = value;
+        checkbox.dataset.line = line;
+        checkbox.dataset.attributeName = attributeName;
+        checkbox.title = `${attributeName}: ${value}`;
+        gutterLine.appendChild(checkbox);
       });
 
       // Add collapse buttons
@@ -1296,6 +1360,19 @@ class GeoJsonEditor extends HTMLElement {
     // Replace color value on the specified line for the specific attribute
     const regex = new RegExp(`"${attributeName}"\\s*:\\s*"#[0-9a-fA-F]{6}"`);
     lines[line] = lines[line].replace(regex, `"${attributeName}": "${newColor}"`);
+
+    textarea.value = lines.join('\n');
+    this.updateHighlight();
+    this.emitChange();
+  }
+
+  updateBooleanValue(line, newValue, attributeName) {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    const lines = textarea.value.split('\n');
+
+    // Replace boolean value on the specified line for the specific attribute
+    const regex = new RegExp(`"${attributeName}"\\s*:\\s*(true|false)`);
+    lines[line] = lines[line].replace(regex, `"${attributeName}": ${newValue}`);
 
     textarea.value = lines.join('\n');
     this.updateHighlight();

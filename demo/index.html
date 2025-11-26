@@ -858,6 +858,12 @@ Example:
         data: { type: 'FeatureCollection', features: [] }
       });
 
+      // Add vertices source (for features with marker: true)
+      map.addSource('vertices-data', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
       // Polygon fill layer
       map.addLayer({
         id: 'geojson-fill',
@@ -927,12 +933,79 @@ Example:
         }
       });
 
+      // Vertices layer (for LineString/Polygon with marker: true)
+      map.addLayer({
+        id: 'geojson-vertices',
+        type: 'circle',
+        source: 'vertices-data',
+        paint: {
+          'circle-radius': ['coalesce', ['get', 'marker-width'], 5],
+          'circle-color': ['coalesce', ['get', 'marker-color'], '#ff6b35'],
+          'circle-opacity': ['coalesce', ['get', 'marker-opacity'], 0.9],
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff'
+        }
+      });
+
       // Apply pending GeoJSON if data was loaded before map was ready
       if (pendingGeojson) {
         updateMap(pendingGeojson);
         pendingGeojson = null;
       }
     });
+
+    // Extract all coordinates from a geometry
+    function extractCoordinates(geometry) {
+      if (!geometry) return [];
+      switch (geometry.type) {
+        case 'Point':
+          return [geometry.coordinates];
+        case 'MultiPoint':
+        case 'LineString':
+          return geometry.coordinates;
+        case 'MultiLineString':
+        case 'Polygon':
+          return geometry.coordinates.flat();
+        case 'MultiPolygon':
+          return geometry.coordinates.flat(2);
+        default:
+          return [];
+      }
+    }
+
+    // Extract vertices from features that have marker: true
+    function extractVertices(featureCollection) {
+      const vertexFeatures = [];
+      if (!featureCollection || !featureCollection.features) {
+        return { type: 'FeatureCollection', features: [] };
+      }
+      featureCollection.features.forEach(feature => {
+        // Only process if marker property is true
+        if (!feature.properties || feature.properties.marker !== true) {
+          return;
+        }
+        // Skip Point geometries (they are already displayed as points)
+        if (feature.geometry && feature.geometry.type === 'Point') {
+          return;
+        }
+        const props = feature.properties;
+        const markerColor = props['marker-color'] || props['stroke-color'] || '#ff6b35';
+        const markerOpacity = props['marker-opacity'];
+        const markerWidth = props['marker-width'];
+        const coords = extractCoordinates(feature.geometry);
+        coords.forEach(coord => {
+          const vertexProps = { 'marker-color': markerColor };
+          if (markerOpacity !== undefined) vertexProps['marker-opacity'] = markerOpacity;
+          if (markerWidth !== undefined) vertexProps['marker-width'] = markerWidth;
+          vertexFeatures.push({
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: coord },
+            properties: vertexProps
+          });
+        });
+      });
+      return { type: 'FeatureCollection', features: vertexFeatures };
+    }
 
     // Function to update map with GeoJSON data
     function updateMap(geojson) {
@@ -944,6 +1017,12 @@ Example:
 
       try {
         map.getSource('geojson-data').setData(geojson);
+
+        // Extract and display vertices for features with marker: true
+        const vertices = extractVertices(geojson);
+        if (map.getSource('vertices-data')) {
+          map.getSource('vertices-data').setData(vertices);
+        }
 
         // Fit bounds to data if there are features
         if (geojson.features && geojson.features.length > 0) {
@@ -1547,7 +1626,8 @@ editor.setTheme(${themeTextarea.value});`;
           "label-size": 12,
           "fill-color": "#e74c3c",
           "stroke-color": "#ffffff",
-          "stroke-width": 2
+          "stroke-width": 2,
+          marker: true
         }
       },
       {
@@ -1557,7 +1637,10 @@ editor.setTheme(${themeTextarea.value});`;
           label: "Airway",
           "label-color": "#3498db",
           "stroke-color": "#3498db",
-          "stroke-width": 2
+          "stroke-width": 2,
+          marker: true,
+          "marker-color": "#ff6b35",
+          "marker-width": 6
         }
       }
     ];

@@ -35,6 +35,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 | **Invalid type detection** | ✅ Visual feedback | ❌ | ❌ | ❌ |
 | **Collapsible nodes** | ✅ Native | ✅ | ✅ Plugin | ❌ |
 | **Color picker** | ✅ Integrated | ❌ | ❌ | ❌ |
+| **Boolean checkbox** | ✅ Integrated | ❌ | ❌ | ❌ |
 | **Feature visibility toggle** | ✅ | ❌ | ❌ | ❌ |
 | **Auto-collapse coordinates** | ✅ | ❌ | ❌ | ❌ |
 | **FeatureCollection output** | ✅ Always | ❌ | ❌ | ❌ |
@@ -54,7 +55,8 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
 - **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); `coordinates` auto-collapsed on load
 - **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
-- **Color Picker** - Built-in color picker for color properties in left gutter
+- **Color Picker** - Built-in color picker for hex color properties (`#rrggbb`) in left gutter; click to open native color picker
+- **Boolean Checkbox** - Inline checkbox for boolean properties in left gutter; toggle to switch between `true`/`false` and emit changes (e.g., `marker: true` to show vertices)
 - **Default Properties** - Auto-inject default visualization properties (fill-color, stroke-color, etc.) into features based on configurable rules
 - **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
 - **Auto-format** - Automatic JSON formatting in real-time (always enabled)
