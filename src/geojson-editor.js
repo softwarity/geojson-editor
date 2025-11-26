@@ -25,7 +25,7 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['readonly', 'value', 'placeholder', 'dark-selector', 'feature-collection'];
+    return ['readonly', 'value', 'placeholder', 'dark-selector'];
   }
 
 
@@ -129,8 +129,6 @@ class GeoJsonEditor extends HTMLElement {
       this.updatePlaceholderContent();
     } else if (name === 'dark-selector') {
       this.updateThemeCSS();
-    } else if (name === 'feature-collection') {
-      this.updatePrefixSuffix();
     }
   }
 
@@ -148,17 +146,13 @@ class GeoJsonEditor extends HTMLElement {
     return this.getAttribute('placeholder') || '';
   }
 
-  get featureCollection() {
-    return this.hasAttribute('feature-collection');
-  }
-
-  // Internal getters for prefix/suffix based on feature-collection mode
+  // Always in FeatureCollection mode - prefix/suffix are constant
   get prefix() {
-    return this.featureCollection ? GeoJsonEditor.FEATURE_COLLECTION_PREFIX : '';
+    return GeoJsonEditor.FEATURE_COLLECTION_PREFIX;
   }
 
   get suffix() {
-    return this.featureCollection ? GeoJsonEditor.FEATURE_COLLECTION_SUFFIX : '';
+    return GeoJsonEditor.FEATURE_COLLECTION_SUFFIX;
   }
 
   render() {
@@ -483,29 +477,74 @@ class GeoJsonEditor extends HTMLElement {
           color: var(--json-key-invalid);
         }
 
-        /* Prefix and suffix styling */
+        /* Prefix and suffix wrapper with gutter */
+        .prefix-wrapper,
+        .suffix-wrapper {
+          display: flex;
+          flex-shrink: 0;
+          background: var(--bg-color);
+        }
+
+        .prefix-gutter,
+        .suffix-gutter {
+          width: 24px;
+          background: var(--gutter-bg);
+          border-right: 1px solid var(--gutter-border);
+          flex-shrink: 0;
+        }
+
         .editor-prefix,
         .editor-suffix {
+          flex: 1;
           padding: 4px 12px;
           color: var(--text-color);
           background: var(--bg-color);
           user-select: none;
           white-space: pre-wrap;
           word-wrap: break-word;
-          flex-shrink: 0;
           font-family: 'Courier New', Courier, monospace;
           font-size: 13px;
           line-height: 1.5;
           opacity: 0.6;
-          border-left: 3px solid rgba(102, 126, 234, 0.5);
         }
 
-        .editor-prefix {
+        .prefix-wrapper {
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .editor-suffix {
+        .suffix-wrapper {
           border-top: 1px solid rgba(255, 255, 255, 0.1);
+          position: relative;
+        }
+
+        /* Clear button in suffix area */
+        .clear-btn {
+          position: absolute;
+          right: 0.5rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: transparent;
+          border: none;
+          color: var(--text-color);
+          opacity: 0.3;
+          cursor: pointer;
+          font-size: 0.65rem;
+          width: 1rem;
+          height: 1rem;
+          padding: 0.15rem 0 0 0;
+          border-radius: 3px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          transition: opacity 0.2s, background 0.2s;
+        }
+        .clear-btn:hover {
+          opacity: 0.7;
+          background: rgba(255, 255, 255, 0.1);
+        }
+        .clear-btn[hidden] {
+          display: none;
         }
 
         /* Scrollbar styling - WebKit (Chrome, Safari, Edge) */
@@ -536,7 +575,10 @@ class GeoJsonEditor extends HTMLElement {
     `;
 
     const template = `
-      <div class="editor-prefix" id="editorPrefix"></div>
+      <div class="prefix-wrapper">
+        <div class="prefix-gutter"></div>
+        <div class="editor-prefix" id="editorPrefix"></div>
+      </div>
       <div class="editor-wrapper">
         <div class="gutter">
           <div class="gutter-content" id="gutterContent"></div>
@@ -553,7 +595,11 @@ class GeoJsonEditor extends HTMLElement {
           ></textarea>
         </div>
       </div>
-      <div class="editor-suffix" id="editorSuffix"></div>
+      <div class="suffix-wrapper">
+        <div class="suffix-gutter"></div>
+        <div class="editor-suffix" id="editorSuffix"></div>
+        <button class="clear-btn" id="clearBtn" title="Clear editor">✕</button>
+      </div>
     `;
 
     this.shadowRoot.innerHTML = styles + template;
@@ -646,6 +692,12 @@ class GeoJsonEditor extends HTMLElement {
       this.handleCutWithCollapsedContent(e);
     });
 
+    // Clear button
+    const clearBtn = this.shadowRoot.getElementById('clearBtn');
+    clearBtn.addEventListener('click', () => {
+      this.removeAll();
+    });
+
     // Update readonly state
     this.updateReadonly();
   }
@@ -659,6 +711,11 @@ class GeoJsonEditor extends HTMLElement {
     const textarea = this.shadowRoot.getElementById('textarea');
     if (textarea) {
       textarea.disabled = this.readonly;
+    }
+    // Hide clear button in readonly mode
+    const clearBtn = this.shadowRoot.getElementById('clearBtn');
+    if (clearBtn) {
+      clearBtn.hidden = this.readonly;
     }
   }
 
@@ -744,24 +801,13 @@ class GeoJsonEditor extends HTMLElement {
     const prefixEl = this.shadowRoot.getElementById('editorPrefix');
     const suffixEl = this.shadowRoot.getElementById('editorSuffix');
 
+    // Always show prefix/suffix (always in FeatureCollection mode)
     if (prefixEl) {
-      if (this.prefix) {
-        prefixEl.textContent = this.prefix;
-        prefixEl.style.display = 'block';
-      } else {
-        prefixEl.textContent = '';
-        prefixEl.style.display = 'none';
-      }
+      prefixEl.textContent = this.prefix;
     }
 
     if (suffixEl) {
-      if (this.suffix) {
-        suffixEl.textContent = this.suffix;
-        suffixEl.style.display = 'block';
-      } else {
-        suffixEl.textContent = '';
-        suffixEl.style.display = 'none';
-      }
+      suffixEl.textContent = this.suffix;
     }
   }
 
@@ -902,8 +948,8 @@ class GeoJsonEditor extends HTMLElement {
     const contextStack = [];       // Stack of {context, isArray}
     let pendingContext = null;     // Context for next object/array
 
-    // Determine root context based on feature-collection mode
-    const rootContext = this.featureCollection ? 'Feature' : null;
+    // Root context is always 'Feature' (always in FeatureCollection mode)
+    const rootContext = 'Feature';
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -915,36 +961,60 @@ class GeoJsonEditor extends HTMLElement {
       contextMap.set(i, lineContext);
 
       // Process each character to track brackets for subsequent lines
+      // Track string state to ignore brackets inside strings
+      let inString = false;
+      let escape = false;
+
       for (let j = 0; j < line.length; j++) {
         const char = line[j];
 
-        // Check for key that changes context: "keyName":
-        if (char === '"') {
-          const keyMatch = line.substring(j).match(/^"([^"]+)"\s*:/);
-          if (keyMatch) {
-            const keyName = keyMatch[1];
-            if (GeoJsonEditor.CONTEXT_CHANGING_KEYS[keyName]) {
-              pendingContext = GeoJsonEditor.CONTEXT_CHANGING_KEYS[keyName];
-            }
-            j += keyMatch[0].length - 1;  // Skip past the key
-            continue;
-          }
+        // Handle escape sequences
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (char === '\\' && inString) {
+          escape = true;
+          continue;
         }
 
-        // Check for type value to refine context: "type": "Point"
-        if (char === '"' && contextStack.length > 0) {
-          const typeMatch = line.substring(0, j).match(/"type"\s*:\s*$/);
-          if (typeMatch) {
-            const valueMatch = line.substring(j).match(/^"([^"]+)"/);
-            if (valueMatch && GeoJsonEditor.GEOJSON_TYPES_ALL.includes(valueMatch[1])) {
-              // Update current context to the specific type
-              const currentCtx = contextStack[contextStack.length - 1];
-              if (currentCtx) {
-                currentCtx.context = valueMatch[1];
+        // Track string boundaries
+        if (char === '"') {
+          if (!inString) {
+            // Entering string - check for special patterns before toggling
+            const keyMatch = line.substring(j).match(/^"([^"\\]*(?:\\.[^"\\]*)*)"\s*:/);
+            if (keyMatch) {
+              const keyName = keyMatch[1];
+              if (GeoJsonEditor.CONTEXT_CHANGING_KEYS[keyName]) {
+                pendingContext = GeoJsonEditor.CONTEXT_CHANGING_KEYS[keyName];
+              }
+              j += keyMatch[0].length - 1;  // Skip past the key
+              continue;
+            }
+
+            // Check for type value to refine context: "type": "Point"
+            if (contextStack.length > 0) {
+              const typeMatch = line.substring(0, j).match(/"type"\s*:\s*$/);
+              if (typeMatch) {
+                const valueMatch = line.substring(j).match(/^"([^"\\]*(?:\\.[^"\\]*)*)"/);
+                if (valueMatch && GeoJsonEditor.GEOJSON_TYPES_ALL.includes(valueMatch[1])) {
+                  const currentCtx = contextStack[contextStack.length - 1];
+                  if (currentCtx) {
+                    currentCtx.context = valueMatch[1];
+                  }
+                }
+                // Skip past this string value
+                j += valueMatch ? valueMatch[0].length - 1 : 0;
+                continue;
               }
             }
           }
+          inString = !inString;
+          continue;
         }
+
+        // Skip everything inside strings (brackets, etc.)
+        if (inString) continue;
 
         // Opening bracket - push context
         if (char === '{' || char === '[') {
@@ -953,10 +1023,8 @@ class GeoJsonEditor extends HTMLElement {
             newContext = pendingContext;
             pendingContext = null;
           } else if (contextStack.length === 0) {
-            // Root level
             newContext = rootContext;
           } else {
-            // Inherit from parent if in array
             const parent = contextStack[contextStack.length - 1];
             if (parent && parent.isArray) {
               newContext = parent.context;
@@ -1020,7 +1088,7 @@ class GeoJsonEditor extends HTMLElement {
       .replace(R.lessThan, '&lt;')
       .replace(R.greaterThan, '&gt;')
       // All JSON keys - validate against context
-      .replace(R.jsonKey, (match, key) => {
+      .replace(R.jsonKey, (_, key) => {
         // Inside properties - all keys are regular user keys
         if (context === 'properties') {
           return `<span class="json-key">"${key}"</span>:`;
@@ -1037,7 +1105,7 @@ class GeoJsonEditor extends HTMLElement {
         }
       })
       // GeoJSON "type" values - validate based on context
-      .replace(R.typeValue, (match, typeValue) => {
+      .replace(R.typeValue, (_, typeValue) => {
         if (isTypeValid(typeValue)) {
           return `<span class="geojson-key">"type"</span>: <span class="geojson-type">"${typeValue}"</span>`;
         } else {
@@ -1114,26 +1182,11 @@ class GeoJsonEditor extends HTMLElement {
       // Check if bracket closes on same line - can't collapse
       if (this.bracketClosesOnSameLine(currentLine, openBracket)) return;
 
-      // Find closing bracket in following lines
-      let depth = 1;
-      let endLine = line;
-      const content = [];
+      // Find closing bracket using helper (handles brackets in strings correctly)
+      const result = this._findClosingBracket(lines, line, openBracket);
+      if (!result) return;
 
-      for (let i = line + 1; i < lines.length; i++) {
-        const scanLine = lines[i];
-
-        for (const char of scanLine) {
-          if (char === openBracket) depth++;
-          if (char === closeBracket) depth--;
-        }
-
-        content.push(scanLine);
-
-        if (depth === 0) {
-          endLine = i;
-          break;
-        }
-      }
+      const { endLine, content } = result;
 
       // Store the original data with unique key
       const uniqueKey = `${line}-${nodeKey}`;
@@ -1141,7 +1194,7 @@ class GeoJsonEditor extends HTMLElement {
         originalLine: currentLine,
         content: content,
         indent: indent.length,
-        nodeKey: nodeKey  // Store nodeKey for later use
+        nodeKey: nodeKey
       });
 
       // Replace with marker
@@ -1181,26 +1234,11 @@ class GeoJsonEditor extends HTMLElement {
           // Skip if bracket closes on same line
           if (this.bracketClosesOnSameLine(line, openBracket)) continue;
 
-          // Find closing bracket in following lines
-          let depth = 1;
-          let endLine = i;
-          const content = [];
+          // Find closing bracket using helper (handles brackets in strings correctly)
+          const result = this._findClosingBracket(lines, i, openBracket);
+          if (!result) continue;
 
-          for (let j = i + 1; j < lines.length; j++) {
-            const scanLine = lines[j];
-
-            for (const char of scanLine) {
-              if (char === openBracket) depth++;
-              if (char === closeBracket) depth--;
-            }
-
-            content.push(scanLine);
-
-            if (depth === 0) {
-              endLine = j;
-              break;
-            }
-          }
+          const { endLine, content } = result;
 
           // Store the original data with unique key
           const uniqueKey = `${i}-${nodeKey}`;
@@ -1322,9 +1360,15 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   showColorPicker(indicator, line, currentColor, attributeName) {
-    // Remove existing picker
+    // Remove existing picker and clean up its listener
     const existing = document.querySelector('.geojson-color-picker-input');
-    if (existing) existing.remove();
+    if (existing) {
+      // Clean up the stored listener before removing
+      if (existing._closeListener) {
+        document.removeEventListener('click', existing._closeListener, true);
+      }
+      existing.remove();
+    }
 
     // Create small color input positioned at the indicator
     const colorInput = document.createElement('input');
@@ -1358,10 +1402,13 @@ class GeoJsonEditor extends HTMLElement {
     // Close picker when clicking anywhere else
     const closeOnClickOutside = (e) => {
       if (e.target !== colorInput && !colorInput.contains(e.target)) {
-        colorInput.remove();
         document.removeEventListener('click', closeOnClickOutside, true);
+        colorInput.remove();
       }
     };
+
+    // Store the listener reference on the element for cleanup
+    colorInput._closeListener = closeOnClickOutside;
 
     // Add to document body with fixed positioning
     document.body.appendChild(colorInput);
@@ -1424,8 +1471,15 @@ class GeoJsonEditor extends HTMLElement {
       return; // No collapsed content, use default copy behavior
     }
 
-    // Replace collapsed markers with real content
-    const expandedText = this.expandCollapsedMarkersInText(selectedText, start);
+    let expandedText;
+
+    // If selecting all content, use expandAllCollapsed directly (more reliable)
+    if (start === 0 && end === textarea.value.length) {
+      expandedText = this.expandAllCollapsed(selectedText);
+    } else {
+      // For partial selection, expand using line-by-line matching
+      expandedText = this.expandCollapsedMarkersInText(selectedText, start);
+    }
 
     // Put expanded text in clipboard
     e.preventDefault();
@@ -1436,6 +1490,7 @@ class GeoJsonEditor extends HTMLElement {
     const textarea = this.shadowRoot.getElementById('textarea');
     const beforeSelection = textarea.value.substring(0, startPos);
     const startLineNum = beforeSelection.split('\n').length - 1;
+    const R = GeoJsonEditor.REGEX;
 
     const lines = text.split('\n');
     const expandedLines = [];
@@ -1445,12 +1500,37 @@ class GeoJsonEditor extends HTMLElement {
 
       // Check if this line has a collapsed marker
       if (line.includes('{...}') || line.includes('[...]')) {
-        // Find the collapsed node for this line
+        const match = line.match(R.collapsedMarker);
+        if (match) {
+          const nodeKey = match[2]; // Extract nodeKey from the marker
+          const exactKey = `${absoluteLineNum}-${nodeKey}`;
+
+          // Try exact key match first
+          if (this.collapsedData.has(exactKey)) {
+            const collapsed = this.collapsedData.get(exactKey);
+            expandedLines.push(collapsed.originalLine);
+            expandedLines.push(...collapsed.content);
+            return;
+          }
+
+          // Fallback: search by line number and nodeKey
+          let found = false;
+          for (const [key, collapsed] of this.collapsedData.entries()) {
+            if (key.endsWith(`-${nodeKey}`)) {
+              expandedLines.push(collapsed.originalLine);
+              expandedLines.push(...collapsed.content);
+              found = true;
+              break;
+            }
+          }
+          if (found) return;
+        }
+
+        // Fallback: search by line number only
         let found = false;
         this.collapsedData.forEach((collapsed, key) => {
           const collapsedLineNum = parseInt(key.split('-')[0]);
-          if (collapsedLineNum === absoluteLineNum) {
-            // Replace with original line and all collapsed content
+          if (collapsedLineNum === absoluteLineNum && !found) {
             expandedLines.push(collapsed.originalLine);
             expandedLines.push(...collapsed.content);
             found = true;
@@ -1605,11 +1685,6 @@ class GeoJsonEditor extends HTMLElement {
     this.emitChange();
   }
 
-  // Check if a feature is hidden
-  isFeatureHidden(featureKey) {
-    return this.hiddenFeatures.has(featureKey);
-  }
-
   // Parse JSON and extract feature ranges (line numbers for each Feature)
   updateFeatureRanges() {
     const textarea = this.shadowRoot.getElementById('textarea');
@@ -1663,22 +1738,16 @@ class GeoJsonEditor extends HTMLElement {
           inFeature = true;
 
           // Start braceDepth at 1 since we're inside the Feature's opening brace
-          // Then count any additional braces from startLine to current line
+          // Then count any additional braces from startLine to current line (ignoring strings)
           braceDepth = 1;
           for (let k = startLine; k <= i; k++) {
             const scanLine = lines[k];
-            // Skip the first { we already counted
-            let skipFirst = (k === startLine);
-            for (const char of scanLine) {
-              if (char === '{') {
-                if (skipFirst) {
-                  skipFirst = false;
-                } else {
-                  braceDepth++;
-                }
-              } else if (char === '}') {
-                braceDepth--;
-              }
+            const counts = this._countBracketsOutsideStrings(scanLine, '{');
+            if (k === startLine) {
+              // Skip the first { we already counted
+              braceDepth += (counts.open - 1) - counts.close;
+            } else {
+              braceDepth += counts.open - counts.close;
             }
           }
 
@@ -1687,11 +1756,9 @@ class GeoJsonEditor extends HTMLElement {
             currentFeatureKey = this.getFeatureKey(features[featureIndex]);
           }
         } else if (inFeature) {
-          // Count braces
-          for (const char of line) {
-            if (char === '{') braceDepth++;
-            else if (char === '}') braceDepth--;
-          }
+          // Count braces (ignoring those in strings)
+          const counts = this._countBracketsOutsideStrings(line, '{');
+          braceDepth += counts.open - counts.close;
 
           // Feature ends when braceDepth returns to 0
           if (braceDepth <= 0) {
@@ -1779,19 +1846,86 @@ class GeoJsonEditor extends HTMLElement {
     return errors;
   }
 
-  // Helper: Check if bracket closes on same line
-  bracketClosesOnSameLine(line, openBracket) {
+  // Helper: Count bracket depth change in a line, ignoring brackets inside strings
+  // Returns {open: count, close: count} for the specified bracket type
+  _countBracketsOutsideStrings(line, openBracket) {
     const closeBracket = openBracket === '{' ? '}' : ']';
+    let openCount = 0;
+    let closeCount = 0;
+    let inString = false;
+    let escape = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+
+      if (char === '\\' && inString) {
+        escape = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = !inString;
+        continue;
+      }
+
+      if (!inString) {
+        if (char === openBracket) openCount++;
+        if (char === closeBracket) closeCount++;
+      }
+    }
+
+    return { open: openCount, close: closeCount };
+  }
+
+  // Helper: Check if bracket closes on same line (ignores brackets in strings)
+  bracketClosesOnSameLine(line, openBracket) {
     const bracketPos = line.indexOf(openBracket);
     if (bracketPos === -1) return false;
+
     const restOfLine = line.substring(bracketPos + 1);
+    const counts = this._countBracketsOutsideStrings(restOfLine, openBracket);
+
+    // Depth starts at 1 (we're after the opening bracket)
+    // If closes equal or exceed opens + 1, the bracket closes on this line
+    return counts.close > counts.open;
+  }
+
+  // Helper: Find closing bracket line starting from startLine
+  // Returns { endLine, content: string[] } or null if not found
+  _findClosingBracket(lines, startLine, openBracket) {
     let depth = 1;
-    for (const char of restOfLine) {
-      if (char === openBracket) depth++;
-      if (char === closeBracket) depth--;
-      if (depth === 0) return true;
+    const content = [];
+
+    // Count remaining brackets on the start line (after the opening bracket)
+    const startLineContent = lines[startLine];
+    const bracketPos = startLineContent.indexOf(openBracket);
+    if (bracketPos !== -1) {
+      const restOfStartLine = startLineContent.substring(bracketPos + 1);
+      const startCounts = this._countBracketsOutsideStrings(restOfStartLine, openBracket);
+      depth += startCounts.open - startCounts.close;
+      if (depth === 0) {
+        return { endLine: startLine, content: [] };
+      }
     }
-    return false;
+
+    for (let i = startLine + 1; i < lines.length; i++) {
+      const scanLine = lines[i];
+      const counts = this._countBracketsOutsideStrings(scanLine, openBracket);
+      depth += counts.open - counts.close;
+
+      content.push(scanLine);
+
+      if (depth === 0) {
+        return { endLine: i, content };
+      }
+    }
+
+    return null; // Not found (malformed JSON)
   }
 
   // Helper: Expand all collapsed markers and return expanded content
@@ -1908,34 +2042,6 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  autoFormatContent() {
-    const textarea = this.shadowRoot.getElementById('textarea');
-
-    // Save collapsed node details
-    const collapsedNodes = Array.from(this.collapsedData.values()).map(data => ({
-      nodeKey: data.nodeKey,
-      indent: data.indent
-    }));
-
-    // Expand and format
-    const content = this.expandAllCollapsed(textarea.value);
-
-    try {
-      const formattedContent = this.formatJSONContent(content);
-
-      if (formattedContent !== content) {
-        this.collapsedData.clear();
-        textarea.value = formattedContent;
-
-        if (collapsedNodes.length > 0) {
-          this.reapplyCollapsed(collapsedNodes);
-        }
-      }
-    } catch (e) {
-      // Invalid JSON, don't format
-    }
-  }
-
   reapplyCollapsed(collapsedNodes) {
     const textarea = this.shadowRoot.getElementById('textarea');
     const lines = textarea.value.split('\n');
@@ -1967,50 +2073,35 @@ class GeoJsonEditor extends HTMLElement {
 
           // Only collapse if this occurrence should be collapsed
           if (currentOccurrence <= collapseMap.get(key)) {
-          const indent = match[1];
-          const openBracket = match[3];
-          const closeBracket = openBracket === '{' ? '}' : ']';
+            const indent = match[1];
+            const openBracket = match[3];
+            const closeBracket = openBracket === '{' ? '}' : ']';
 
-          // Skip if closes on same line
-          if (this.bracketClosesOnSameLine(line, openBracket)) continue;
+            // Skip if closes on same line
+            if (this.bracketClosesOnSameLine(line, openBracket)) continue;
 
-          // Find closing bracket
-          let depth = 1;
-          let endLine = i;
-          const content = [];
+            // Find closing bracket using helper (handles brackets in strings correctly)
+            const result = this._findClosingBracket(lines, i, openBracket);
+            if (!result) continue;
 
-          for (let j = i + 1; j < lines.length; j++) {
-            const scanLine = lines[j];
+            const { endLine, content } = result;
 
-            for (const char of scanLine) {
-              if (char === openBracket) depth++;
-              if (char === closeBracket) depth--;
-            }
+            // Store with unique key
+            const uniqueKey = `${i}-${nodeKey}`;
+            this.collapsedData.set(uniqueKey, {
+              originalLine: line,
+              content: content,
+              indent: indent.length,
+              nodeKey: nodeKey
+            });
 
-            content.push(scanLine);
+            // Replace with marker
+            const beforeBracket = line.substring(0, line.indexOf(openBracket));
+            const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
+            lines[i] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
 
-            if (depth === 0) {
-              endLine = j;
-              break;
-            }
-          }
-
-          // Store with unique key
-          const uniqueKey = `${i}-${nodeKey}`;
-          this.collapsedData.set(uniqueKey, {
-            originalLine: line,
-            content: content,
-            indent: indent.length,
-            nodeKey: nodeKey
-          });
-
-          // Replace with marker
-          const beforeBracket = line.substring(0, line.indexOf(openBracket));
-          const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
-          lines[i] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
-
-          // Remove content lines
-          lines.splice(i + 1, endLine - i);
+            // Remove content lines
+            lines.splice(i + 1, endLine - i);
           }
         }
       }
@@ -2129,6 +2220,271 @@ class GeoJsonEditor extends HTMLElement {
       light: { ...GeoJsonEditor.DEFAULT_THEMES.light }
     };
     this.updateThemeCSS();
+  }
+
+  // ========================================
+  // Features API - Programmatic manipulation
+  // ========================================
+
+  /**
+   * Normalize a Python-style index (supports negative values)
+   * @param {number} index - Index to normalize (negative = from end)
+   * @param {number} length - Length of the array
+   * @param {boolean} clamp - If true, clamp to valid range; if false, return -1 for out of bounds
+   * @returns {number} Normalized index, or -1 if out of bounds (when clamp=false)
+   * @private
+   */
+  _normalizeIndex(index, length, clamp = false) {
+    let idx = index;
+    if (idx < 0) {
+      idx = length + idx;
+    }
+    if (clamp) {
+      return Math.max(0, Math.min(idx, length));
+    }
+    return (idx < 0 || idx >= length) ? -1 : idx;
+  }
+
+  /**
+   * Parse current textarea content into an array of features
+   * @returns {Array} Array of feature objects
+   * @private
+   */
+  _parseFeatures() {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    if (!textarea || !textarea.value.trim()) {
+      return [];
+    }
+
+    try {
+      // Expand collapsed nodes to get full content
+      const content = this.expandAllCollapsed(textarea.value);
+      // Wrap in array brackets and parse
+      const wrapped = '[' + content + ']';
+      return JSON.parse(wrapped);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Update textarea with features array and trigger all updates
+   * @param {Array} features - Array of feature objects
+   * @private
+   */
+  _setFeatures(features) {
+    const textarea = this.shadowRoot.getElementById('textarea');
+    if (!textarea) return;
+
+    // Clear internal state when replacing features (prevent memory leaks)
+    this.collapsedData.clear();
+    this.hiddenFeatures.clear();
+
+    if (!features || features.length === 0) {
+      textarea.value = '';
+    } else {
+      // Format each feature and join with comma
+      const formatted = features
+        .map(f => JSON.stringify(f, null, 2))
+        .join(',\n');
+
+      textarea.value = formatted;
+    }
+
+    // Trigger all updates
+    this.updateHighlight();
+    this.updatePlaceholderVisibility();
+
+    // Auto-collapse coordinates
+    if (textarea.value) {
+      requestAnimationFrame(() => {
+        this.applyAutoCollapsed();
+      });
+    }
+
+    // Emit change event
+    this.emitChange();
+  }
+
+  /**
+   * Validate a single feature object
+   * @param {Object} feature - Feature object to validate
+   * @returns {string[]} Array of validation error messages (empty if valid)
+   * @private
+   */
+  _validateFeature(feature) {
+    const errors = [];
+
+    if (!feature || typeof feature !== 'object') {
+      errors.push('Feature must be an object');
+      return errors;
+    }
+
+    if (Array.isArray(feature)) {
+      errors.push('Feature cannot be an array');
+      return errors;
+    }
+
+    // Check required type field
+    if (!('type' in feature)) {
+      errors.push('Feature must have a "type" property');
+    } else if (feature.type !== 'Feature') {
+      errors.push(`Feature type must be "Feature", got "${feature.type}"`);
+    }
+
+    // Check geometry field exists (can be null for features without location)
+    if (!('geometry' in feature)) {
+      errors.push('Feature must have a "geometry" property (can be null)');
+    } else if (feature.geometry !== null) {
+      // Validate geometry if not null
+      if (typeof feature.geometry !== 'object' || Array.isArray(feature.geometry)) {
+        errors.push('Feature geometry must be an object or null');
+      } else {
+        // Check geometry has valid type
+        if (!('type' in feature.geometry)) {
+          errors.push('Geometry must have a "type" property');
+        } else if (!GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.includes(feature.geometry.type)) {
+          errors.push(`Invalid geometry type "${feature.geometry.type}" (expected: ${GeoJsonEditor.GEOJSON_TYPES_GEOMETRY.join(', ')})`);
+        }
+
+        // Check geometry has coordinates (except GeometryCollection)
+        if (feature.geometry.type !== 'GeometryCollection' && !('coordinates' in feature.geometry)) {
+          errors.push('Geometry must have a "coordinates" property');
+        }
+
+        // GeometryCollection must have geometries array
+        if (feature.geometry.type === 'GeometryCollection' && !Array.isArray(feature.geometry.geometries)) {
+          errors.push('GeometryCollection must have a "geometries" array');
+        }
+      }
+    }
+
+    // Check properties field exists (can be null)
+    if (!('properties' in feature)) {
+      errors.push('Feature must have a "properties" property (can be null)');
+    } else if (feature.properties !== null && (typeof feature.properties !== 'object' || Array.isArray(feature.properties))) {
+      errors.push('Feature properties must be an object or null');
+    }
+
+    return errors;
+  }
+
+  /**
+   * Replace all features with the given array
+   * @param {Array} features - Array of feature objects to set
+   * @throws {Error} If features is not an array or contains invalid features
+   */
+  set(features) {
+    if (!Array.isArray(features)) {
+      throw new Error('set() expects an array of features');
+    }
+
+    // Validate each feature
+    const allErrors = [];
+    features.forEach((feature, index) => {
+      const errors = this._validateFeature(feature);
+      if (errors.length > 0) {
+        allErrors.push(`Feature[${index}]: ${errors.join(', ')}`);
+      }
+    });
+
+    if (allErrors.length > 0) {
+      throw new Error(`Invalid features: ${allErrors.join('; ')}`);
+    }
+
+    this._setFeatures(features);
+  }
+
+  /**
+   * Add a feature at the end of the list
+   * @param {Object} feature - Feature object to add
+   * @throws {Error} If feature is invalid
+   */
+  add(feature) {
+    const errors = this._validateFeature(feature);
+    if (errors.length > 0) {
+      throw new Error(`Invalid feature: ${errors.join(', ')}`);
+    }
+
+    const features = this._parseFeatures();
+    features.push(feature);
+    this._setFeatures(features);
+  }
+
+  /**
+   * Insert a feature at the specified index
+   * @param {Object} feature - Feature object to insert
+   * @param {number} index - Index to insert at (negative = from end)
+   * @throws {Error} If feature is invalid
+   */
+  insertAt(feature, index) {
+    const errors = this._validateFeature(feature);
+    if (errors.length > 0) {
+      throw new Error(`Invalid feature: ${errors.join(', ')}`);
+    }
+
+    const features = this._parseFeatures();
+    const idx = this._normalizeIndex(index, features.length, true);
+
+    features.splice(idx, 0, feature);
+    this._setFeatures(features);
+  }
+
+  /**
+   * Remove the feature at the specified index
+   * @param {number} index - Index to remove (negative = from end)
+   * @returns {Object|undefined} The removed feature, or undefined if index out of bounds
+   */
+  removeAt(index) {
+    const features = this._parseFeatures();
+    if (features.length === 0) return undefined;
+
+    const idx = this._normalizeIndex(index, features.length);
+    if (idx === -1) return undefined;
+
+    const removed = features.splice(idx, 1)[0];
+    this._setFeatures(features);
+    return removed;
+  }
+
+  /**
+   * Remove all features
+   * @returns {Array} Array of removed features
+   */
+  removeAll() {
+    const removed = this._parseFeatures();
+    this._setFeatures([]);
+    return removed;
+  }
+
+  /**
+   * Get the feature at the specified index
+   * @param {number} index - Index to get (negative = from end)
+   * @returns {Object|undefined} The feature, or undefined if index out of bounds
+   */
+  get(index) {
+    const features = this._parseFeatures();
+    if (features.length === 0) return undefined;
+
+    const idx = this._normalizeIndex(index, features.length);
+    if (idx === -1) return undefined;
+
+    return features[idx];
+  }
+
+  /**
+   * Get all features as an array
+   * @returns {Array} Array of all feature objects
+   */
+  getAll() {
+    return this._parseFeatures();
+  }
+
+  /**
+   * Emit the current document on the change event
+   */
+  emit() {
+    this.emitChange();
   }
 }
 

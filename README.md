@@ -37,7 +37,8 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 | **Color picker** | ✅ Integrated | ❌ | ❌ | ❌ |
 | **Feature visibility toggle** | ✅ | ❌ | ❌ | ❌ |
 | **Auto-collapse coordinates** | ✅ | ❌ | ❌ | ❌ |
-| **FeatureCollection mode** | ✅ | ❌ | ❌ | ❌ |
+| **FeatureCollection output** | ✅ Always | ❌ | ❌ | ❌ |
+| **Clear button** | ✅ | ❌ | ❌ | ❌ |
 | **Dark mode detection** | ✅ Auto | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual |
 | **Dependencies** | 0 | Many | Few | 0 |
 | **Setup complexity** | 1 line | Complex | Moderate | Simple |
@@ -59,7 +60,8 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Readonly Mode** - Visual indicator with diagonal stripes when editing is disabled
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
 - **Smart Copy/Paste** - Copy includes expanded content even from collapsed nodes
-- **FeatureCollection Mode** - Optional mode to auto-wrap features in a FeatureCollection structure
+- **FeatureCollection Output** - Emits valid FeatureCollection with all edited features
+- **Clear Button** - Discreet ✕ button in suffix area to clear all editor content (hidden in readonly mode)
 
 ## Installation
 
@@ -101,7 +103,7 @@ import '@softwarity/geojson-editor';
 
 ## Usage
 
-### Basic Usage (FeatureCollection mode)
+### Basic Usage
 
 ```html
 <!DOCTYPE html>
@@ -111,30 +113,17 @@ import '@softwarity/geojson-editor';
 </head>
 <body>
   <!-- User edits features, component wraps in FeatureCollection -->
-  <geojson-editor
-    feature-collection
-    placeholder="Enter GeoJSON features here..."
-  ></geojson-editor>
+  <geojson-editor placeholder="Enter GeoJSON features here..."></geojson-editor>
 </body>
 </html>
 ```
 
-### Standalone Mode (Full GeoJSON)
-
-```html
-<!-- User edits a complete GeoJSON object (Feature or FeatureCollection) -->
-<geojson-editor
-  placeholder="Enter GeoJSON here..."
-></geojson-editor>
-```
+Users edit features directly (comma-separated), and the component automatically wraps them in a `{"type": "FeatureCollection", "features": [...]}` structure for validation and events.
 
 ### With Theme Detection
 
 ```html
-<geojson-editor
-  feature-collection
-  dark-selector="html.dark"
-></geojson-editor>
+<geojson-editor dark-selector="html.dark"></geojson-editor>
 ```
 
 ### Listen to Changes
@@ -158,11 +147,10 @@ editor.addEventListener('error', (e) => {
 
 | Attribute | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `value` | `string` | `""` | Initial editor content |
+| `value` | `string` | `""` | Initial editor content (features array content) |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
-| `feature-collection` | `boolean` | `false` | When set, wraps editor content in a FeatureCollection for validation/events |
 
 **Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. All nodes can be manually expanded/collapsed by clicking the toggle button.
 
@@ -181,18 +169,65 @@ The `dark-selector` attribute determines when the dark theme is active. If the s
 
 ```javascript
 const editor = document.querySelector('geojson-editor');
+```
 
-// Get/set theme
+### Features API
+
+Programmatic manipulation of features:
+
+| Method | Description |
+|--------|-------------|
+| `set(features[])` | Replace all features with the given array (throws if invalid) |
+| `add(feature)` | Add a feature at the end (throws if invalid) |
+| `insertAt(feature, index)` | Insert at index (negative = from end: -1 = before last) (throws if invalid) |
+| `removeAt(index)` | Remove feature at index (negative = from end), returns removed feature |
+| `removeAll()` | Remove all features, returns array of removed features |
+| `get(index)` | Get feature at index (negative = from end) |
+| `getAll()` | Get all features as an array |
+| `emit()` | Emit the current document on the change event |
+
+**Validation:** `set()`, `add()`, and `insertAt()` validate features before adding. Invalid features throw an `Error` with a descriptive message. A valid Feature must have:
+- `type: "Feature"`
+- `geometry`: object with valid type (`Point`, `LineString`, `Polygon`, etc.) and `coordinates`, or `null`
+- `properties`: object or `null`
+
+```javascript
+// Set features
+editor.set([
+  { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} },
+  { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} }
+]);
+
+// Add a feature
+editor.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: {} });
+
+// Insert at position 1
+editor.insertAt({ type: 'Feature', ... }, 1);
+
+// Remove last feature
+const removed = editor.removeAt(-1);
+
+// Get all features
+const features = editor.getAll();
+
+// Manually emit change event
+editor.emit();
+```
+
+### Theme API
+
+```javascript
+// Get current theme
 const themes = editor.getTheme();
+
+// Set custom theme (partial update)
 editor.setTheme({
   dark: { background: '#000', textColor: '#fff' },
   light: { background: '#fff', textColor: '#000' }
 });
-editor.resetTheme();
 
-// Get/set value
-editor.setAttribute('value', JSON.stringify(data));
-const value = editor.querySelector('#textarea').value; // via Shadow DOM
+// Reset to defaults
+editor.resetTheme();
 ```
 
 ## Events
@@ -207,15 +242,11 @@ editor.addEventListener('change', (e) => {
 });
 ```
 
-**Event detail:** The parsed GeoJSON object directly. In `feature-collection` mode, the wrapper is included.
+**Event detail:** The parsed GeoJSON object (always a FeatureCollection).
 
 **Note:** Hidden features (toggled via the eye icon) are automatically excluded from the emitted GeoJSON. This allows temporary filtering without modifying the actual JSON content.
 
-**Example with FeatureCollection mode:**
-
-```html
-<geojson-editor feature-collection></geojson-editor>
-```
+**Example:**
 
 ```javascript
 // User edits features only, but change event includes the FeatureCollection wrapper

@@ -85,10 +85,11 @@ test/geojson-editor.test.js:
   ✓ GeoJsonEditor - Basic > should render with default state
   ✓ GeoJsonEditor - Formatting > should always format JSON on input
   ✓ GeoJsonEditor - Feature Visibility > should show visibility buttons for Features
+  ✓ GeoJsonEditor - Features API > set() should replace all features
   ...
 
-Chromium: 47 passed, 0 failed
-Finished running tests in 4s, all tests passed! 🎉
+Chromium: 108 passed, 0 failed
+Finished running tests in 10s, all tests passed! 🎉
 ```
 
 ### Coverage Report
@@ -134,13 +135,14 @@ The demo page (`demo/index.html`) includes comprehensive examples:
 1. Start dev server: `npm run dev`
 2. Open `http://localhost:5173`
 3. Test features:
-   - FeatureCollection mode
+   - FeatureCollection output (prefix/suffix display)
    - Color scheme (Dark/Light)
    - Readonly mode
    - Collapsible nodes
    - Color picker
    - Feature visibility toggle
    - Theme customization
+   - Features API (in browser console)
 
 ### Test as npm Package (Local)
 
@@ -169,10 +171,7 @@ cat > index.html << 'EOF'
 <body>
   <h1>Testing @softwarity/geojson-editor</h1>
 
-  <geojson-editor
-    feature-collection
-    placeholder="Enter GeoJSON features..."
-  ></geojson-editor>
+  <geojson-editor placeholder="Enter GeoJSON features..."></geojson-editor>
 
   <script type="module">
     import '@softwarity/geojson-editor';
@@ -275,7 +274,7 @@ Vite provides instant feedback:
 Edit `demo/index.html` to test edge cases:
 
 ```html
-<!-- Test with initial value -->
+<!-- Test with initial value (features array content) -->
 <geojson-editor
   value='{"type": "Feature", "geometry": {"type": "Point", "coordinates": [0, 0]}}'
 ></geojson-editor>
@@ -283,18 +282,14 @@ Edit `demo/index.html` to test edge cases:
 <!-- Test readonly -->
 <geojson-editor readonly></geojson-editor>
 
-<!-- Test FeatureCollection mode -->
-<geojson-editor
-  feature-collection
-  placeholder="Enter GeoJSON features..."
-></geojson-editor>
+<!-- Test with placeholder -->
+<geojson-editor placeholder="Enter GeoJSON features..."></geojson-editor>
 
 <!-- Test with dark theme detection (Tailwind style) -->
-<geojson-editor
-  dark-selector="html.dark"
-  feature-collection
-></geojson-editor>
+<geojson-editor dark-selector="html.dark"></geojson-editor>
 ```
+
+**Note:** Users edit features directly (comma-separated). The component wraps them in a FeatureCollection structure automatically.
 
 ### 4. Check Build Output
 
@@ -360,9 +355,11 @@ Before submitting changes, verify:
 - [ ] `dist/geojson-editor.js` exists and is not empty
 - [ ] No console errors in browser DevTools
 - [ ] Works in both dark and light themes
-- [ ] FeatureCollection mode works correctly
+- [ ] FeatureCollection prefix/suffix displays correctly with gutter
 - [ ] Feature visibility toggle works (eye icon)
-- [ ] Readonly mode works
+- [ ] Clear button works (✕ in suffix area)
+- [ ] Features API works (set, add, insertAt, removeAt, removeAll, get, getAll, emit)
+- [ ] Readonly mode works (clear button hidden)
 - [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
 - [ ] `error` events fire with invalid JSON/GeoJSON
 

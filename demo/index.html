@@ -70,6 +70,26 @@
     }
     .section-box h3 { color: var(--text-primary); margin-bottom: 0.5rem; }
     .section-box p { color: var(--text-muted); }
+
+    /* Log container with floating clear button */
+    .log-container {
+      position: relative;
+    }
+    .log-container pre {
+      padding-bottom: 2.5rem; /* Space for the clear button */
+    }
+    .btn-clear {
+      position: absolute;
+      bottom: 0.5rem;
+      right: 1.5rem; /* Space for scrollbar */
+      padding: 0.2rem 0.4rem;
+      font-size: 0.9rem;
+      opacity: 0.5;
+      line-height: 1;
+    }
+    .btn-clear:hover {
+      opacity: 1;
+    }
     .section-box pre {
       background: var(--bg-canvas);
       color: var(--text-secondary);
@@ -194,17 +214,53 @@
 
     .code-example pre { line-height: 1.5; margin: 0; }
 
-    button {
+    /* Base button - neutral/primary style (dark) */
+    button, .btn {
       padding: 0.5rem 1rem;
-      background: var(--accent-green);
-      color: white;
-      border: none;
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-default);
       border-radius: 4px;
       cursor: pointer;
       font-weight: 600;
-      transition: background 0.2s;
+      transition: all 0.2s;
     }
-    button:hover { background: var(--accent-green-hover); }
+    button:hover, .btn:hover {
+      background: var(--border-default);
+      color: var(--text-primary);
+    }
+
+    /* Action button - green for primary actions (Execute, Apply) */
+    .btn-action {
+      background: var(--accent-green);
+      color: white;
+      border-color: var(--accent-green);
+    }
+    .btn-action:hover {
+      background: var(--accent-green-hover);
+      border-color: var(--accent-green-hover);
+      color: white;
+    }
+
+    /* Icon button - compact, for icons only */
+    .btn-icon {
+      padding: 0.4rem 0.6rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Accent button - purple for secondary actions */
+    .btn-accent {
+      background: var(--accent-purple);
+      color: white;
+      border-color: var(--accent-purple);
+    }
+    .btn-accent:hover {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+      color: white;
+    }
 
     .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
     .header h1 { margin: 0; flex: 1; }
@@ -236,7 +292,7 @@
       border-left: 3px solid var(--accent-blue);
     }
 
-    /* Prism.js syntax highlighting */
+    /* Prism.js syntax highlighting - shared tokens */
     .code-example .token.comment, .code-example .token.prolog, .code-example .token.doctype { color: var(--text-muted); }
     .code-example .token.punctuation, .code-example .token.operator, .code-example .token.entity, .code-example .token.url, .code-example .token.variable { color: var(--text-secondary); }
     .code-example .token.property, .code-example .token.tag, .code-example .token.boolean, .code-example .token.number, .code-example .token.constant, .code-example .token.symbol { color: #79c0ff; }
@@ -244,6 +300,15 @@
     .code-example .token.atrule, .code-example .token.attr-value, .code-example .token.keyword { color: #ff7b72; }
     .code-example .token.function { color: #d2a8ff; }
     .code-example .token.regex, .code-example .token.important { color: #ffa657; }
+
+    /* JSON syntax highlighting for event log */
+    .json-highlight .token.punctuation { color: var(--text-secondary); }
+    .json-highlight .token.property { color: #79c0ff; }
+    .json-highlight .token.string { color: #a5d6ff; }
+    .json-highlight .token.number { color: #79c0ff; }
+    .json-highlight .token.boolean { color: #ff7b72; }
+    .json-highlight .token.null { color: #ff7b72; }
+    .json-highlight .token.operator { color: var(--text-secondary); }
 
     /* Modal */
     .modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
@@ -268,11 +333,19 @@
       background: var(--bg-secondary);
     }
     .modal-header h3 { margin: 0; color: var(--text-primary); }
-    .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); padding: 0; line-height: 1; }
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      padding: 0;
+      line-height: 1;
+    }
     .modal-close:hover { color: var(--text-primary); }
     .modal-body { padding: 1.5rem; overflow-y: auto; max-height: calc(90vh - 60px); }
     .modal-body p { color: var(--text-muted); }
-    .theme-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+    .theme-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; justify-content: flex-end; }
 
     #themeTextarea {
       width: 100%;
@@ -286,10 +359,117 @@
       color: var(--text-secondary);
     }
     #themeTextarea:focus { outline: none; border-color: var(--accent-blue); }
+
+    /* API Toolbar */
+    .api-toolbar {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      border: 1px solid var(--border-default);
+    }
+    .api-toolbar h4 {
+      width: 100%;
+      margin: 0 0 0.5rem 0;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      border-bottom: 2px solid var(--accent-purple);
+      padding-bottom: 0.5rem;
+    }
+    .api-btn {
+      padding: 0.5rem 1rem;
+      background: var(--accent-purple);
+      color: white;
+      border: 1px solid var(--accent-purple);
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+    .api-btn:hover {
+      background: #8b5cf6;
+      border-color: #8b5cf6;
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+    }
+    .api-btn.danger {
+      background: var(--accent-red);
+      border-color: var(--accent-red);
+    }
+    .api-btn.danger:hover {
+      background: #dc2626;
+      border-color: #dc2626;
+      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+    }
+
+    /* API Modal */
+    .api-modal-body { padding: 1.5rem; }
+    .api-modal-body label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    .api-modal-body textarea {
+      width: 100%;
+      min-height: 200px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 1rem;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      resize: vertical;
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+    }
+    .api-modal-body textarea:focus { outline: none; border-color: var(--accent-blue); }
+    .api-modal-body input[type="number"] {
+      width: 100%;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+    }
+    .api-modal-body input[type="number"]:focus { outline: none; border-color: var(--accent-blue); }
+    .api-modal-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      justify-content: flex-end;
+    }
+    .api-modal-actions button { min-width: 100px; }
+    .api-modal-error {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: rgba(248, 81, 73, 0.1);
+      border: 1px solid var(--accent-red);
+      border-radius: 4px;
+      color: var(--accent-red);
+      font-size: 0.85rem;
+    }
+    .form-group { margin-bottom: 1rem; }
+    .form-group:last-of-type { margin-bottom: 0; }
+
+    /* Toast animations */
+    @keyframes toastFadeIn {
+      from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+      to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    @keyframes toastFadeOut {
+      from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      to { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+    }
   </style>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
 </head>
 <body>
   <div class="container">
@@ -362,7 +542,7 @@
                 <option value="onedark">One Dark / One Light</option>
                 <option value="solarized">Solarized</option>
               </select>
-              <button onclick="openThemeModal()" title="Edit theme" style="padding: 0.5rem 0.75rem; display: flex; align-items: center;"><span class="icon-palette"></span></button>
+              <button class="btn-icon btn-accent" onclick="openThemeModal()" title="Edit theme"><span class="icon-palette"></span></button>
             </div>
           </div>
         </div>
@@ -405,15 +585,13 @@ Example:
         </div>
         <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
           <div class="checkbox-group">
-            <input type="checkbox" id="featureCollectionCheck" checked>
-            <label for="featureCollectionCheck">FeatureCollection mode</label>
-            <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— wrap features in FeatureCollection</small>
-          </div>
-          <div class="checkbox-group">
             <input type="checkbox" id="readonlyCheck">
             <label for="readonlyCheck">Readonly mode</label>
             <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— disable editing</small>
           </div>
+        </div>
+        <div class="info-box">
+          <strong>Note:</strong> Edit features directly (comma-separated). The component wraps them in a FeatureCollection and emits the complete structure on change events.
         </div>
       </div>
     </div>
@@ -429,12 +607,26 @@ Example:
       </div>
     </div>
 
+    <!-- API Toolbar -->
+    <div class="api-toolbar">
+      <h4>Features API</h4>
+      <button class="api-btn" onclick="openApiModal('set')">set()</button>
+      <button class="api-btn" onclick="openApiModal('add')">add()</button>
+      <button class="api-btn" onclick="openApiModal('insertAt')">insertAt()</button>
+      <button class="api-btn" onclick="openApiModal('removeAt')">removeAt()</button>
+      <button class="api-btn danger" onclick="apiRemoveAll()">removeAll()</button>
+      <button class="api-btn" onclick="apiEmit()">emit()</button>
+    </div>
+
     <div class="section-box output">
       <h3>Change Events:</h3>
       <p>
         The component emits <code>change</code> events with <code>e.detail</code> containing the parsed GeoJSON object directly.
       </p>
-      <pre id="eventLog">Waiting for change events...</pre>
+      <div class="log-container">
+        <pre id="eventLog" class="json-highlight">Waiting for change events...</pre>
+        <button class="btn-clear" onclick="clearEventLog()" title="Clear">✕</button>
+      </div>
     </div>
 
     <div class="section-box output error">
@@ -445,7 +637,10 @@ Example:
         <strong>error</strong> (error message),
         <strong>content</strong> (editor content for debugging)
       </p>
-      <pre id="errorLog">No errors</pre>
+      <div class="log-container">
+        <pre id="errorLog">No errors</pre>
+        <button class="btn-clear" onclick="clearErrorLog()" title="Clear">✕</button>
+      </div>
     </div>
 
     <div class="section-box code-example">
@@ -473,9 +668,9 @@ Example:
         </p>
         <textarea id="themeTextarea" rows="20" spellcheck="false"></textarea>
         <div class="theme-actions">
-          <button onclick="applyTheme()">✓ Apply</button>
-          <button onclick="resetTheme()">↺ Reset to Default</button>
-          <button onclick="copyTheme()">📋 Copy Code</button>
+          <button onclick="resetTheme()">Reset</button>
+          <button onclick="copyTheme()">Copy</button>
+          <button class="btn-action" onclick="applyTheme()">Apply</button>
         </div>
       </div>
     </div>
@@ -485,6 +680,61 @@ Example:
         <img src="https://www.softwarity.io/img/softwarity.svg" alt="Softwarity" style="height: 20px; opacity: 0.7;">
         <span>Made by Softwarity</span>
       </a>
+    </div>
+  </div>
+
+  <!-- API Modal -->
+  <div id="apiModal" class="modal" style="display: none;">
+    <div class="modal-backdrop" onclick="closeApiModal()"></div>
+    <div class="modal-content" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 id="apiModalTitle">API Method</h3>
+        <button class="modal-close" onclick="closeApiModal()">×</button>
+      </div>
+      <div class="modal-body api-modal-body">
+        <!-- set() form -->
+        <div id="apiFormSet" style="display: none;">
+          <div class="form-group">
+            <label for="apiSetTextarea">Features Array (JSON)</label>
+            <textarea id="apiSetTextarea" placeholder='[{"type": "Feature", "geometry": {...}, "properties": {...}}]'></textarea>
+          </div>
+        </div>
+
+        <!-- add() form -->
+        <div id="apiFormAdd" style="display: none;">
+          <div class="form-group">
+            <label for="apiAddTextarea">Feature (JSON)</label>
+            <textarea id="apiAddTextarea" placeholder='{"type": "Feature", "geometry": {"type": "Point", "coordinates": [0, 0]}, "properties": {}}'></textarea>
+          </div>
+        </div>
+
+        <!-- insertAt() form -->
+        <div id="apiFormInsertAt" style="display: none;">
+          <div class="form-group">
+            <label for="apiInsertAtTextarea">Feature (JSON)</label>
+            <textarea id="apiInsertAtTextarea" placeholder='{"type": "Feature", "geometry": {"type": "Point", "coordinates": [0, 0]}, "properties": {}}'></textarea>
+          </div>
+          <div class="form-group">
+            <label for="apiInsertAtIndex">Index (negative = from end)</label>
+            <input type="number" id="apiInsertAtIndex" value="0" />
+          </div>
+        </div>
+
+        <!-- removeAt() form -->
+        <div id="apiFormRemoveAt" style="display: none;">
+          <div class="form-group">
+            <label for="apiRemoveAtIndex">Index (negative = from end, e.g. -1 = last)</label>
+            <input type="number" id="apiRemoveAtIndex" value="0" />
+          </div>
+        </div>
+
+        <div id="apiModalError" class="api-modal-error" style="display: none;"></div>
+
+        <div class="api-modal-actions">
+          <button onclick="closeApiModal()">Cancel</button>
+          <button class="btn-action" onclick="executeApiMethod()">Execute</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -499,7 +749,6 @@ Example:
     const selectorPreview = document.getElementById('selectorPreview');
     const selectorDescription = document.getElementById('selectorDescription');
     const readonlyCheck = document.getElementById('readonlyCheck');
-    const featureCollectionCheck = document.getElementById('featureCollectionCheck');
     const themeModal = document.getElementById('themeModal');
     const themeTextarea = document.getElementById('themeTextarea');
     const themePresetMainSelect = document.getElementById('themePresetMainSelect');
@@ -818,12 +1067,6 @@ Example:
       editor.setAttribute('placeholder', placeholderInput.value);
       editor.setAttribute('dark-selector', darkSelector);
 
-      if (featureCollectionCheck.checked) {
-        editor.setAttribute('feature-collection', '');
-      } else {
-        editor.removeAttribute('feature-collection');
-      }
-
       if (readonlyCheck.checked) {
         editor.setAttribute('readonly', '');
       } else {
@@ -837,16 +1080,14 @@ Example:
     function updateHTMLCode() {
       const placeholder = placeholderInput.value;
       const readonly = readonlyCheck.checked;
-      const featureCollection = featureCollectionCheck.checked;
       const scheme = colorSchemeSelect.value;
       const isDark = scheme === 'dark';
 
       // Parse selector to understand its type
       const selectorTarget = parseSelector(darkSelector);
 
-      // Build component attributes
+      // Build component attributes (always in FeatureCollection mode)
       let attrs = [];
-      if (featureCollection) attrs.push('feature-collection');
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (readonly) attrs.push('readonly');
       if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
@@ -898,7 +1139,9 @@ Example:
 
     // Listen to editor change events (valid JSON parsed object)
     editor.addEventListener('change', (e) => {
-      eventLog.textContent = JSON.stringify(e.detail, null, 2);
+      const jsonStr = JSON.stringify(e.detail, null, 2);
+      // Apply Prism.js JSON highlighting
+      eventLog.innerHTML = Prism.highlight(jsonStr, Prism.languages.json, 'json');
       // Clear error log on successful parse
       errorLog.textContent = 'No errors';
       errorLog.style.color = '';
@@ -912,14 +1155,18 @@ Example:
       errorLog.style.color = '#f85149';
     });
 
+    // Clear event/error logs
+    function clearEventLog() {
+      eventLog.textContent = 'Waiting for change events...';
+    }
+
+    function clearErrorLog() {
+      errorLog.textContent = 'No errors';
+      errorLog.style.color = '';
+    }
+
     // Listen to input changes
     placeholderInput.addEventListener('input', updateEditor);
-
-    // Handle feature-collection mode toggle: reload sample data in appropriate format
-    featureCollectionCheck.addEventListener('change', () => {
-      updateEditor();
-      loadSampleData();
-    });
     readonlyCheck.addEventListener('change', updateEditor);
 
     // Color scheme change - applies to the selector target and updates HTML code
@@ -994,27 +1241,163 @@ editor.setTheme(${themeTextarea.value});`;
       });
     }
 
-    // Show feedback message in theme modal
+    // Show feedback message as centered toast overlay in theme modal
     function showThemeMessage(message, type) {
-      const modalBody = themeModal.querySelector('.modal-body');
-      const existing = modalBody.querySelector('.theme-message');
+      const modalContent = themeModal.querySelector('.modal-content');
+      const existing = modalContent.querySelector('.theme-toast');
       if (existing) existing.remove();
 
-      const msg = document.createElement('div');
-      msg.className = 'theme-message';
-      msg.style.cssText = `
-        padding: 0.5rem 1rem;
-        margin-top: 0.5rem;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        background: ${type === 'success' ? '#d4edda' : '#f8d7da'};
-        color: ${type === 'success' ? '#155724' : '#721c24'};
+      const toast = document.createElement('div');
+      toast.className = 'theme-toast';
+      toast.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-weight: 500;
+        background: ${type === 'success' ? 'rgba(40, 167, 69, 0.95)' : 'rgba(220, 53, 69, 0.95)'};
+        color: white;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        z-index: 10;
+        animation: toastFadeIn 0.2s ease-out;
       `;
-      msg.textContent = message;
-      modalBody.querySelector('.theme-actions').appendChild(msg);
+      toast.textContent = message;
+      modalContent.style.position = 'relative';
+      modalContent.appendChild(toast);
 
-      setTimeout(() => msg.remove(), 3000);
+      setTimeout(() => {
+        toast.style.animation = 'toastFadeOut 0.3s ease-out forwards';
+        setTimeout(() => toast.remove(), 300);
+      }, 2000);
     }
+
+    // ========================================
+    // API Modal Functions
+    // ========================================
+    const apiModal = document.getElementById('apiModal');
+    const apiModalTitle = document.getElementById('apiModalTitle');
+    const apiModalError = document.getElementById('apiModalError');
+    let currentApiMethod = null;
+
+    // Open API modal for a specific method
+    function openApiModal(method) {
+      currentApiMethod = method;
+
+      // Hide all forms
+      document.querySelectorAll('[id^="apiForm"]').forEach(el => el.style.display = 'none');
+      apiModalError.style.display = 'none';
+
+      // Show the relevant form
+      const formId = 'apiForm' + method.charAt(0).toUpperCase() + method.slice(1);
+      const form = document.getElementById(formId);
+      if (form) form.style.display = 'block';
+
+      // Update title
+      const titles = {
+        set: 'set(features[])',
+        add: 'add(feature)',
+        insertAt: 'insertAt(feature, index)',
+        removeAt: 'removeAt(index)'
+      };
+      apiModalTitle.textContent = titles[method] || method;
+
+      // Pre-fill with sample feature for add/insertAt
+      if (method === 'add' || method === 'insertAt') {
+        const sampleFeature = {
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [29.5, -3.0] },
+          properties: { name: 'New Point' }
+        };
+        const textarea = document.getElementById(method === 'add' ? 'apiAddTextarea' : 'apiInsertAtTextarea');
+        if (textarea && !textarea.value.trim()) {
+          textarea.value = JSON.stringify(sampleFeature, null, 2);
+        }
+      }
+
+      // Pre-fill set with current features
+      if (method === 'set') {
+        const textarea = document.getElementById('apiSetTextarea');
+        const currentFeatures = editor.getAll();
+        if (textarea) {
+          textarea.value = JSON.stringify(currentFeatures, null, 2);
+        }
+      }
+
+      apiModal.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+
+    // Close API modal
+    function closeApiModal() {
+      apiModal.style.display = 'none';
+      document.body.style.overflow = '';
+      currentApiMethod = null;
+    }
+
+    // Execute the current API method
+    function executeApiMethod() {
+      apiModalError.style.display = 'none';
+
+      try {
+        switch (currentApiMethod) {
+          case 'set': {
+            const textarea = document.getElementById('apiSetTextarea');
+            const features = JSON.parse(textarea.value);
+            if (!Array.isArray(features)) {
+              throw new Error('Value must be an array of features');
+            }
+            editor.set(features);
+            break;
+          }
+          case 'add': {
+            const textarea = document.getElementById('apiAddTextarea');
+            const feature = JSON.parse(textarea.value);
+            editor.add(feature);
+            break;
+          }
+          case 'insertAt': {
+            const textarea = document.getElementById('apiInsertAtTextarea');
+            const indexInput = document.getElementById('apiInsertAtIndex');
+            const feature = JSON.parse(textarea.value);
+            const index = parseInt(indexInput.value, 10);
+            editor.insertAt(feature, index);
+            break;
+          }
+          case 'removeAt': {
+            const indexInput = document.getElementById('apiRemoveAtIndex');
+            const index = parseInt(indexInput.value, 10);
+            const removed = editor.removeAt(index);
+            if (removed === undefined) {
+              throw new Error('Index out of bounds');
+            }
+            break;
+          }
+        }
+        closeApiModal();
+      } catch (e) {
+        apiModalError.textContent = e.message;
+        apiModalError.style.display = 'block';
+      }
+    }
+
+    // Direct API actions (no modal)
+    function apiRemoveAll() {
+      editor.removeAll();
+    }
+
+    function apiEmit() {
+      editor.emit();
+    }
+
+    // Close API modal on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && apiModal.style.display === 'flex') {
+        closeApiModal();
+      }
+    });
 
     // Sample features array with styling properties
     const sampleFeaturesArray = [
@@ -1060,17 +1443,10 @@ editor.setTheme(${themeTextarea.value});`;
       }
     ];
 
-    // Load sample data in appropriate format based on mode
+    // Load sample data (always in FeatureCollection mode - just the features array content)
     function loadSampleData() {
-      if (featureCollectionCheck.checked) {
-        // Feature-collection mode: just the features (comma-separated)
-        const featuresStr = sampleFeaturesArray.map(f => JSON.stringify(f, null, 2)).join(',\n');
-        editor.setAttribute('value', featuresStr);
-      } else {
-        // Standalone mode: full FeatureCollection
-        const featureCollection = { type: "FeatureCollection", features: sampleFeaturesArray };
-        editor.setAttribute('value', JSON.stringify(featureCollection, null, 2));
-      }
+      const featuresStr = sampleFeaturesArray.map(f => JSON.stringify(f, null, 2)).join(',\n');
+      editor.setAttribute('value', featuresStr);
     }
 
     function clearEditor() {
