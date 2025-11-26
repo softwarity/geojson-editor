@@ -331,15 +331,16 @@ describe('GeoJsonEditor - Events', () => {
 
 describe('GeoJsonEditor - Theme API', () => {
 
-  it('should return default theme via getTheme()', async () => {
+  it('should have default theme variables as CSS fallbacks', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
 
-    const theme = el.getTheme();
-
-    expect(theme.dark).to.exist;
-    expect(theme.light).to.exist;
-    expect(theme.dark.background).to.equal('#1e1e1e');
-    expect(theme.light.background).to.equal('#ffffff');
+    // Default values are now CSS fallbacks with IntelliJ Light colors
+    const allStyles = el.shadowRoot.querySelectorAll('style');
+    const mainStyle = Array.from(allStyles).find(s => s.id !== 'theme-styles');
+    expect(mainStyle).to.exist;
+    expect(mainStyle.textContent).to.include('var(--bg-color, #ffffff)');
+    expect(mainStyle.textContent).to.include('var(--text-color, #000000)');
+    expect(mainStyle.textContent).to.include('var(--json-key, #660e7a)');
   });
 
   it('should allow theme customization via setTheme()', async () => {
@@ -349,24 +350,28 @@ describe('GeoJsonEditor - Theme API', () => {
       dark: { controlColor: '#ff0000' }
     });
 
-    const theme = el.getTheme();
-    expect(theme.dark.controlColor).to.equal('#ff0000');
-    // Other properties should remain unchanged
-    expect(theme.dark.background).to.equal('#1e1e1e');
+    // Theme override should be stored
+    expect(el.themes.dark.controlColor).to.equal('#ff0000');
+
+    // CSS should include the override
+    const themeStyle = el.shadowRoot.querySelector('#theme-styles');
+    expect(themeStyle.textContent).to.include('--control-color: #ff0000');
   });
 
   it('should reset theme via resetTheme()', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
 
     el.setTheme({
-      dark: { background: '#000000' }
+      dark: { bgColor: '#000000' }
     });
 
-    expect(el.getTheme().dark.background).to.equal('#000000');
+    expect(el.themes.dark.bgColor).to.equal('#000000');
 
     el.resetTheme();
 
-    expect(el.getTheme().dark.background).to.equal('#1e1e1e');
+    // Themes should be empty after reset (uses CSS defaults)
+    expect(el.themes.dark).to.deep.equal({});
+    expect(el.themes.light).to.deep.equal({});
   });
 });
 
@@ -778,16 +783,23 @@ describe('GeoJsonEditor - Dark Selector', () => {
       <geojson-editor class="dark" dark-selector=".dark"></geojson-editor>
     `);
 
-    // Theme CSS should be injected
+    // Set a dark theme override to generate CSS
+    el.setTheme({ dark: { bgColor: '#111111' } });
+
+    // Theme CSS should be injected with the dark selector
     const themeStyle = el.shadowRoot.querySelector('#theme-styles');
     expect(themeStyle).to.exist;
     expect(themeStyle.textContent).to.include('--bg-color');
+    expect(themeStyle.textContent).to.include(':host(.dark)');
   });
 
   it('should update theme when dark-selector changes', async () => {
     const el = await fixture(html`
       <geojson-editor dark-selector=".dark"></geojson-editor>
     `);
+
+    // Set a dark theme override to generate CSS
+    el.setTheme({ dark: { bgColor: '#222222' } });
 
     el.setAttribute('dark-selector', '.night-mode');
 
@@ -1869,6 +1881,112 @@ describe('GeoJsonEditor - Audit Fixes', () => {
         // First picker should be removed
         expect(document.querySelectorAll('.geojson-color-picker-input').length).to.equal(1);
       }
+    });
+  });
+
+  describe('Lifecycle Cleanup', () => {
+
+    it('should clean up color picker on disconnectedCallback', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      // Feature with color property
+      const feature = {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: { color: '#ff0000' }
+      };
+
+      el.set([feature]);
+      await new Promise(r => setTimeout(r, 200));
+
+      const gutter = el.shadowRoot.querySelector('.gutter-content');
+      const colorIndicator = gutter.querySelector('.color-indicator');
+
+      if (colorIndicator) {
+        // Open picker
+        colorIndicator.click();
+        await new Promise(r => setTimeout(r, 50));
+
+        const picker = document.querySelector('.geojson-color-picker-input');
+        expect(picker).to.exist;
+
+        // Remove element from DOM (triggers disconnectedCallback)
+        el.remove();
+        await new Promise(r => setTimeout(r, 50));
+
+        // Picker should be removed
+        expect(document.querySelector('.geojson-color-picker-input')).to.be.null;
+      }
+    });
+
+    it('should clear highlight timer on disconnectedCallback', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+      const textarea = el.shadowRoot.getElementById('textarea');
+
+      // Trigger input to set a highlight timer
+      textarea.value = '{"type": "Feature"';
+      textarea.dispatchEvent(new Event('input'));
+
+      // Timer should be set
+      expect(el.highlightTimer).to.not.be.null;
+
+      // Remove element
+      el.remove();
+
+      // Timer should be cleared
+      expect(el.highlightTimer).to.be.null;
+    });
+  });
+
+  describe('_performCollapse() Helper', () => {
+
+    it('should collapse a node and return lines removed', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      const lines = [
+        '  "data": {',
+        '    "value": 42',
+        '  }'
+      ];
+
+      const linesRemoved = el._performCollapse(lines, 0, 'data', '  ', '{');
+
+      expect(linesRemoved).to.equal(2);
+      expect(lines.length).to.equal(1);
+      expect(lines[0]).to.include('{...}');
+      expect(el.collapsedData.has('0-data')).to.be.true;
+    });
+
+    it('should return 0 if bracket closes on same line', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      const lines = [
+        '  "data": {}',
+        '  "other": 1'
+      ];
+
+      const linesRemoved = el._performCollapse(lines, 0, 'data', '  ', '{');
+
+      expect(linesRemoved).to.equal(0);
+      expect(lines.length).to.equal(2);
+      expect(lines[0]).to.equal('  "data": {}');
+    });
+
+    it('should preserve trailing comma', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      const lines = [
+        '  "data": [',
+        '    1,',
+        '    2',
+        '  ],',
+        '  "next": true'
+      ];
+
+      el._performCollapse(lines, 0, 'data', '  ', '[');
+
+      expect(lines[0]).to.include('[...]');
+      expect(lines[0]).to.match(/\],$/);
     });
   });
 });

@@ -17,68 +17,40 @@ class GeoJsonEditor extends HTMLElement {
     this._cachedLineHeight = null;
     this._cachedPaddingTop = null;
 
-    // Initialize themes from defaults
-    this.themes = {
-      dark: { ...GeoJsonEditor.DEFAULT_THEMES.dark },
-      light: { ...GeoJsonEditor.DEFAULT_THEMES.light }
-    };
+    // Custom theme overrides (empty by default, CSS has defaults)
+    this.themes = { dark: {}, light: {} };
   }
 
   static get observedAttributes() {
     return ['readonly', 'value', 'placeholder', 'dark-selector'];
   }
 
+  // Helper: Convert camelCase to kebab-case
+  static _toKebabCase(str) {
+    return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+  }
 
-  // Default theme values
-  static DEFAULT_THEMES = {
-    dark: {
-      background: '#1e1e1e',
-      textColor: '#d4d4d4',
-      caretColor: '#fff',
-      gutterBackground: '#252526',
-      gutterBorder: '#3e3e42',
-      jsonKey: '#9cdcfe',
-      jsonString: '#ce9178',
-      jsonNumber: '#b5cea8',
-      jsonBoolean: '#569cd6',
-      jsonNull: '#569cd6',
-      jsonPunctuation: '#d4d4d4',
-      controlColor: '#c586c0',
-      controlBg: '#3e3e42',
-      controlBorder: '#555',
-      geojsonKey: '#c586c0',
-      geojsonType: '#4ec9b0',
-      geojsonTypeInvalid: '#f44747',
-      jsonKeyInvalid: '#f44747'
-    },
-    light: {
-      background: '#ffffff',
-      textColor: '#333333',
-      caretColor: '#000',
-      gutterBackground: '#f5f5f5',
-      gutterBorder: '#ddd',
-      jsonKey: '#0000ff',
-      jsonString: '#a31515',
-      jsonNumber: '#098658',
-      jsonBoolean: '#0000ff',
-      jsonNull: '#0000ff',
-      jsonPunctuation: '#333333',
-      controlColor: '#a31515',
-      controlBg: '#e0e0e0',
-      controlBorder: '#999',
-      geojsonKey: '#af00db',
-      geojsonType: '#267f99',
-      geojsonTypeInvalid: '#d32f2f',
-      jsonKeyInvalid: '#d32f2f'
-    }
+  // Dark theme defaults - IntelliJ Darcula (light defaults are CSS fallbacks)
+  static DARK_THEME_DEFAULTS = {
+    bgColor: '#2b2b2b',
+    textColor: '#a9b7c6',
+    caretColor: '#bbbbbb',
+    gutterBg: '#313335',
+    gutterBorder: '#3c3f41',
+    jsonKey: '#9876aa',
+    jsonString: '#6a8759',
+    jsonNumber: '#6897bb',
+    jsonBoolean: '#cc7832',
+    jsonNull: '#cc7832',
+    jsonPunct: '#a9b7c6',
+    controlColor: '#cc7832',
+    controlBg: '#3c3f41',
+    controlBorder: '#5a5a5a',
+    geojsonKey: '#9876aa',
+    geojsonType: '#6a8759',
+    geojsonTypeInvalid: '#ff6b68',
+    jsonKeyInvalid: '#ff6b68'
   };
-
-  // FeatureCollection wrapper constants
-  static FEATURE_COLLECTION_PREFIX = '{"type": "FeatureCollection", "features": [';
-  static FEATURE_COLLECTION_SUFFIX = ']}';
-
-  // SVG icon for visibility toggle (single icon, style changes based on state)
-  static ICON_EYE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M480-320q75 0 127.5-52.5T660-500q0-75-52.5-127.5T480-680q-75 0-127.5 52.5T300-500q0 75 52.5 127.5T480-320Zm0-72q-45 0-76.5-31.5T372-500q0-45 31.5-76.5T480-608q45 0 76.5 31.5T588-500q0 45-31.5 76.5T480-392Zm0 192q-146 0-266-81.5T40-500q54-137 174-218.5T480-800q146 0 266 81.5T920-500q-54 137-174 218.5T480-200Zm0-300Zm0 220q113 0 207.5-59.5T832-500q-50-101-144.5-160.5T480-720q-113 0-207.5 59.5T128-500q50 101 144.5 160.5T480-280Z"/></svg>';
 
   // Pre-compiled regex patterns (avoid recompilation on each call)
   static REGEX = {
@@ -118,6 +90,21 @@ class GeoJsonEditor extends HTMLElement {
     this.updatePlaceholderContent();
   }
 
+  disconnectedCallback() {
+    // Clean up any open color picker and its global listener
+    const colorPicker = document.querySelector('.geojson-color-picker-input');
+    if (colorPicker && colorPicker._closeListener) {
+      document.removeEventListener('click', colorPicker._closeListener, true);
+      colorPicker.remove();
+    }
+
+    // Clear any pending highlight timer
+    if (this.highlightTimer) {
+      clearTimeout(this.highlightTimer);
+      this.highlightTimer = null;
+    }
+  }
+
   attributeChangedCallback(name, oldValue, newValue) {
     if (oldValue === newValue) return;
 
@@ -148,11 +135,11 @@ class GeoJsonEditor extends HTMLElement {
 
   // Always in FeatureCollection mode - prefix/suffix are constant
   get prefix() {
-    return GeoJsonEditor.FEATURE_COLLECTION_PREFIX;
+    return '{"type": "FeatureCollection", "features": [';
   }
-
+  
   get suffix() {
-    return GeoJsonEditor.FEATURE_COLLECTION_SUFFIX;
+    return ']}';
   }
 
   render() {
@@ -182,9 +169,6 @@ class GeoJsonEditor extends HTMLElement {
           position: relative;
           width: 100%;
           height: 400px;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          line-height: 1.5;
           border-radius: 4px;
           overflow: hidden;
         }
@@ -215,18 +199,15 @@ class GeoJsonEditor extends HTMLElement {
           position: relative;
           width: 100%;
           flex: 1;
-          background: var(--bg-color);
+          background: var(--bg-color, #ffffff);
           display: flex;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          line-height: 1.5;
         }
 
         .gutter {
           width: 24px;
           height: 100%;
-          background: var(--gutter-bg);
-          border-right: 1px solid var(--gutter-border);
+          background: var(--gutter-bg, #f0f0f0);
+          border-right: 1px solid var(--gutter-border, #e0e0e0);
           overflow: hidden;
           flex-shrink: 0;
           position: relative;
@@ -268,10 +249,10 @@ class GeoJsonEditor extends HTMLElement {
         .collapse-button {
           width: 12px;
           height: 12px;
-          background: var(--control-bg);
-          border: 1px solid var(--control-border);
+          background: var(--control-bg, #e8e8e8);
+          border: 1px solid var(--control-border, #c0c0c0);
           border-radius: 2px;
-          color: var(--control-color);
+          color: var(--control-color, #000080);
           font-size: 8px;
           font-weight: bold;
           cursor: pointer;
@@ -284,8 +265,8 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         .collapse-button:hover {
-          background: var(--control-bg);
-          border-color: var(--control-color);
+          background: var(--control-bg, #e8e8e8);
+          border-color: var(--control-color, #000080);
           transform: scale(1.1);
         }
 
@@ -294,7 +275,6 @@ class GeoJsonEditor extends HTMLElement {
           height: 14px;
           background: transparent;
           border: none;
-          color: var(--control-color);
           cursor: pointer;
           display: flex;
           align-items: center;
@@ -303,21 +283,16 @@ class GeoJsonEditor extends HTMLElement {
           flex-shrink: 0;
           opacity: 0.7;
           padding: 0;
+          font-size: 11px;
         }
 
         .visibility-button:hover {
           opacity: 1;
-          transform: scale(1.1);
+          transform: scale(1.15);
         }
 
         .visibility-button.hidden {
-          opacity: 0.4;
-        }
-
-        .visibility-button svg {
-          width: 12px;
-          height: 12px;
-          fill: currentColor;
+          opacity: 0.35;
         }
 
         /* Hidden feature lines - grayed out */
@@ -356,17 +331,12 @@ class GeoJsonEditor extends HTMLElement {
           width: 100%;
           height: 100%;
           padding: 8px 12px;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          font-weight: normal;
-          font-style: normal;
-          line-height: 1.5;
           white-space: pre-wrap;
           word-wrap: break-word;
           overflow: auto;
           pointer-events: none;
           z-index: 1;
-          color: var(--text-color);
+          color: var(--text-color, #000000);
         }
 
         .highlight-layer::-webkit-scrollbar {
@@ -385,18 +355,12 @@ class GeoJsonEditor extends HTMLElement {
           outline: none;
           background: transparent;
           color: transparent;
-          caret-color: var(--caret-color);
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          font-weight: normal;
-          font-style: normal;
-          line-height: 1.5;
+          caret-color: var(--caret-color, #000);
           white-space: pre-wrap;
           word-wrap: break-word;
           resize: none;
           overflow: auto;
           z-index: 2;
-          box-sizing: border-box;
         }
 
         textarea::selection {
@@ -414,11 +378,6 @@ class GeoJsonEditor extends HTMLElement {
           width: 100%;
           height: 100%;
           padding: 8px 12px;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          font-weight: normal;
-          font-style: normal;
-          line-height: 1.5;
           white-space: pre-wrap;
           word-wrap: break-word;
           color: #6a6a6a;
@@ -432,49 +391,49 @@ class GeoJsonEditor extends HTMLElement {
           opacity: 0.6;
         }
 
-        /* Syntax highlighting colors */
+        /* Syntax highlighting colors - IntelliJ Light defaults */
         .json-key {
-          color: var(--json-key);
+          color: var(--json-key, #660e7a);
         }
 
         .json-string {
-          color: var(--json-string);
+          color: var(--json-string, #008000);
         }
 
         .json-number {
-          color: var(--json-number);
+          color: var(--json-number, #0000ff);
         }
 
         .json-boolean {
-          color: var(--json-boolean);
+          color: var(--json-boolean, #000080);
         }
 
         .json-null {
-          color: var(--json-null);
+          color: var(--json-null, #000080);
         }
 
         .json-punctuation {
-          color: var(--json-punct);
+          color: var(--json-punct, #000000);
         }
 
         /* GeoJSON-specific highlighting */
         .geojson-key {
-          color: var(--geojson-key);
+          color: var(--geojson-key, #660e7a);
           font-weight: 600;
         }
 
         .geojson-type {
-          color: var(--geojson-type);
+          color: var(--geojson-type, #008000);
           font-weight: 600;
         }
 
         .geojson-type-invalid {
-          color: var(--geojson-type-invalid);
+          color: var(--geojson-type-invalid, #ff0000);
           font-weight: 600;
         }
 
         .json-key-invalid {
-          color: var(--json-key-invalid);
+          color: var(--json-key-invalid, #ff0000);
         }
 
         /* Prefix and suffix wrapper with gutter */
@@ -482,14 +441,14 @@ class GeoJsonEditor extends HTMLElement {
         .suffix-wrapper {
           display: flex;
           flex-shrink: 0;
-          background: var(--bg-color);
+          background: var(--bg-color, #ffffff);
         }
 
         .prefix-gutter,
         .suffix-gutter {
           width: 24px;
-          background: var(--gutter-bg);
-          border-right: 1px solid var(--gutter-border);
+          background: var(--gutter-bg, #f0f0f0);
+          border-right: 1px solid var(--gutter-border, #e0e0e0);
           flex-shrink: 0;
         }
 
@@ -497,14 +456,11 @@ class GeoJsonEditor extends HTMLElement {
         .editor-suffix {
           flex: 1;
           padding: 4px 12px;
-          color: var(--text-color);
-          background: var(--bg-color);
+          color: var(--text-color, #000000);
+          background: var(--bg-color, #ffffff);
           user-select: none;
           white-space: pre-wrap;
           word-wrap: break-word;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          line-height: 1.5;
           opacity: 0.6;
         }
 
@@ -525,7 +481,7 @@ class GeoJsonEditor extends HTMLElement {
           transform: translateY(-50%);
           background: transparent;
           border: none;
-          color: var(--text-color);
+          color: var(--text-color, #000000);
           opacity: 0.3;
           cursor: pointer;
           font-size: 0.65rem;
@@ -554,22 +510,22 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         textarea::-webkit-scrollbar-track {
-          background: var(--control-bg);
+          background: var(--control-bg, #e8e8e8);
         }
 
         textarea::-webkit-scrollbar-thumb {
-          background: var(--control-border);
+          background: var(--control-border, #c0c0c0);
           border-radius: 5px;
         }
 
         textarea::-webkit-scrollbar-thumb:hover {
-          background: var(--control-color);
+          background: var(--control-color, #000080);
         }
 
         /* Scrollbar styling - Firefox */
         textarea {
           scrollbar-width: thin;
-          scrollbar-color: var(--control-border) var(--control-bg);
+          scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8);
         }
       </style>
     `;
@@ -721,10 +677,11 @@ class GeoJsonEditor extends HTMLElement {
 
   escapeHtml(text) {
     if (!text) return '';
+    const R = GeoJsonEditor.REGEX;
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+      .replace(R.ampersand, '&amp;')
+      .replace(R.lessThan, '&lt;')
+      .replace(R.greaterThan, '&gt;');
   }
 
   updatePlaceholderVisibility() {
@@ -1177,33 +1134,9 @@ class GeoJsonEditor extends HTMLElement {
 
       const indent = match[1];
       const openBracket = match[3];
-      const closeBracket = openBracket === '{' ? '}' : ']';
 
-      // Check if bracket closes on same line - can't collapse
-      if (this.bracketClosesOnSameLine(currentLine, openBracket)) return;
-
-      // Find closing bracket using helper (handles brackets in strings correctly)
-      const result = this._findClosingBracket(lines, line, openBracket);
-      if (!result) return;
-
-      const { endLine, content } = result;
-
-      // Store the original data with unique key
-      const uniqueKey = `${line}-${nodeKey}`;
-      this.collapsedData.set(uniqueKey, {
-        originalLine: currentLine,
-        content: content,
-        indent: indent.length,
-        nodeKey: nodeKey
-      });
-
-      // Replace with marker
-      const beforeBracket = currentLine.substring(0, currentLine.indexOf(openBracket));
-      const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
-      lines[line] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
-
-      // Remove content lines
-      lines.splice(line + 1, endLine - line);
+      // Use common collapse helper
+      if (this._performCollapse(lines, line, nodeKey, indent, openBracket) === 0) return;
     }
 
     // Update textarea
@@ -1229,33 +1162,9 @@ class GeoJsonEditor extends HTMLElement {
         if (nodeKey === 'coordinates') {
           const indent = match[1];
           const openBracket = match[3];
-          const closeBracket = openBracket === '{' ? '}' : ']';
 
-          // Skip if bracket closes on same line
-          if (this.bracketClosesOnSameLine(line, openBracket)) continue;
-
-          // Find closing bracket using helper (handles brackets in strings correctly)
-          const result = this._findClosingBracket(lines, i, openBracket);
-          if (!result) continue;
-
-          const { endLine, content } = result;
-
-          // Store the original data with unique key
-          const uniqueKey = `${i}-${nodeKey}`;
-          this.collapsedData.set(uniqueKey, {
-            originalLine: line,
-            content: content,
-            indent: indent.length,
-            nodeKey: nodeKey
-          });
-
-          // Replace with marker
-          const beforeBracket = line.substring(0, line.indexOf(openBracket));
-          const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
-          lines[i] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
-
-          // Remove content lines
-          lines.splice(i + 1, endLine - i);
+          // Use common collapse helper
+          this._performCollapse(lines, i, nodeKey, indent, openBracket);
         }
       }
     }
@@ -1323,7 +1232,7 @@ class GeoJsonEditor extends HTMLElement {
       elements.visibilityButtons.forEach(({ featureKey, isHidden }) => {
         const button = document.createElement('button');
         button.className = 'visibility-button' + (isHidden ? ' hidden' : '');
-        button.innerHTML = GeoJsonEditor.ICON_EYE;
+        button.textContent = '👁';
         button.dataset.featureKey = featureKey;
         button.title = isHidden ? 'Show feature in events' : 'Hide feature from events';
         gutterLine.appendChild(button);
@@ -1528,14 +1437,15 @@ class GeoJsonEditor extends HTMLElement {
 
         // Fallback: search by line number only
         let found = false;
-        this.collapsedData.forEach((collapsed, key) => {
+        for (const [key, collapsed] of this.collapsedData.entries()) {
           const collapsedLineNum = parseInt(key.split('-')[0]);
-          if (collapsedLineNum === absoluteLineNum && !found) {
+          if (collapsedLineNum === absoluteLineNum) {
             expandedLines.push(collapsed.originalLine);
             expandedLines.push(...collapsed.content);
             found = true;
+            break;
           }
-        });
+        }
         if (!found) {
           expandedLines.push(line);
         }
@@ -1928,6 +1838,51 @@ class GeoJsonEditor extends HTMLElement {
     return null; // Not found (malformed JSON)
   }
 
+  /**
+   * Helper: Perform collapse operation on a node at given line
+   * Stores data in collapsedData, replaces line with marker, removes content lines
+   * @param {string[]} lines - Array of lines (modified in place)
+   * @param {number} lineIndex - Index of line to collapse
+   * @param {string} nodeKey - Key of the node (e.g., 'coordinates')
+   * @param {string} indent - Indentation string
+   * @param {string} openBracket - Opening bracket character ('{' or '[')
+   * @returns {number} Number of lines removed, or 0 if collapse failed
+   * @private
+   */
+  _performCollapse(lines, lineIndex, nodeKey, indent, openBracket) {
+    const line = lines[lineIndex];
+    const closeBracket = openBracket === '{' ? '}' : ']';
+
+    // Skip if bracket closes on same line
+    if (this.bracketClosesOnSameLine(line, openBracket)) return 0;
+
+    // Find closing bracket
+    const result = this._findClosingBracket(lines, lineIndex, openBracket);
+    if (!result) return 0;
+
+    const { endLine, content } = result;
+
+    // Store the original data with unique key
+    const uniqueKey = `${lineIndex}-${nodeKey}`;
+    this.collapsedData.set(uniqueKey, {
+      originalLine: line,
+      content: content,
+      indent: indent.length,
+      nodeKey: nodeKey
+    });
+
+    // Replace with marker
+    const beforeBracket = line.substring(0, line.indexOf(openBracket));
+    const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
+    lines[lineIndex] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
+
+    // Remove content lines
+    const linesRemoved = endLine - lineIndex;
+    lines.splice(lineIndex + 1, linesRemoved);
+
+    return linesRemoved;
+  }
+
   // Helper: Expand all collapsed markers and return expanded content
   expandAllCollapsed(content) {
     const R = GeoJsonEditor.REGEX;
@@ -2075,33 +2030,9 @@ class GeoJsonEditor extends HTMLElement {
           if (currentOccurrence <= collapseMap.get(key)) {
             const indent = match[1];
             const openBracket = match[3];
-            const closeBracket = openBracket === '{' ? '}' : ']';
 
-            // Skip if closes on same line
-            if (this.bracketClosesOnSameLine(line, openBracket)) continue;
-
-            // Find closing bracket using helper (handles brackets in strings correctly)
-            const result = this._findClosingBracket(lines, i, openBracket);
-            if (!result) continue;
-
-            const { endLine, content } = result;
-
-            // Store with unique key
-            const uniqueKey = `${i}-${nodeKey}`;
-            this.collapsedData.set(uniqueKey, {
-              originalLine: line,
-              content: content,
-              indent: indent.length,
-              nodeKey: nodeKey
-            });
-
-            // Replace with marker
-            const beforeBracket = line.substring(0, line.indexOf(openBracket));
-            const hasTrailingComma = lines[endLine] && lines[endLine].trim().endsWith(',');
-            lines[i] = `${beforeBracket}${openBracket}...${closeBracket}${hasTrailingComma ? ',' : ''}`;
-
-            // Remove content lines
-            lines.splice(i + 1, endLine - i);
+            // Use common collapse helper
+            this._performCollapse(lines, i, nodeKey, indent, openBracket);
           }
         }
       }
@@ -2130,77 +2061,41 @@ class GeoJsonEditor extends HTMLElement {
   // Generate and inject theme CSS based on dark selector
   updateThemeCSS() {
     const darkSelector = this.getAttribute('dark-selector') || '.dark';
-
-    // Parse selector to create CSS rule for dark theme
     const darkRule = this.parseSelectorToHostRule(darkSelector);
-    // Light theme is the default (no selector = light)
-    const lightRule = ':host';
 
     // Find or create theme style element
     let themeStyle = this.shadowRoot.getElementById('theme-styles');
     if (!themeStyle) {
       themeStyle = document.createElement('style');
       themeStyle.id = 'theme-styles';
-      // Insert at the beginning of shadow root to ensure it's before static styles
       this.shadowRoot.insertBefore(themeStyle, this.shadowRoot.firstChild);
     }
 
-    // Generate CSS with theme variables (light first as default, then dark overrides)
-    const css = `
-      ${lightRule} {
-        --bg-color: ${this.themes.light.background};
-        --text-color: ${this.themes.light.textColor};
-        --caret-color: ${this.themes.light.caretColor};
-        --gutter-bg: ${this.themes.light.gutterBackground};
-        --gutter-border: ${this.themes.light.gutterBorder};
-        --json-key: ${this.themes.light.jsonKey};
-        --json-string: ${this.themes.light.jsonString};
-        --json-number: ${this.themes.light.jsonNumber};
-        --json-boolean: ${this.themes.light.jsonBoolean};
-        --json-null: ${this.themes.light.jsonNull};
-        --json-punct: ${this.themes.light.jsonPunctuation};
-        --control-color: ${this.themes.light.controlColor};
-        --control-bg: ${this.themes.light.controlBg};
-        --control-border: ${this.themes.light.controlBorder};
-        --geojson-key: ${this.themes.light.geojsonKey};
-        --geojson-type: ${this.themes.light.geojsonType};
-        --geojson-type-invalid: ${this.themes.light.geojsonTypeInvalid};
-        --json-key-invalid: ${this.themes.light.jsonKeyInvalid};
-      }
+    // Helper to generate CSS variables from theme object
+    const generateVars = (themeObj) => {
+      return Object.entries(themeObj || {})
+        .map(([key, value]) => `--${GeoJsonEditor._toKebabCase(key)}: ${value};`)
+        .join('\n        ');
+    };
 
-      ${darkRule} {
-        --bg-color: ${this.themes.dark.background};
-        --text-color: ${this.themes.dark.textColor};
-        --caret-color: ${this.themes.dark.caretColor};
-        --gutter-bg: ${this.themes.dark.gutterBackground};
-        --gutter-border: ${this.themes.dark.gutterBorder};
-        --json-key: ${this.themes.dark.jsonKey};
-        --json-string: ${this.themes.dark.jsonString};
-        --json-number: ${this.themes.dark.jsonNumber};
-        --json-boolean: ${this.themes.dark.jsonBoolean};
-        --json-null: ${this.themes.dark.jsonNull};
-        --json-punct: ${this.themes.dark.jsonPunctuation};
-        --control-color: ${this.themes.dark.controlColor};
-        --control-bg: ${this.themes.dark.controlBg};
-        --control-border: ${this.themes.dark.controlBorder};
-        --geojson-key: ${this.themes.dark.geojsonKey};
-        --geojson-type: ${this.themes.dark.geojsonType};
-        --geojson-type-invalid: ${this.themes.dark.geojsonTypeInvalid};
-        --json-key-invalid: ${this.themes.dark.jsonKeyInvalid};
-      }
-    `;
+    // Light theme: only overrides (defaults are in static CSS)
+    const lightVars = generateVars(this.themes.light);
+
+    // Dark theme: ALWAYS generate with defaults + overrides (selector is dynamic)
+    const darkTheme = { ...GeoJsonEditor.DARK_THEME_DEFAULTS, ...this.themes.dark };
+    const darkVars = generateVars(darkTheme);
+
+    let css = '';
+    if (lightVars) {
+      css += `:host {\n        ${lightVars}\n      }\n`;
+    }
+    // Dark theme is always generated (selector is configurable)
+    css += `${darkRule} {\n        ${darkVars}\n      }`;
 
     themeStyle.textContent = css;
   }
 
   // Public API: Theme management
-  getTheme() {
-    return {
-      dark: { ...this.themes.dark },
-      light: { ...this.themes.light }
-    };
-  }
-
   setTheme(theme) {
     if (theme.dark) {
       this.themes.dark = { ...this.themes.dark, ...theme.dark };
@@ -2208,17 +2103,11 @@ class GeoJsonEditor extends HTMLElement {
     if (theme.light) {
       this.themes.light = { ...this.themes.light, ...theme.light };
     }
-
-    // Regenerate CSS with new theme values
     this.updateThemeCSS();
   }
 
   resetTheme() {
-    // Reset to defaults
-    this.themes = {
-      dark: { ...GeoJsonEditor.DEFAULT_THEMES.dark },
-      light: { ...GeoJsonEditor.DEFAULT_THEMES.light }
-    };
+    this.themes = { dark: {}, light: {} };
     this.updateThemeCSS();
   }
 

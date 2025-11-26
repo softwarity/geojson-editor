@@ -88,7 +88,7 @@ test/geojson-editor.test.js:
   ✓ GeoJsonEditor - Features API > set() should replace all features
   ...
 
-Chromium: 108 passed, 0 failed
+Chromium: 113 passed, 0 failed
 Finished running tests in 10s, all tests passed! 🎉
 ```
 
