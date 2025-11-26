@@ -249,6 +249,7 @@ class GeoJsonEditor extends HTMLElement {
         .collapse-button {
           width: 12px;
           height: 12px;
+          padding-top: 1px;
           background: var(--control-bg, #e8e8e8);
           border: 1px solid var(--control-border, #c0c0c0);
           border-radius: 2px;
@@ -274,6 +275,7 @@ class GeoJsonEditor extends HTMLElement {
           width: 14px;
           height: 14px;
           background: transparent;
+          color: var(--control-color, #000080);
           border: none;
           cursor: pointer;
           display: flex;
