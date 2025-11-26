@@ -338,8 +338,9 @@ describe('GeoJsonEditor - Theme API', () => {
     const allStyles = el.shadowRoot.querySelectorAll('style');
     const mainStyle = Array.from(allStyles).find(s => s.id !== 'theme-styles');
     expect(mainStyle).to.exist;
-    expect(mainStyle.textContent).to.include('var(--bg-color, #ffffff)');
-    expect(mainStyle.textContent).to.include('var(--text-color, #000000)');
+    // Check for CSS variable patterns (colors can be shorthand like #fff or full like #ffffff)
+    expect(mainStyle.textContent).to.include('var(--bg-color,');
+    expect(mainStyle.textContent).to.include('var(--text-color,');
     expect(mainStyle.textContent).to.include('var(--json-key, #660e7a)');
   });
 

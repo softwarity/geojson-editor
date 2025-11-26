@@ -290,22 +290,16 @@ class GeoJsonEditor extends HTMLElement {
   render() {
     const styles = `
       <style>
-        /* Global reset with exact values to prevent external CSS interference */
-        :host *,
-        :host *::before,
-        :host *::after {
+        /* Base reset - protect against inherited styles */
+        :host *, :host *::before, :host *::after {
           box-sizing: border-box;
-          font-family: 'Courier New', Courier, monospace;
-          font-size: 13px;
-          font-weight: normal;
-          font-style: normal;
+          font: normal normal 13px/1.5 'Courier New', Courier, monospace;
           font-variant: normal;
-          line-height: 1.5;
           letter-spacing: 0;
+          word-spacing: 0;
           text-transform: none;
           text-decoration: none;
           text-indent: 0;
-          word-spacing: 0;
         }
 
         :host {
@@ -321,30 +315,19 @@ class GeoJsonEditor extends HTMLElement {
         :host([readonly]) .editor-wrapper::after {
           content: '';
           position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
+          inset: 0;
           pointer-events: none;
-          background: repeating-linear-gradient(
-            -45deg,
-            rgba(128, 128, 128, 0.08),
-            rgba(128, 128, 128, 0.08) 3px,
-            transparent 3px,
-            transparent 12px
-          );
+          background: repeating-linear-gradient(-45deg, rgba(128,128,128,0.08), rgba(128,128,128,0.08) 3px, transparent 3px, transparent 12px);
           z-index: 1;
         }
 
-        :host([readonly]) textarea {
-          cursor: text;
-        }
+        :host([readonly]) textarea { cursor: text; }
 
         .editor-wrapper {
           position: relative;
           width: 100%;
           flex: 1;
-          background: var(--bg-color, #ffffff);
+          background: var(--bg-color, #fff);
           display: flex;
         }
 
@@ -376,42 +359,36 @@ class GeoJsonEditor extends HTMLElement {
           justify-content: center;
         }
 
-        .color-indicator {
+        .color-indicator, .collapse-button {
           width: 12px;
           height: 12px;
           border-radius: 2px;
-          border: 1px solid #555;
           cursor: pointer;
           transition: transform 0.1s;
           flex-shrink: 0;
         }
 
+        .color-indicator {
+          border: 1px solid #555;
+        }
         .color-indicator:hover {
           transform: scale(1.2);
           border-color: #fff;
         }
 
         .collapse-button {
-          width: 12px;
-          height: 12px;
           padding-top: 1px;
           background: var(--control-bg, #e8e8e8);
           border: 1px solid var(--control-border, #c0c0c0);
-          border-radius: 2px;
           color: var(--control-color, #000080);
           font-size: 8px;
           font-weight: bold;
-          cursor: pointer;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: all 0.1s;
-          flex-shrink: 0;
           user-select: none;
         }
-
         .collapse-button:hover {
-          background: var(--control-bg, #e8e8e8);
           border-color: var(--control-color, #000080);
           transform: scale(1.1);
         }
@@ -432,38 +409,10 @@ class GeoJsonEditor extends HTMLElement {
           padding: 0;
           font-size: 11px;
         }
+        .visibility-button:hover { opacity: 1; transform: scale(1.15); }
+        .visibility-button.hidden { opacity: 0.35; }
 
-        .visibility-button:hover {
-          opacity: 1;
-          transform: scale(1.15);
-        }
-
-        .visibility-button.hidden {
-          opacity: 0.35;
-        }
-
-        /* Hidden feature lines - grayed out */
-        .line-hidden {
-          opacity: 0.35;
-          filter: grayscale(50%);
-        }
-
-        .color-picker-popup {
-          position: absolute;
-          background: #2d2d30;
-          border: 1px solid #555;
-          border-radius: 4px;
-          padding: 8px;
-          z-index: 1000;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        }
-
-        .color-picker-popup input[type="color"] {
-          width: 150px;
-          height: 30px;
-          border: none;
-          cursor: pointer;
-        }
+        .line-hidden { opacity: 0.35; filter: grayscale(50%); }
 
         .editor-content {
           position: relative;
@@ -471,156 +420,82 @@ class GeoJsonEditor extends HTMLElement {
           overflow: hidden;
         }
 
-        .highlight-layer {
+        .highlight-layer, textarea, .placeholder-layer {
           position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
+          inset: 0;
           padding: 8px 12px;
           white-space: pre-wrap;
           word-wrap: break-word;
+        }
+
+        .highlight-layer {
           overflow: auto;
           pointer-events: none;
           z-index: 1;
-          color: var(--text-color, #000000);
+          color: var(--text-color, #000);
         }
-
-        .highlight-layer::-webkit-scrollbar {
-          display: none;
-        }
+        .highlight-layer::-webkit-scrollbar { display: none; }
 
         textarea {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          padding: 8px 12px;
           margin: 0;
           border: none;
           outline: none;
           background: transparent;
           color: transparent;
           caret-color: var(--caret-color, #000);
-          white-space: pre-wrap;
-          word-wrap: break-word;
           resize: none;
           overflow: auto;
           z-index: 2;
         }
-
-        textarea::selection {
-          background: rgba(51, 153, 255, 0.3);
-        }
-
-        textarea::placeholder {
-          color: transparent;
-        }
+        textarea::selection { background: rgba(51,153,255,0.3); }
+        textarea::placeholder { color: transparent; }
+        textarea:disabled { cursor: not-allowed; opacity: 0.6; }
 
         .placeholder-layer {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          padding: 8px 12px;
-          white-space: pre-wrap;
-          word-wrap: break-word;
           color: #6a6a6a;
           pointer-events: none;
           z-index: 0;
           overflow: hidden;
         }
 
-        textarea:disabled {
-          cursor: not-allowed;
-          opacity: 0.6;
-        }
+        .json-key { color: var(--json-key, #660e7a); }
+        .json-string { color: var(--json-string, #008000); }
+        .json-number { color: var(--json-number, #00f); }
+        .json-boolean, .json-null { color: var(--json-boolean, #000080); }
+        .json-punctuation { color: var(--json-punct, #000); }
+        .json-key-invalid { color: var(--json-key-invalid, #f00); }
 
-        /* Syntax highlighting colors - IntelliJ Light defaults */
-        .json-key {
-          color: var(--json-key, #660e7a);
-        }
+        .geojson-key { color: var(--geojson-key, #660e7a); font-weight: 600; }
+        .geojson-type { color: var(--geojson-type, #008000); font-weight: 600; }
+        .geojson-type-invalid { color: var(--geojson-type-invalid, #f00); font-weight: 600; }
 
-        .json-string {
-          color: var(--json-string, #008000);
-        }
-
-        .json-number {
-          color: var(--json-number, #0000ff);
-        }
-
-        .json-boolean {
-          color: var(--json-boolean, #000080);
-        }
-
-        .json-null {
-          color: var(--json-null, #000080);
-        }
-
-        .json-punctuation {
-          color: var(--json-punct, #000000);
-        }
-
-        /* GeoJSON-specific highlighting */
-        .geojson-key {
-          color: var(--geojson-key, #660e7a);
-          font-weight: 600;
-        }
-
-        .geojson-type {
-          color: var(--geojson-type, #008000);
-          font-weight: 600;
-        }
-
-        .geojson-type-invalid {
-          color: var(--geojson-type-invalid, #ff0000);
-          font-weight: 600;
-        }
-
-        .json-key-invalid {
-          color: var(--json-key-invalid, #ff0000);
-        }
-
-        /* Prefix and suffix wrapper with gutter */
-        .prefix-wrapper,
-        .suffix-wrapper {
+        .prefix-wrapper, .suffix-wrapper {
           display: flex;
           flex-shrink: 0;
-          background: var(--bg-color, #ffffff);
+          background: var(--bg-color, #fff);
         }
 
-        .prefix-gutter,
-        .suffix-gutter {
+        .prefix-gutter, .suffix-gutter {
           width: 24px;
           background: var(--gutter-bg, #f0f0f0);
           border-right: 1px solid var(--gutter-border, #e0e0e0);
           flex-shrink: 0;
         }
 
-        .editor-prefix,
-        .editor-suffix {
+        .editor-prefix, .editor-suffix {
           flex: 1;
           padding: 4px 12px;
-          color: var(--text-color, #000000);
-          background: var(--bg-color, #ffffff);
+          color: var(--text-color, #000);
+          background: var(--bg-color, #fff);
           user-select: none;
           white-space: pre-wrap;
           word-wrap: break-word;
           opacity: 0.6;
         }
 
-        .prefix-wrapper {
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
+        .prefix-wrapper { border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .suffix-wrapper { border-top: 1px solid rgba(255,255,255,0.1); position: relative; }
 
-        .suffix-wrapper {
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          position: relative;
-        }
-
-        /* Clear button in suffix area */
         .clear-btn {
           position: absolute;
           right: 0.5rem;
@@ -628,7 +503,7 @@ class GeoJsonEditor extends HTMLElement {
           transform: translateY(-50%);
           background: transparent;
           border: none;
-          color: var(--text-color, #000000);
+          color: var(--text-color, #000);
           opacity: 0.3;
           cursor: pointer;
           font-size: 0.65rem;
@@ -639,41 +514,16 @@ class GeoJsonEditor extends HTMLElement {
           display: flex;
           align-items: center;
           justify-content: center;
-          box-sizing: border-box;
           transition: opacity 0.2s, background 0.2s;
         }
-        .clear-btn:hover {
-          opacity: 0.7;
-          background: rgba(255, 255, 255, 0.1);
-        }
-        .clear-btn[hidden] {
-          display: none;
-        }
+        .clear-btn:hover { opacity: 0.7; background: rgba(255,255,255,0.1); }
+        .clear-btn[hidden] { display: none; }
 
-        /* Scrollbar styling - WebKit (Chrome, Safari, Edge) */
-        textarea::-webkit-scrollbar {
-          width: 10px;
-          height: 10px;
-        }
-
-        textarea::-webkit-scrollbar-track {
-          background: var(--control-bg, #e8e8e8);
-        }
-
-        textarea::-webkit-scrollbar-thumb {
-          background: var(--control-border, #c0c0c0);
-          border-radius: 5px;
-        }
-
-        textarea::-webkit-scrollbar-thumb:hover {
-          background: var(--control-color, #000080);
-        }
-
-        /* Scrollbar styling - Firefox */
-        textarea {
-          scrollbar-width: thin;
-          scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8);
-        }
+        textarea::-webkit-scrollbar { width: 10px; height: 10px; }
+        textarea::-webkit-scrollbar-track { background: var(--control-bg, #e8e8e8); }
+        textarea::-webkit-scrollbar-thumb { background: var(--control-border, #c0c0c0); border-radius: 5px; }
+        textarea::-webkit-scrollbar-thumb:hover { background: var(--control-color, #000080); }
+        textarea { scrollbar-width: thin; scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8); }
       </style>
     `;
 
