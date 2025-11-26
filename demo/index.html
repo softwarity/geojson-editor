@@ -595,6 +595,28 @@ Example:
           <strong>Note:</strong> Edit features directly (comma-separated). The component wraps them in a FeatureCollection and emits the complete structure on change events.
         </div>
       </div>
+
+      <div class="controls-section">
+        <h4>Default Properties</h4>
+        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
+          Define default properties to add to features on <code>change</code> events. Useful for visualization styling (fill-color, stroke-color, etc.) in your mapping framework. Properties are only added if not already defined on the feature.
+        </p>
+        <div class="control-group" style="margin-bottom: 1rem;">
+          <label for="defaultPropsSelect">Preset Examples</label>
+          <select id="defaultPropsSelect">
+            <option value="">None (disabled)</option>
+            <option value="simple">Simple (all features)</option>
+            <option value="geometry">By Geometry Type</option>
+            <option value="combined" selected>Combined (fallback + conditions)</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="defaultPropsInput">Configuration (JSON)</label>
+          <textarea id="defaultPropsInput" rows="6" style="font-size: 0.8rem;"></textarea>
+          <small style="color: #666; font-size: 0.85rem;">Edit the JSON or select a preset above</small>
+        </div>
+        <div id="defaultPropsDescription" class="info-box" style="margin-top: 1rem;"></div>
+      </div>
     </div>
 
     <div class="editor-map-row">
@@ -753,6 +775,63 @@ Example:
     const themeModal = document.getElementById('themeModal');
     const themeTextarea = document.getElementById('themeTextarea');
     const themePresetMainSelect = document.getElementById('themePresetMainSelect');
+    const defaultPropsSelect = document.getElementById('defaultPropsSelect');
+    const defaultPropsInput = document.getElementById('defaultPropsInput');
+    const defaultPropsDescription = document.getElementById('defaultPropsDescription');
+
+    // Default properties presets
+    const defaultPropsPresets = {
+      '': {
+        value: '',
+        description: '<strong>Disabled:</strong> No default properties will be added to features.'
+      },
+      'simple': {
+        value: JSON.stringify({
+          "fill-color": "#1a465b",
+          "fill-opacity": 0.5,
+          "stroke-color": "#0d2633",
+          "stroke-width": 2
+        }, null, 2),
+        description: '<strong>Simple:</strong> Apply the same default styling properties to all features. Great for consistent visualization.'
+      },
+      'geometry': {
+        value: JSON.stringify([
+          { "match": { "geometry.type": "Polygon" }, "values": { "fill-color": "#58a6ff", "fill-opacity": 0.4, "stroke-color": "#58a6ff" } },
+          { "match": { "geometry.type": "LineString" }, "values": { "stroke-color": "#a371f7", "stroke-width": 3 } },
+          { "match": { "geometry.type": "Point" }, "values": { "fill-color": "#f85149", "stroke-color": "#ffffff", "stroke-width": 2 } }
+        ], null, 2),
+        description: '<strong>By Geometry Type:</strong> Apply different styles based on geometry type (Polygon, LineString, Point). Each type gets distinct colors.'
+      },
+      'combined': {
+        value: JSON.stringify([
+          { "values": { "stroke-width": 2, "stroke-color": "#333333" } },
+          { "match": { "geometry.type": "Polygon" }, "values": { "fill-color": "#238636", "fill-opacity": 0.3 } },
+          { "match": { "geometry.type": "Point" }, "values": { "fill-color": "#f85149" } },
+          { "match": { "properties.highlighted": true }, "values": { "stroke-color": "#ff0000", "stroke-width": 4 } }
+        ], null, 2),
+        description: '<strong>Combined:</strong> First rule applies to all features (fallback). Following rules add/override for specific conditions. Try adding <code>"highlighted": true</code> to a feature\'s properties!'
+      }
+    };
+
+    // Handle default properties preset selection
+    defaultPropsSelect.addEventListener('change', (e) => {
+      const preset = defaultPropsPresets[e.target.value];
+      defaultPropsInput.value = preset.value;
+      defaultPropsDescription.innerHTML = preset.description;
+      updateEditor();
+    });
+
+    // Handle manual edit of default properties
+    defaultPropsInput.addEventListener('input', () => {
+      updateEditor();
+    });
+
+    // Initialize default properties UI
+    function initDefaultPropsUI() {
+      const preset = defaultPropsPresets[defaultPropsSelect.value];
+      defaultPropsInput.value = preset.value;
+      defaultPropsDescription.innerHTML = preset.description;
+    }
 
     // Initialize MapLibre map with globe projection
     const map = new maplibregl.Map({
@@ -1093,6 +1172,14 @@ Example:
         editor.removeAttribute('readonly');
       }
 
+      // Apply default-properties attribute
+      const defaultPropsValue = defaultPropsInput.value.trim();
+      if (defaultPropsValue) {
+        editor.setAttribute('default-properties', defaultPropsValue);
+      } else {
+        editor.removeAttribute('default-properties');
+      }
+
       updateHTMLCode();
     }
 
@@ -1102,6 +1189,7 @@ Example:
       const readonly = readonlyCheck.checked;
       const scheme = colorSchemeSelect.value;
       const isDark = scheme === 'dark';
+      const defaultPropsValue = defaultPropsInput.value.trim();
 
       // Parse selector to understand its type
       const selectorTarget = parseSelector(darkSelector);
@@ -1111,6 +1199,16 @@ Example:
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (readonly) attrs.push('readonly');
       if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
+      if (defaultPropsValue) {
+        // Minify the JSON for the HTML output
+        try {
+          const minified = JSON.stringify(JSON.parse(defaultPropsValue));
+          attrs.push(`default-properties='${minified}'`);
+        } catch (e) {
+          // If invalid JSON, use as-is
+          attrs.push(`default-properties='${defaultPropsValue.replace(/'/g, "\\'")}'`);
+        }
+      }
 
       // Build HTML tag attributes based on selector type
       let htmlAttrs = 'lang="en"';
@@ -1476,6 +1574,7 @@ editor.setTheme(${themeTextarea.value});`;
 
     // Load initial sample automatically after component is ready
     customElements.whenDefined('geojson-editor').then(() => {
+      initDefaultPropsUI();
       updateEditor();
       applyColorScheme();
       loadSampleData();

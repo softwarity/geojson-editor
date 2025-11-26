@@ -22,8 +22,11 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   static get observedAttributes() {
-    return ['readonly', 'value', 'placeholder', 'dark-selector'];
+    return ['readonly', 'value', 'placeholder', 'dark-selector', 'default-properties'];
   }
+
+  // Parsed default properties rules (cache)
+  _defaultPropertiesRules = null;
 
   // Helper: Convert camelCase to kebab-case
   static _toKebabCase(str) {
@@ -83,6 +86,9 @@ class GeoJsonEditor extends HTMLElement {
     // Setup theme CSS
     this.updateThemeCSS();
 
+    // Parse default properties rules
+    this._parseDefaultProperties();
+
     // Initialize textarea with value attribute (attributeChangedCallback fires before render)
     if (this.value) {
       this.updateValue(this.value);
@@ -116,6 +122,9 @@ class GeoJsonEditor extends HTMLElement {
       this.updatePlaceholderContent();
     } else if (name === 'dark-selector') {
       this.updateThemeCSS();
+    } else if (name === 'default-properties') {
+      // Re-parse the default properties rules
+      this._parseDefaultProperties();
     }
   }
 
@@ -140,6 +149,136 @@ class GeoJsonEditor extends HTMLElement {
   
   get suffix() {
     return ']}';
+  }
+
+  get defaultProperties() {
+    return this.getAttribute('default-properties') || '';
+  }
+
+  /**
+   * Parse and cache the default-properties attribute.
+   * Supports two formats:
+   * 1. Simple object: {"fill-color": "#1a465b", "stroke-width": 2}
+   * 2. Conditional array: [{"match": {"geometry.type": "Polygon"}, "values": {...}}, ...]
+   * 
+   * Returns an array of rules: [{match: null|object, values: object}]
+   */
+  _parseDefaultProperties() {
+    const attr = this.defaultProperties;
+    if (!attr) {
+      this._defaultPropertiesRules = [];
+      return this._defaultPropertiesRules;
+    }
+
+    try {
+      const parsed = JSON.parse(attr);
+      
+      if (Array.isArray(parsed)) {
+        // Conditional format: array of rules
+        this._defaultPropertiesRules = parsed.map(rule => ({
+          match: rule.match || null,
+          values: rule.values || {}
+        }));
+      } else if (typeof parsed === 'object' && parsed !== null) {
+        // Simple format: single object of properties for all features
+        this._defaultPropertiesRules = [{ match: null, values: parsed }];
+      } else {
+        this._defaultPropertiesRules = [];
+      }
+    } catch (e) {
+      console.warn('geojson-editor: Invalid default-properties JSON:', e.message);
+      this._defaultPropertiesRules = [];
+    }
+
+    return this._defaultPropertiesRules;
+  }
+
+  /**
+   * Check if a feature matches a condition.
+   * Supports dot notation for nested properties:
+   * - "geometry.type": "Polygon"
+   * - "properties.category": "airport"
+   */
+  _matchesCondition(feature, match) {
+    if (!match || typeof match !== 'object') return true;
+
+    for (const [path, expectedValue] of Object.entries(match)) {
+      const actualValue = this._getNestedValue(feature, path);
+      if (actualValue !== expectedValue) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Get a nested value from an object using dot notation.
+   * E.g., _getNestedValue(feature, "geometry.type") => "Polygon"
+   */
+  _getNestedValue(obj, path) {
+    const parts = path.split('.');
+    let current = obj;
+    for (const part of parts) {
+      if (current === null || current === undefined) return undefined;
+      current = current[part];
+    }
+    return current;
+  }
+
+  /**
+   * Apply default properties to a single feature.
+   * Only adds properties that don't already exist.
+   * Returns a new feature object (doesn't mutate original).
+   */
+  _applyDefaultPropertiesToFeature(feature) {
+    if (!feature || typeof feature !== 'object') return feature;
+    if (!this._defaultPropertiesRules || this._defaultPropertiesRules.length === 0) return feature;
+
+    // Collect all properties to apply (later rules override earlier for same key)
+    const propsToApply = {};
+
+    for (const rule of this._defaultPropertiesRules) {
+      if (this._matchesCondition(feature, rule.match)) {
+        Object.assign(propsToApply, rule.values);
+      }
+    }
+
+    if (Object.keys(propsToApply).length === 0) return feature;
+
+    // Apply only properties that don't already exist
+    const existingProps = feature.properties || {};
+    const newProps = { ...existingProps };
+    let hasChanges = false;
+
+    for (const [key, value] of Object.entries(propsToApply)) {
+      if (!(key in existingProps)) {
+        newProps[key] = value;
+        hasChanges = true;
+      }
+    }
+
+    if (!hasChanges) return feature;
+
+    return { ...feature, properties: newProps };
+  }
+
+  /**
+   * Apply default properties to all features in a parsed GeoJSON.
+   * Returns a new GeoJSON object (doesn't mutate original).
+   */
+  _applyDefaultProperties(parsed) {
+    if (!parsed || !this._defaultPropertiesRules || this._defaultPropertiesRules.length === 0) {
+      return parsed;
+    }
+
+    if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+      const newFeatures = parsed.features.map(f => this._applyDefaultPropertiesToFeature(f));
+      return { ...parsed, features: newFeatures };
+    } else if (parsed.type === 'Feature') {
+      return this._applyDefaultPropertiesToFeature(parsed);
+    }
+
+    return parsed;
   }
 
   render() {
@@ -1930,6 +2069,7 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // Helper: Format JSON content respecting prefix/suffix
+  // Also applies default properties to features if configured
   formatJSONContent(content) {
     const prefix = this.prefix;
     const suffix = this.suffix;
@@ -1938,7 +2078,13 @@ class GeoJsonEditor extends HTMLElement {
 
     if (prefixEndsWithBracket && suffixStartsWithBracket) {
       const wrapped = '[' + content + ']';
-      const parsed = JSON.parse(wrapped);
+      let parsed = JSON.parse(wrapped);
+      
+      // Apply default properties to each feature in the array
+      if (Array.isArray(parsed)) {
+        parsed = parsed.map(f => this._applyDefaultPropertiesToFeature(f));
+      }
+      
       const formatted = JSON.stringify(parsed, null, 2);
       const lines = formatted.split('\n');
       return lines.length > 2 ? lines.slice(1, -1).join('\n') : '';
@@ -2283,7 +2429,9 @@ class GeoJsonEditor extends HTMLElement {
       throw new Error(`Invalid features: ${allErrors.join('; ')}`);
     }
 
-    this._setFeatures(features);
+    // Apply default properties to each feature
+    const featuresWithDefaults = features.map(f => this._applyDefaultPropertiesToFeature(f));
+    this._setFeatures(featuresWithDefaults);
   }
 
   /**
@@ -2298,7 +2446,8 @@ class GeoJsonEditor extends HTMLElement {
     }
 
     const features = this._parseFeatures();
-    features.push(feature);
+    // Apply default properties before adding
+    features.push(this._applyDefaultPropertiesToFeature(feature));
     this._setFeatures(features);
   }
 
@@ -2317,7 +2466,8 @@ class GeoJsonEditor extends HTMLElement {
     const features = this._parseFeatures();
     const idx = this._normalizeIndex(index, features.length, true);
 
-    features.splice(idx, 0, feature);
+    // Apply default properties before inserting
+    features.splice(idx, 0, this._applyDefaultPropertiesToFeature(feature));
     this._setFeatures(features);
   }
 

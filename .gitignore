@@ -5,3 +5,4 @@ dist/
 .vscode/
 .idea/
 CLAUDE.md
+coverage/

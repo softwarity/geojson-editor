@@ -1990,3 +1990,265 @@ describe('GeoJsonEditor - Audit Fixes', () => {
     });
   });
 });
+
+describe('GeoJsonEditor - Default Properties', () => {
+
+  it('should initialize with empty default properties', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.defaultProperties).to.equal('');
+    expect(el._defaultPropertiesRules).to.deep.equal([]);
+  });
+
+  it('should parse simple default-properties format', async () => {
+    const props = JSON.stringify({ 'fill-color': '#1a465b', 'stroke-width': 2 });
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    expect(el._defaultPropertiesRules).to.have.lengthOf(1);
+    expect(el._defaultPropertiesRules[0].match).to.be.null;
+    expect(el._defaultPropertiesRules[0].values).to.deep.equal({
+      'fill-color': '#1a465b',
+      'stroke-width': 2
+    });
+  });
+
+  it('should parse conditional default-properties format', async () => {
+    const props = JSON.stringify([
+      { match: { 'geometry.type': 'Polygon' }, values: { 'fill-color': '#1a465b' } },
+      { match: { 'geometry.type': 'Point' }, values: { 'marker-color': '#ff0000' } }
+    ]);
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    expect(el._defaultPropertiesRules).to.have.lengthOf(2);
+    expect(el._defaultPropertiesRules[0].match).to.deep.equal({ 'geometry.type': 'Polygon' });
+    expect(el._defaultPropertiesRules[1].match).to.deep.equal({ 'geometry.type': 'Point' });
+  });
+
+  it('should handle invalid JSON in default-properties gracefully', async () => {
+    const el = await fixture(html`<geojson-editor default-properties='invalid json'></geojson-editor>`);
+
+    expect(el._defaultPropertiesRules).to.deep.equal([]);
+  });
+
+  it('should apply simple default properties to features', async () => {
+    const props = JSON.stringify({ 'fill-color': '#1a465b' });
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    const listener = oneEvent(el, 'change');
+
+    // Set a simple point feature without fill-color
+    el.set([{
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { name: 'Test' }
+    }]);
+
+    const { detail } = await listener;
+
+    expect(detail.features[0].properties['fill-color']).to.equal('#1a465b');
+    expect(detail.features[0].properties.name).to.equal('Test');
+  });
+
+  it('should not overwrite existing properties', async () => {
+    const props = JSON.stringify({ 'fill-color': '#1a465b', 'stroke-width': 2 });
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    const listener = oneEvent(el, 'change');
+
+    // Set a feature that already has fill-color
+    el.set([{
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { 'fill-color': '#ff0000' }
+    }]);
+
+    const { detail } = await listener;
+
+    // Existing fill-color should be preserved
+    expect(detail.features[0].properties['fill-color']).to.equal('#ff0000');
+    // stroke-width should be added
+    expect(detail.features[0].properties['stroke-width']).to.equal(2);
+  });
+
+  it('should apply conditional properties based on geometry.type', async () => {
+    const props = JSON.stringify([
+      { match: { 'geometry.type': 'Polygon' }, values: { 'fill-color': '#green' } },
+      { match: { 'geometry.type': 'Point' }, values: { 'marker-color': '#red' } }
+    ]);
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    const listener = oneEvent(el, 'change');
+
+    el.set([
+      {
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+        properties: {}
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: {}
+      }
+    ]);
+
+    const { detail } = await listener;
+
+    // Polygon should have fill-color
+    expect(detail.features[0].properties['fill-color']).to.equal('#green');
+    expect(detail.features[0].properties['marker-color']).to.be.undefined;
+
+    // Point should have marker-color
+    expect(detail.features[1].properties['marker-color']).to.equal('#red');
+    expect(detail.features[1].properties['fill-color']).to.be.undefined;
+  });
+
+  it('should apply conditional properties based on properties values', async () => {
+    const props = JSON.stringify([
+      { match: { 'properties.type': 'airport' }, values: { 'marker-symbol': 'airport' } },
+      { match: { 'properties.type': 'hospital' }, values: { 'marker-symbol': 'hospital' } }
+    ]);
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    const listener = oneEvent(el, 'change');
+
+    el.set([
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: { type: 'airport', name: 'CDG' }
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [1, 1] },
+        properties: { type: 'hospital', name: 'Clinic' }
+      }
+    ]);
+
+    const { detail } = await listener;
+
+    expect(detail.features[0].properties['marker-symbol']).to.equal('airport');
+    expect(detail.features[1].properties['marker-symbol']).to.equal('hospital');
+  });
+
+  it('should apply multiple matching rules (later rules win)', async () => {
+    const props = JSON.stringify([
+      { values: { 'stroke-width': 1, 'stroke-color': '#333' } },  // fallback for all
+      { match: { 'geometry.type': 'Polygon' }, values: { 'fill-color': '#blue' } },
+      { match: { 'properties.highlighted': true }, values: { 'stroke-width': 5 } }
+    ]);
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    const listener = oneEvent(el, 'change');
+
+    el.set([{
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
+      properties: { highlighted: true }
+    }]);
+
+    const { detail } = await listener;
+    const props0 = detail.features[0].properties;
+
+    // From fallback rule
+    expect(props0['stroke-color']).to.equal('#333');
+    // From polygon rule
+    expect(props0['fill-color']).to.equal('#blue');
+    // From highlighted rule (overrides fallback stroke-width)
+    expect(props0['stroke-width']).to.equal(5);
+  });
+
+  it('should update rules when default-properties attribute changes', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._defaultPropertiesRules).to.deep.equal([]);
+
+    // Set default-properties
+    el.setAttribute('default-properties', JSON.stringify({ 'fill-color': '#new' }));
+
+    expect(el._defaultPropertiesRules).to.have.lengthOf(1);
+    expect(el._defaultPropertiesRules[0].values['fill-color']).to.equal('#new');
+  });
+
+  it('should work with nested match conditions', async () => {
+    const props = JSON.stringify([
+      { match: { 'properties.metadata.priority': 'high' }, values: { 'stroke-color': '#red' } }
+    ]);
+    const el = await fixture(html`<geojson-editor default-properties='${props}'></geojson-editor>`);
+
+    const listener = oneEvent(el, 'change');
+
+    el.set([{
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { metadata: { priority: 'high' } }
+    }]);
+
+    const { detail } = await listener;
+
+    expect(detail.features[0].properties['stroke-color']).to.equal('#red');
+  });
+
+  describe('_matchesCondition()', () => {
+    it('should return true for null match', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+      const feature = { type: 'Feature', geometry: { type: 'Point' }, properties: {} };
+
+      expect(el._matchesCondition(feature, null)).to.be.true;
+      expect(el._matchesCondition(feature, undefined)).to.be.true;
+    });
+
+    it('should match simple property', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+      const feature = { type: 'Feature', geometry: { type: 'Point' }, properties: {} };
+
+      expect(el._matchesCondition(feature, { type: 'Feature' })).to.be.true;
+      expect(el._matchesCondition(feature, { type: 'Other' })).to.be.false;
+    });
+
+    it('should match nested property with dot notation', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+      const feature = { type: 'Feature', geometry: { type: 'Polygon' }, properties: { cat: 'A' } };
+
+      expect(el._matchesCondition(feature, { 'geometry.type': 'Polygon' })).to.be.true;
+      expect(el._matchesCondition(feature, { 'geometry.type': 'Point' })).to.be.false;
+      expect(el._matchesCondition(feature, { 'properties.cat': 'A' })).to.be.true;
+    });
+
+    it('should require all conditions to match', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+      const feature = { type: 'Feature', geometry: { type: 'Point' }, properties: { name: 'Test' } };
+
+      expect(el._matchesCondition(feature, { 'geometry.type': 'Point', 'properties.name': 'Test' })).to.be.true;
+      expect(el._matchesCondition(feature, { 'geometry.type': 'Point', 'properties.name': 'Other' })).to.be.false;
+    });
+  });
+
+  describe('_getNestedValue()', () => {
+    it('should get top-level value', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      expect(el._getNestedValue({ a: 1 }, 'a')).to.equal(1);
+    });
+
+    it('should get nested value', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      expect(el._getNestedValue({ a: { b: { c: 'deep' } } }, 'a.b.c')).to.equal('deep');
+    });
+
+    it('should return undefined for missing path', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      expect(el._getNestedValue({ a: 1 }, 'b')).to.be.undefined;
+      expect(el._getNestedValue({ a: 1 }, 'a.b.c')).to.be.undefined;
+    });
+
+    it('should handle null/undefined in path', async () => {
+      const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+      expect(el._getNestedValue({ a: null }, 'a.b')).to.be.undefined;
+      expect(el._getNestedValue(null, 'a')).to.be.undefined;
+    });
+  });
+});
