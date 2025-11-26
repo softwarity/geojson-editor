@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';
+import { minifyHTMLLiterals } from 'minify-literals';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
@@ -9,11 +10,31 @@ const banner = `/**
  * @name ${pkg.name}
  * @version ${pkg.version}
  * @author Softwarity (https://www.softwarity.io/)
- * @copyright 2024 Softwarity
+ * @copyright ${new Date().getFullYear()} Softwarity
  * @see https://github.com/softwarity/geojson-editor
  */`;
 
+// Custom Vite plugin to minify template literals (CSS/HTML)
+function minifyLiteralsPlugin() {
+  return {
+    name: 'minify-literals',
+    async transform(code, id) {
+      if (id.endsWith('.js') && code.includes('`')) {
+        try {
+          const result = await minifyHTMLLiterals(code, { fileName: id });
+          return result ? { code: result.code, map: result.map } : null;
+        } catch (e) {
+          // If minification fails, return original code
+          return null;
+        }
+      }
+      return null;
+    }
+  };
+}
+
 export default defineConfig({
+  plugins: [minifyLiteralsPlugin()],
   build: {
     lib: {
       entry: resolve(__dirname, 'src/geojson-editor.js'),
@@ -21,10 +42,21 @@ export default defineConfig({
       fileName: 'geojson-editor',
       formats: ['es']
     },
-    minify: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        passes: 3
+      },
+      mangle: {
+        toplevel: true
+      },
+      format: {
+        comments: false,
+        preamble: banner
+      }
+    },
     rollupOptions: {
       output: {
-        banner,
         assetFileNames: 'geojson-editor.[ext]'
       }
     }
