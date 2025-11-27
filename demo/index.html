@@ -1606,18 +1606,17 @@ editor.setTheme(${themeTextarea.value});`;
         const response = await fetch('./sample.geojson');
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const geojson = await response.json();
-        sampleFeaturesArray = geojson.features || [];
-        const featuresStr = sampleFeaturesArray.map(f => JSON.stringify(f, null, 2)).join(',\n');
-        editor.setAttribute('value', featuresStr);
+        console.log('Loaded sample.geojson with', geojson.length, 'features');
+        editor.set(geojson);
       } catch (error) {
         console.error('Failed to load sample.geojson:', error);
         // Fallback to empty editor
-        editor.setAttribute('value', '');
+        editor.removeAll();
       }
     }
 
     function clearEditor() {
-      editor.setAttribute('value', '');
+      editor.removeAll();
     }
 
     // Load initial sample automatically after component is ready
