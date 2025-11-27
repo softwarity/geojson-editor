@@ -25,6 +25,12 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 
 **[🚀 Try the Live Demo](https://softwarity.github.io/geojson-editor/)**
 
+<p align="center">
+  <a href="https://softwarity.github.io/geojson-editor/">
+    <img src="preview.png" alt="GeoJSON Editor Preview" width="800">
+  </a>
+</p>
+
 ## Why not Monaco, CodeMirror, or Prism?
 
 | | @softwarity/geojson-editor | Monaco Editor | CodeMirror 6 | Prism.js |
