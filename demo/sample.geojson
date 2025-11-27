@@ -2,6 +2,33 @@
   {
     "type": "Feature",
     "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          2.55,
+          49.0128
+        ],
+        [
+          105.807,
+          21.2212
+        ]
+      ]
+    },
+    "properties": {
+      "stroke-color": "#001eff",
+      "stroke-width": 1,
+      "icon": "airplane",
+      "icon-color": "#001eff",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
       "type": "MultiPolygon",
       "coordinates": [
         [
@@ -549,33 +576,6 @@
       "label": "HAN",
       "label-color": "#000000",
       "label-size": 12
-    }
-  },
-  {
-    "type": "Feature",
-    "geometry": {
-      "type": "LineString",
-      "coordinates": [
-        [
-          2.55,
-          49.0128
-        ],
-        [
-          105.807,
-          21.2212
-        ]
-      ]
-    },
-    "properties": {
-      "stroke-color": "#001eff",
-      "stroke-width": 1 ,
-      "icon": "airplane",
-      "icon-color": "#001eff",
-      "icon-size": 16,
-      "icon-rotate": 45,
-      "icon-animation": true,
-      "icon-animation-loop": true,
-      "icon-animation-speed": 1
     }
   }
 ]
