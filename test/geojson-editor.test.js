@@ -1,5 +1,5 @@
 import { expect, fixture, html, oneEvent } from '@open-wc/testing';
-import '../src/geojson-editor.js';
+import GeoJsonEditor from '../src/geojson-editor.js';
 import {
   validPointStr,
   validPolygonStr,
@@ -519,10 +519,10 @@ describe('GeoJsonEditor - Collapsible Nodes', () => {
     const gutter = el.shadowRoot.querySelector('.gutter-content');
     const collapseButtons = gutter.querySelectorAll('.collapse-button');
 
-    // Find the button that expands (has '+' sign - meaning it's collapsed)
+    // Find the button that expands (collapsed icon - meaning it's collapsed)
     let expandButton = null;
     for (const btn of collapseButtons) {
-      if (btn.textContent === '+') {
+      if (btn.textContent === GeoJsonEditor.ICONS.collapsed) {
         expandButton = btn;
         break;
       }
@@ -563,11 +563,11 @@ describe('GeoJsonEditor - Collapsible Nodes', () => {
     const textarea = el.shadowRoot.querySelector('textarea');
     const gutter = el.shadowRoot.querySelector('.gutter-content');
 
-    // Find a collapse button (should show '-' when expanded)
+    // Find a collapse button (expanded icon when node is expanded)
     const collapseButtons = gutter.querySelectorAll('.collapse-button');
     let collapseButton = null;
     for (const btn of collapseButtons) {
-      if (btn.textContent === '-') {
+      if (btn.textContent === GeoJsonEditor.ICONS.expanded) {
         collapseButton = btn;
         break;
       }

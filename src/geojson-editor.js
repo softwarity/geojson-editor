@@ -78,6 +78,13 @@ class GeoJsonEditor extends HTMLElement {
     collapsedMarker: /^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/
   };
 
+  // Icons used in the gutter
+  static ICONS = {
+    expanded: '⌄',    // Chevron down (collapse button when expanded)
+    collapsed: '›',   // Chevron right (expand button when collapsed)
+    visibility: '👁'  // Eye icon for visibility toggle
+  };
+
   /**
    * Find collapsed data by line index, nodeKey, and indent
    * @param {number} lineIndex - Current line index
@@ -405,20 +412,25 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         .collapse-button {
-          padding-top: 1px;
-          background: var(--control-bg, #e8e8e8);
-          border: 1px solid var(--control-border, #c0c0c0);
-          color: var(--control-color, #000080);
-          font-size: 8px;
-          font-weight: bold;
+          background: transparent;
+          border: none;
+          color: var(--json-punct, #a9b7c6);
+          font-size: 10px;
           display: flex;
           align-items: center;
           justify-content: center;
           user-select: none;
+          opacity: 0;
+          transition: opacity 0.15s;
+        }
+        .collapse-button.collapsed {
+          opacity: 1;
+        }
+        .gutter:hover .collapse-button {
+          opacity: 1;
         }
         .collapse-button:hover {
-          border-color: var(--control-color, #000080);
-          transform: scale(1.1);
+          transform: scale(1.2);
         }
 
         .visibility-button {
@@ -1241,7 +1253,7 @@ class GeoJsonEditor extends HTMLElement {
       elements.visibilityButtons.forEach(({ featureKey, isHidden }) => {
         const button = document.createElement('button');
         button.className = 'visibility-button' + (isHidden ? ' hidden' : '');
-        button.textContent = '👁';
+        button.textContent = GeoJsonEditor.ICONS.visibility;
         button.dataset.featureKey = featureKey;
         button.title = isHidden ? 'Show feature in events' : 'Hide feature from events';
         gutterLine.appendChild(button);
@@ -1274,8 +1286,8 @@ class GeoJsonEditor extends HTMLElement {
       // Add collapse buttons
       elements.buttons.forEach(({ nodeKey, isCollapsed }) => {
         const button = document.createElement('div');
-        button.className = 'collapse-button';
-        button.textContent = isCollapsed ? '+' : '-';
+        button.className = isCollapsed ? 'collapse-button collapsed' : 'collapse-button';
+        button.textContent = isCollapsed ? GeoJsonEditor.ICONS.collapsed : GeoJsonEditor.ICONS.expanded;
         button.dataset.line = line;
         button.dataset.nodeKey = nodeKey;
         button.title = isCollapsed ? 'Expand' : 'Collapse';
@@ -2374,3 +2386,5 @@ class GeoJsonEditor extends HTMLElement {
 
 // Register the custom element
 customElements.define('geojson-editor', GeoJsonEditor);
+
+export default GeoJsonEditor;
