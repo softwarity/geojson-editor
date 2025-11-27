@@ -72,7 +72,7 @@ class GeoJsonEditor extends HTMLElement {
     allNumbers: /\b(-?\d+\.?\d*)\b/g,
     punctuation: /([{}[\],])/g,
     // Highlighting detection
-    colorInLine: /"([\w-]+)"\s*:\s*"(#[0-9a-fA-F]{6})"/g,
+    colorInLine: /"([\w-]+)"\s*:\s*"(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}))"/g,
     booleanInLine: /"([\w-]+)"\s*:\s*(true|false)/g,
     collapsibleNode: /^(\s*)"(\w+)"\s*:\s*([{\[])/,
     collapsedMarker: /^(\s*)"(\w+)"\s*:\s*([{\[])\.\.\.([\]\}])/
@@ -1357,8 +1357,8 @@ class GeoJsonEditor extends HTMLElement {
     const textarea = this.shadowRoot.getElementById('textarea');
     const lines = textarea.value.split('\n');
 
-    // Replace color value on the specified line for the specific attribute
-    const regex = new RegExp(`"${attributeName}"\\s*:\\s*"#[0-9a-fA-F]{6}"`);
+    // Replace color value on the specified line for the specific attribute (supports #rgb and #rrggbb)
+    const regex = new RegExp(`"${attributeName}"\\s*:\\s*"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})"`);
     lines[line] = lines[line].replace(regex, `"${attributeName}": "${newColor}"`);
 
     textarea.value = lines.join('\n');

@@ -775,6 +775,118 @@ describe('GeoJsonEditor - Color Picker', () => {
     expect(textarea.value).to.include('#9b59b6');
     expect(textarea.value).to.not.include('#e74c3c');
   });
+
+  it('should detect shorthand hex colors (#rgb format)', async () => {
+    const featureWithShortColor = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { "fill-color": "#f00" }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithShortColor}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicators = gutter.querySelectorAll('.color-indicator');
+
+    expect(colorIndicators.length).to.equal(1);
+    expect(colorIndicators[0].dataset.attributeName).to.equal('fill-color');
+    expect(colorIndicators[0].dataset.color).to.equal('#f00');
+  });
+
+  it('should detect all valid hex color formats', async () => {
+    const featureWithMultipleColorFormats = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: {
+        "color-1": "#000",
+        "color-2": "#fff",
+        "color-3": "#abc",
+        "color-4": "#000000",
+        "color-5": "#ffffff",
+        "color-6": "#abcdef"
+      }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithMultipleColorFormats}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicators = gutter.querySelectorAll('.color-indicator');
+
+    expect(colorIndicators.length).to.equal(6);
+
+    const colors = Array.from(colorIndicators).map(i => i.dataset.color);
+    expect(colors).to.include('#000');
+    expect(colors).to.include('#fff');
+    expect(colors).to.include('#abc');
+    expect(colors).to.include('#000000');
+    expect(colors).to.include('#ffffff');
+    expect(colors).to.include('#abcdef');
+  });
+
+  it('should update shorthand color value when color picker changes', async () => {
+    const featureWithShortColor = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { "marker-color": "#f0f" }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithShortColor}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const textarea = el.shadowRoot.querySelector('textarea');
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicator = gutter.querySelector('.color-indicator');
+
+    expect(colorIndicator).to.exist;
+    expect(colorIndicator.dataset.color).to.equal('#f0f');
+
+    const line = parseInt(colorIndicator.dataset.line);
+    el.updateColorValue(line, '#00ff00', 'marker-color');
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(textarea.value).to.include('#00ff00');
+    expect(textarea.value).to.not.include('#f0f');
+  });
+
+  it('should detect lowercase and uppercase hex colors', async () => {
+    const featureWithMixedCase = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: {
+        "color-lower": "#aabbcc",
+        "color-upper": "#AABBCC",
+        "color-mixed": "#AaBbCc"
+      }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${featureWithMixedCase}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const gutter = el.shadowRoot.querySelector('.gutter-content');
+    const colorIndicators = gutter.querySelectorAll('.color-indicator');
+
+    expect(colorIndicators.length).to.equal(3);
+
+    const colors = Array.from(colorIndicators).map(i => i.dataset.color);
+    expect(colors).to.include('#aabbcc');
+    expect(colors).to.include('#AABBCC');
+    expect(colors).to.include('#AaBbCc');
+  });
 });
 
 describe('GeoJsonEditor - Boolean Checkbox', () => {
