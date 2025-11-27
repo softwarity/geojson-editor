@@ -612,6 +612,81 @@ describe('GeoJsonEditor - Collapsible Nodes', () => {
     // Coordinates should be auto-collapsed
     expect(textarea.value).to.include('[...]');
   });
+
+  it('should have CSS media query for touch devices to show collapse buttons', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    
+    // Get all style elements from shadow DOM
+    const styleElements = el.shadowRoot.querySelectorAll('style');
+    expect(styleElements.length).to.be.greaterThan(0);
+    
+    // Find the main style element containing collapse-button rules
+    let foundMediaQuery = false;
+    for (const styleElement of styleElements) {
+      const styleContent = styleElement.textContent;
+      if (styleContent.includes('@media (hover: none)') && 
+          styleContent.includes('(pointer: coarse)') &&
+          styleContent.includes('.collapse-button') &&
+          styleContent.includes('opacity: 1')) {
+        foundMediaQuery = true;
+        break;
+      }
+    }
+    
+    expect(foundMediaQuery).to.be.true;
+  });
+});
+
+describe('GeoJsonEditor - Horizontal Scrolling', () => {
+
+  it('should have white-space: pre for horizontal scrolling', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    
+    const textarea = el.shadowRoot.querySelector('textarea');
+    const highlightLayer = el.shadowRoot.querySelector('.highlight-layer');
+    
+    const textareaStyle = window.getComputedStyle(textarea);
+    const highlightStyle = window.getComputedStyle(highlightLayer);
+    
+    // Both should have white-space: pre to enable horizontal scrolling
+    expect(textareaStyle.whiteSpace).to.equal('pre');
+    expect(highlightStyle.whiteSpace).to.equal('pre');
+  });
+
+  it('should sync horizontal scroll between textarea and highlight layer', async () => {
+    // Create content with a very long line to enable horizontal scrolling
+    const longLineGeoJson = JSON.stringify({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [0, 0] },
+      properties: { description: "A".repeat(500) }
+    });
+
+    const el = await fixture(html`
+      <geojson-editor value='${longLineGeoJson}'></geojson-editor>
+    `);
+
+    await new Promise(r => setTimeout(r, 100));
+
+    const textarea = el.shadowRoot.querySelector('textarea');
+    const highlightLayer = el.shadowRoot.querySelector('.highlight-layer');
+
+    // Scroll textarea horizontally
+    textarea.scrollLeft = 100;
+    textarea.dispatchEvent(new Event('scroll'));
+
+    // Highlight layer should sync
+    expect(highlightLayer.scrollLeft).to.equal(100);
+  });
+
+  it('should show horizontal scrollbar when content is wider than editor', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    
+    const textarea = el.shadowRoot.querySelector('textarea');
+    const computedStyle = window.getComputedStyle(textarea);
+    
+    // Overflow should allow horizontal scrolling
+    expect(computedStyle.overflowX).to.be.oneOf(['auto', 'scroll']);
+  });
 });
 
 describe('GeoJsonEditor - Color Picker', () => {

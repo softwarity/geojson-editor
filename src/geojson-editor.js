@@ -433,6 +433,13 @@ class GeoJsonEditor extends HTMLElement {
           transform: scale(1.2);
         }
 
+        /* Touch devices: always show collapse buttons */
+        @media (hover: none), (pointer: coarse) {
+          .collapse-button {
+            opacity: 1;
+          }
+        }
+
         .visibility-button {
           width: 14px;
           height: 14px;
@@ -464,17 +471,16 @@ class GeoJsonEditor extends HTMLElement {
           position: absolute;
           inset: 0;
           padding: 8px 12px;
-          white-space: pre-wrap;
-          word-wrap: break-word;
+          white-space: pre;
+          word-wrap: normal;
         }
 
         .highlight-layer {
-          overflow: auto;
+          overflow: hidden;
           pointer-events: none;
           z-index: 1;
           color: var(--text-color, #000);
         }
-        .highlight-layer::-webkit-scrollbar { display: none; }
 
         textarea {
           margin: 0;
