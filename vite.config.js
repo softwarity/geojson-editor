@@ -35,6 +35,9 @@ function minifyLiteralsPlugin() {
 
 export default defineConfig({
   plugins: [minifyLiteralsPlugin()],
+  define: {
+    __VERSION__: JSON.stringify(pkg.version)
+  },
   build: {
     lib: {
       entry: resolve(__dirname, 'src/geojson-editor.js'),

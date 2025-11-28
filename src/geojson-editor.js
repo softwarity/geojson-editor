@@ -1,6 +1,9 @@
 import styles from './geojson-editor.css?inline';
 import { getTemplate } from './geojson-editor.template.js';
 
+// Version injected by Vite build from package.json
+const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
+
 // GeoJSON constants
 const GEOJSON_KEYS = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
 const GEOMETRY_TYPES = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
@@ -312,7 +315,7 @@ class GeoJsonEditor extends HTMLElement {
     styleEl.textContent = styles;
     
     const template = document.createElement('div');
-    template.innerHTML = getTemplate(this.placeholder);
+    template.innerHTML = getTemplate(this.placeholder, VERSION);
     
     this.shadowRoot.innerHTML = '';
     this.shadowRoot.appendChild(styleEl);
@@ -778,8 +781,8 @@ class GeoJsonEditor extends HTMLElement {
     const startIndex = Math.max(0, firstVisible - this.bufferLines);
     const endIndex = Math.min(totalLines, firstVisible + visibleCount + this.bufferLines);
     
-    // Skip render if visible range hasn't changed
-    if (this._lastStartIndex === startIndex && this._lastEndIndex === endIndex && this._lastTotalLines === totalLines) {
+    // Skip render if visible range hasn't changed (but always render if empty editor)
+    if (totalLines > 0 && this._lastStartIndex === startIndex && this._lastEndIndex === endIndex && this._lastTotalLines === totalLines) {
       return;
     }
     this._lastStartIndex = startIndex;
@@ -799,6 +802,21 @@ class GeoJsonEditor extends HTMLElement {
     
     // Render visible lines
     const fragment = document.createDocumentFragment();
+    
+    // Handle empty editor: render an empty line with cursor
+    if (totalLines === 0) {
+      const lineEl = document.createElement('div');
+      lineEl.className = 'line empty-line';
+      lineEl.dataset.lineIndex = '0';
+      if (isFocused) {
+        lineEl.innerHTML = this._insertCursor(0);
+      }
+      fragment.appendChild(lineEl);
+      linesContainer.innerHTML = '';
+      linesContainer.appendChild(fragment);
+      this.renderGutter(0, 0);
+      return;
+    }
     
     for (let i = startIndex; i < endIndex; i++) {
       const lineData = this.visibleLines[i];
@@ -1665,6 +1683,10 @@ class GeoJsonEditor extends HTMLElement {
     const text = e.clipboardData.getData('text/plain');
     if (text) {
       this.insertText(text);
+      // Auto-collapse coordinates after pasting new content
+      requestAnimationFrame(() => {
+        this.autoCollapseCoordinates();
+      });
     }
   }
 
@@ -2455,6 +2477,9 @@ class GeoJsonEditor extends HTMLElement {
   }
 }
 
-customElements.define('geojson-editor', GeoJsonEditor);
+// Register custom element only if not already defined
+if (!customElements.get('geojson-editor')) {
+  customElements.define('geojson-editor', GeoJsonEditor);
+}
 
 export default GeoJsonEditor;

@@ -3,11 +3,12 @@
  * @param {string} placeholder - Placeholder text
  * @returns {string} HTML template string
  */
-export function getTemplate(placeholder = '') {
+export function getTemplate(placeholder = '', version = '') {
   return `
     <div class="prefix-wrapper">
       <div class="prefix-gutter"></div>
       <div class="editor-prefix" id="editorPrefix"></div>
+      <button class="info-btn" id="infoBtn" title="@softwarity/geojson-editor v${version}" aria-label="About">ⓘ</button>
     </div>
     <div class="editor-wrapper">
       <div class="gutter">

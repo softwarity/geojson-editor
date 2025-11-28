@@ -343,8 +343,31 @@
   opacity: 0.6;
 }
 
-.prefix-wrapper { border-bottom: 1px solid rgba(255,255,255,0.1); }
+.prefix-wrapper { border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
 .suffix-wrapper { border-top: 1px solid rgba(255,255,255,0.1); position: relative; }
+
+.info-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-color, #000);
+  opacity: 0.15;
+  cursor: pointer;
+  font-size: 0.7rem;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+  font-family: sans-serif;
+}
+.info-btn:hover { opacity: 0.5; }
 
 .clear-btn {
   position: absolute;
