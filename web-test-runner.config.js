@@ -9,13 +9,23 @@ const isCI = process.env.CI === 'true';
 function inlineCssPlugin() {
   return {
     name: 'inline-css',
-    async transform(context) {
-      if (context.path.endsWith('.css?inline')) {
-        const cssPath = context.path.replace('?inline', '');
-        const filePath = path.join(process.cwd(), 'src', path.basename(cssPath));
-        const cssContent = fs.readFileSync(filePath, 'utf-8');
-        const escaped = cssContent.replace(/`/g, '\\`').replace(/\$/g, '\\$');
-        return { body: `export default \`${escaped}\`;` };
+    resolveMimeType(context) {
+      if (context.path.includes('.css')) {
+        return 'js';
+      }
+    },
+    async serve(context) {
+      if (context.path.includes('.css')) {
+        // Remove query params for file path
+        const cleanPath = context.path.split('?')[0];
+        const filePath = path.join(process.cwd(), cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath);
+        try {
+          const cssContent = fs.readFileSync(filePath, 'utf-8');
+          const escaped = cssContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+          return { body: `export default \`${escaped}\`;`, type: 'js' };
+        } catch (e) {
+          console.error('Failed to load CSS:', filePath, e.message);
+        }
       }
     },
   };

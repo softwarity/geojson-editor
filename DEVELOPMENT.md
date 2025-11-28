@@ -81,16 +81,30 @@ npm run test:watch
 
 **Test output example:**
 ```
-test/geojson-editor.test.js:
-  ✓ GeoJsonEditor - Basic > should render with default state
-  ✓ GeoJsonEditor - Formatting > should always format JSON on input
-  ✓ GeoJsonEditor - Feature Visibility > should show visibility buttons for Features
-  ✓ GeoJsonEditor - Features API > set() should replace all features
+test/rendering.test.js:
+  ✓ GeoJsonEditor - Basic Rendering > should render with default state
+test/editing.test.js:
+  ✓ GeoJsonEditor - Text Insertion > should have insertNewline method
+test/actions.test.js:
+  ✓ GeoJsonEditor - Feature Visibility > should toggle feature visibility
   ...
 
-Chromium: 113 passed, 0 failed
-Finished running tests in 10s, all tests passed! 🎉
+Chromium: 178 passed, 0 failed
+Finished running tests in 12s, all tests passed! 🎉
 ```
+
+### Test Organization
+
+Tests are split across 6 themed files for better maintainability:
+
+| File | Purpose |
+|------|---------|
+| `geojson-editor.test.js` | Original comprehensive tests |
+| `rendering.test.js` | Basic rendering, attributes, UI elements |
+| `interactions.test.js` | Cursor, selection, navigation, scroll |
+| `editing.test.js` | Text insertion, deletion, newlines |
+| `highlighting.test.js` | Syntax highlighting, themes, gutter |
+| `actions.test.js` | Features API, collapse/expand, visibility |
 
 ### Coverage Report
 
@@ -108,25 +122,36 @@ npx web-test-runner --coverage
 
 ### Writing Tests
 
-Tests are located in `test/geojson-editor.test.js`. Example test structure:
+Tests are located in the `test/` directory. Example test structure:
 
 ```javascript
 import { fixture, html, expect } from '@open-wc/testing';
 import '../src/geojson-editor.js';
 
+// Helper for async operations
+const waitFor = (ms = 100) => new Promise(r => setTimeout(r, ms));
+
 describe('GeoJsonEditor - MyFeature', () => {
   it('should do something', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
-
-    // Wait for async operations
-    await new Promise(r => setTimeout(r, 150));
+    await waitFor();
 
     // Access shadow DOM
-    const textarea = el.shadowRoot.querySelector('textarea');
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
     expect(textarea).to.exist;
+
+    // Test lines array (core data model)
+    el.lines = ['{"test": true}'];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor();
+    
+    expect(el.lines.length).to.equal(1);
   });
 });
 ```
+
+**Note**: The test runner requires custom middleware for CSS `?inline` imports. See `web-test-runner.config.js`.
 
 ### Test in Demo Page
 
@@ -215,13 +240,22 @@ Now changes to the source will be reflected immediately.
 ```
 geojson-editor/
 ├── src/
-│   └── geojson-editor.js       # Main Web Component source
+│   ├── geojson-editor.js       # Main Web Component (~2500 lines)
+│   ├── geojson-editor.css      # Styles with CSS variables (~450 lines)
+│   └── geojson-editor.template.js # HTML template generator
 ├── test/
-│   └── geojson-editor.test.js  # Unit tests
+│   ├── geojson-editor.test.js  # Original comprehensive tests
+│   ├── rendering.test.js       # Basic rendering, attributes, UI
+│   ├── interactions.test.js    # Cursor, selection, navigation, scroll
+│   ├── editing.test.js         # Text insertion, deletion, features API
+│   ├── highlighting.test.js    # Syntax highlighting, themes
+│   ├── actions.test.js         # Features API, collapse, visibility
+│   └── fixtures/
+│       └── geojson-samples.js  # Shared test data
 ├── demo/
 │   └── index.html              # Interactive demo page
 ├── dist/                       # Built output (generated)
-│   └── geojson-editor.js       # Production bundle
+│   └── geojson-editor.js       # Production bundle (~15 KB gzipped)
 ├── coverage/                   # Coverage reports (generated)
 │   └── lcov-report/            # HTML coverage report
 ├── .github/
@@ -232,12 +266,21 @@ geojson-editor/
 │       └── deploy-demo.yml     # Deploy demo to GitHub Pages
 ├── package.json                # Package configuration
 ├── vite.config.js              # Vite build configuration
-├── web-test-runner.config.js   # Test runner configuration
+├── web-test-runner.config.js   # Test runner configuration (with CSS middleware)
 ├── README.md                   # User documentation
 ├── DEVELOPMENT.md              # This file
+├── CLAUDE.md                   # AI assistant guidelines
 ├── RELEASE.md                  # Release process guide
 └── LICENSE                     # MIT License
 ```
+
+### Architecture Notes
+
+The component uses a **Monaco-like architecture**:
+- **Virtual viewport**: Only visible lines are rendered to DOM
+- **Hidden textarea**: Captures keyboard input
+- **CSS pseudo-elements**: Inline controls (color picker, checkbox) don't affect text layout
+- **Separate CSS file**: Easier theming via CSS custom properties
 
 ## Development Tips
 

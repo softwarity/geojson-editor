@@ -1,6 +1,10 @@
 import styles from './geojson-editor.css?inline';
 import { getTemplate } from './geojson-editor.template.js';
 
+// GeoJSON constants
+const GEOJSON_KEYS = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
+const GEOMETRY_TYPES = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
+
 /**
  * GeoJSON Editor Web Component
  * Monaco-like architecture with virtualized line rendering
@@ -1196,7 +1200,7 @@ class GeoJsonEditor extends HTMLElement {
             this.cursorLine = containingNode.startLine;
             this.cursorColumn = bracketPos >= 0 ? bracketPos + 1 : startLine.length;
             this._clearSelection();
-            this.syncViewport();
+            this._scrollToCursor();
           }
           return;
         }
@@ -1584,6 +1588,14 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
+   * Clear the current selection
+   */
+  _clearSelection() {
+    this.selectionStart = null;
+    this.selectionEnd = null;
+  }
+
+  /**
    * Delete selected text
    */
   _deleteSelection() {
@@ -1709,21 +1721,6 @@ class GeoJsonEditor extends HTMLElement {
     return { line, column };
   }
 
-  handleViewportClick(e) {
-    const viewport = this.shadowRoot.getElementById('viewport');
-    this.cursorLine = pos.line;
-    this.cursorColumn = pos.column;
-    
-    // Clear selection on single click without shift
-    if (!e.shiftKey) {
-      this.selectionStart = null;
-      this.selectionEnd = null;
-    }
-    
-    this._lastStartIndex = -1; // Force re-render to show cursor
-    this.scheduleRender();
-  }
-
   // ========== Gutter Interactions ==========
   
   handleGutterClick(e) {
@@ -1737,7 +1734,6 @@ class GeoJsonEditor extends HTMLElement {
     // Collapse button in gutter
     if (e.target.classList.contains('collapse-button')) {
       const nodeId = e.target.dataset.nodeId;
-      console.log('Collapse button clicked, nodeId:', nodeId, 'collapsedNodes:', [...this.collapsedNodes]);
       this.toggleCollapse(nodeId);
       return;
     }
@@ -1806,13 +1802,11 @@ class GeoJsonEditor extends HTMLElement {
   // ========== Collapse/Expand ==========
   
   toggleCollapse(nodeId) {
-    console.log('toggleCollapse called with nodeId:', nodeId, 'currently collapsed:', this.collapsedNodes.has(nodeId));
     if (this.collapsedNodes.has(nodeId)) {
       this.collapsedNodes.delete(nodeId);
     } else {
       this.collapsedNodes.add(nodeId);
     }
-    console.log('After toggle, collapsedNodes:', [...this.collapsedNodes]);
     
     // Use updateView - don't rebuild nodeId mappings since content didn't change
     this.updateView();
@@ -2232,9 +2226,6 @@ class GeoJsonEditor extends HTMLElement {
   _highlightSyntax(text, context, meta) {
     if (!text) return '';
     
-    const GEOJSON_KEYS = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
-    const GEOMETRY_TYPES = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
-    
     // For collapsed nodes, truncate the text at the opening bracket
     let displayText = text;
     let collapsedBracket = null;
@@ -2374,7 +2365,6 @@ class GeoJsonEditor extends HTMLElement {
 
   _validateGeoJSON(parsed) {
     const errors = [];
-    const GEOMETRY_TYPES = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
     
     if (!parsed.features) return errors;
     

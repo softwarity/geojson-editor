@@ -383,35 +383,12 @@
 
 /* ========== Inline Controls (using ::before pseudo-elements) ========== */
 
-/* Color swatch before hex values - positioned outside the span with negative left */
-.json-color {
-  position: relative;
-  /* No padding - pseudo-element is positioned outside */
-}
-.json-color::before {
-  content: '';
-  position: absolute;
-  left: -8px;
-  top: 50%;
-  transform: translateY(-50%);
-  margin-top: -1px;
-  width: 8px;
-  height: 8px;
-  background-color: var(--swatch-color);
-  border: 1px solid var(--json-punct, #a9b7c6);
-  border-radius: 2px;
-  cursor: pointer;
-}
-.json-color:hover::before {
-  transform: translateY(-50%) scale(1.2);
-  border-color: var(--control-color, #000080);
-}
-
-/* Boolean checkbox using ::before - positioned outside the span with negative left */
+/* Shared styles for inline control pseudo-elements */
+.json-color,
 .json-boolean {
   position: relative;
-  /* No padding - pseudo-element is positioned outside */
 }
+.json-color::before,
 .json-boolean::before {
   content: '';
   position: absolute;
@@ -421,10 +398,25 @@
   margin-top: -1px;
   width: 8px;
   height: 8px;
-  border: 1.5px solid var(--control-border, #c0c0c0);
   border-radius: 2px;
-  background: transparent;
   cursor: pointer;
+}
+.json-color:hover::before,
+.json-boolean:hover::before {
+  transform: translateY(-50%) scale(1.2);
+  border-color: var(--control-color, #000080);
+}
+
+/* Color swatch specific styles */
+.json-color::before {
+  background-color: var(--swatch-color);
+  border: 1px solid var(--json-punct, #a9b7c6);
+}
+
+/* Boolean checkbox specific styles */
+.json-boolean::before {
+  border: 1.5px solid var(--control-border, #c0c0c0);
+  background: transparent;
 }
 .json-bool-true::before {
   content: '✔';
@@ -435,10 +427,6 @@
   align-items: center;
   justify-content: center;
   line-height: 8px;
-}
-.json-boolean:hover::before {
-  transform: translateY(-50%) scale(1.2);
-  border-color: var(--control-color, #000080);
 }
 
 /* Feature visibility using ::before on the line (placed in indentation space) */

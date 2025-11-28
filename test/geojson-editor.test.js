@@ -73,22 +73,22 @@ describe('GeoJsonEditor - Value Attribute', () => {
 
 describe('GeoJsonEditor - Readonly Attribute', () => {
 
-  it('should disable textarea when readonly', async () => {
+  it('should set readOnly on textarea when readonly', async () => {
     const el = await fixture(html`<geojson-editor readonly></geojson-editor>`);
     const textarea = el.shadowRoot.querySelector('.hidden-textarea');
 
-    expect(textarea.disabled).to.be.true;
+    expect(textarea.readOnly).to.be.true;
   });
 
-  it('should enable textarea when readonly is removed', async () => {
+  it('should remove readOnly from textarea when readonly is removed', async () => {
     const el = await fixture(html`<geojson-editor readonly></geojson-editor>`);
     const textarea = el.shadowRoot.querySelector('.hidden-textarea');
 
-    expect(textarea.disabled).to.be.true;
+    expect(textarea.readOnly).to.be.true;
 
     el.removeAttribute('readonly');
 
-    expect(textarea.disabled).to.be.false;
+    expect(textarea.readOnly).to.be.false;
   });
 
   it('should have readonly visual indicator', async () => {
@@ -545,11 +545,21 @@ describe('GeoJsonEditor - Syntax Highlighting', () => {
   });
 
   it('should highlight JSON numbers', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    const el = await fixture(html`<geojson-editor style="height: 300px; width: 500px;"></geojson-editor>`);
     await waitFor();
 
-    el.set([validPoint]);
-    await waitFor(200);
+    // Use a feature with a number property to ensure numbers are visible
+    const featureWithNumber = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { count: 42 }
+    };
+    el.set([featureWithNumber]);
+    await waitFor(300);
+    
+    // Force render to ensure lines are rendered
+    el.renderViewport();
+    await waitFor(100);
 
     const linesContainer = el.shadowRoot.getElementById('linesContainer');
     const numbers = linesContainer.querySelectorAll('.json-number');
@@ -593,32 +603,32 @@ describe('GeoJsonEditor - Theme Support', () => {
 
 describe('GeoJsonEditor - Color Indicators', () => {
 
-  it('should show color indicator in gutter for color properties', async () => {
+  it('should show color class for color properties', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
 
     el.set([validPolygon]); // Has color: '#ff5733'
     await waitFor(200);
 
-    const colorIndicators = el.shadowRoot.querySelectorAll('.color-indicator');
-    expect(colorIndicators.length).to.be.greaterThan(0);
+    const colorSpans = el.shadowRoot.querySelectorAll('.json-color');
+    expect(colorSpans.length).to.be.greaterThan(0);
   });
 
-  it('should display correct color in indicator', async () => {
+  it('should have correct color in CSS variable', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
 
     el.set([validPolygon]); // Has color: '#ff5733'
     await waitFor(200);
 
-    const colorIndicator = el.shadowRoot.querySelector('.color-indicator');
-    expect(colorIndicator.style.backgroundColor).to.include('ff5733');
+    const colorSpan = el.shadowRoot.querySelector('.json-color');
+    expect(colorSpan.style.getPropertyValue('--swatch-color')).to.include('#ff5733');
   });
 });
 
 describe('GeoJsonEditor - Boolean Checkboxes', () => {
 
-  it('should show checkbox in gutter for boolean properties', async () => {
+  it('should show boolean class for boolean properties', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
 
@@ -630,8 +640,8 @@ describe('GeoJsonEditor - Boolean Checkboxes', () => {
     el.set([featureWithBool]);
     await waitFor(200);
 
-    const checkboxes = el.shadowRoot.querySelectorAll('.boolean-checkbox');
-    expect(checkboxes.length).to.be.greaterThan(0);
+    const booleanSpans = el.shadowRoot.querySelectorAll('.json-boolean');
+    expect(booleanSpans.length).to.be.greaterThan(0);
   });
 });
 
@@ -746,14 +756,14 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     expect(el.hiddenFeatures).to.be.instanceOf(Set);
   });
 
-  it('should have visibility button for features', async () => {
+  it('should have visibility indicator for features', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
 
     el.set([validPoint]);
-    await waitFor(200);
+    await waitFor(300);
 
-    const visibilityButtons = el.shadowRoot.querySelectorAll('.visibility-button');
-    expect(visibilityButtons.length).to.be.greaterThan(0);
+    const visibilityLines = el.shadowRoot.querySelectorAll('.line.has-visibility');
+    expect(visibilityLines.length).to.be.greaterThan(0);
   });
 });
