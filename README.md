@@ -40,12 +40,15 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 | **Type highlighting** | ✅ Contextual | ⚠️ Generic JSON | ⚠️ Generic JSON | ⚠️ Generic JSON |
 | **Invalid type detection** | ✅ Visual feedback | ❌ | ❌ | ❌ |
 | **Collapsible nodes** | ✅ Native | ✅ | ✅ Plugin | ❌ |
+| **Undo/Redo** | ✅ With grouping | ✅ | ✅ | ❌ |
 | **Color picker** | ✅ Integrated | ❌ | ❌ | ❌ |
 | **Boolean checkbox** | ✅ Integrated | ❌ | ❌ | ❌ |
 | **Feature visibility toggle** | ✅ | ❌ | ❌ | ❌ |
 | **Auto-collapse coordinates** | ✅ | ❌ | ❌ | ❌ |
 | **FeatureCollection output** | ✅ Always | ❌ | ❌ | ❌ |
 | **Clear button** | ✅ | ❌ | ❌ | ❌ |
+| **Save to file (Ctrl+S)** | ✅ | ❌ | ❌ | ❌ |
+| **Open from file (Ctrl+O)** | ✅ | ❌ | ❌ | ❌ |
 | **Dark mode detection** | ✅ Auto | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual |
 | **Dependencies** | 0 | Many | Few | 0 |
 | **Setup complexity** | 1 line | Complex | Moderate | Simple |
@@ -62,8 +65,8 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); use Tab to expand and Shift+Tab to collapse; `coordinates` auto-collapsed on load
 - **Virtualized Rendering** - Monaco-like architecture: only visible lines are rendered to DOM for optimal performance with large GeoJSON files
 - **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
-- **Color Picker** - Built-in color picker for hex color properties (`#rrggbb`) in left gutter; click to open native color picker
-- **Boolean Checkbox** - Inline checkbox for boolean properties in left gutter; toggle to switch between `true`/`false` and emit changes (e.g., `marker: true` to show vertices)
+- **Color Picker** - Built-in color swatch for hex color properties (`#rrggbb`) displayed inline next to the value; click to open native color picker
+- **Boolean Checkbox** - Inline checkbox for boolean properties displayed next to the value; toggle to switch between `true`/`false` and emit changes (e.g., `marker: true` to show vertices)
 - **Default Properties** - Auto-inject default visualization properties (fill-color, stroke-color, etc.) into features based on configurable rules
 - **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
 - **Auto-format** - Automatic JSON formatting in real-time (always enabled)
@@ -72,6 +75,9 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Smart Copy/Paste** - Copy includes expanded content even from collapsed nodes
 - **FeatureCollection Output** - Emits valid FeatureCollection with all edited features
 - **Clear Button** - Discreet ✕ button in suffix area to clear all editor content (hidden in readonly mode)
+- **Undo/Redo** - Full undo/redo support with Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z; rapid keystrokes grouped as single undo step
+- **Save to File** - Ctrl+S to download GeoJSON as `.geojson` file; programmatic `save(filename)` method available
+- **Open from File** - Ctrl+O to open a `.geojson` or `.json` file from the client filesystem; programmatic `open()` method available
 
 ## Installation
 
@@ -239,6 +245,96 @@ editor.setTheme({
 // Reset to defaults
 editor.resetTheme();
 ```
+
+### Undo/Redo API
+
+Full undo/redo support with action grouping:
+
+| Method | Description |
+|--------|-------------|
+| `undo()` | Undo last action, returns `true` if successful |
+| `redo()` | Redo previously undone action, returns `true` if successful |
+| `canUndo()` | Check if undo is available |
+| `canRedo()` | Check if redo is available |
+| `clearHistory()` | Clear undo/redo history |
+
+**Keyboard shortcuts:**
+- `Ctrl+Z` / `Cmd+Z` - Undo
+- `Ctrl+Y` / `Cmd+Y` - Redo
+- `Ctrl+Shift+Z` / `Cmd+Shift+Z` - Redo (alternative)
+
+**Action grouping:** Rapid keystrokes (< 500ms apart, same action type) are automatically grouped as a single undo step. This means typing "hello" quickly creates one undo entry, not five.
+
+```javascript
+// Programmatic undo/redo
+if (editor.canUndo()) {
+  editor.undo();
+}
+
+// Clear history after saving
+editor.clearHistory();
+```
+
+### Save API
+
+Save the current GeoJSON content to a file:
+
+| Method | Description |
+|--------|-------------|
+| `save(filename?)` | Download GeoJSON as file, returns `true` if successful |
+
+**Keyboard shortcut:**
+- `Ctrl+S` / `Cmd+S` - Save with default filename (`features.geojson`)
+
+```javascript
+// Save with default filename
+editor.save();  // Downloads "features.geojson"
+
+// Save with custom filename
+editor.save('my-map-data.geojson');
+```
+
+### Open API
+
+Open a GeoJSON file from the client filesystem:
+
+| Method | Description |
+|--------|-------------|
+| `open()` | Open file dialog, returns `Promise<boolean>` (true if loaded successfully) |
+
+**Keyboard shortcut:**
+- `Ctrl+O` / `Cmd+O` - Open file dialog
+
+**Supported formats:**
+- FeatureCollection (extracts features array)
+- Single Feature (wraps in array)
+- Array of Features
+
+**Note:** The `Ctrl+O` shortcut is disabled in readonly mode, but `open()` remains available via API for programmatic loading.
+
+```javascript
+// Open file dialog
+const success = await editor.open();
+if (success) {
+  console.log('File loaded:', editor.getAll());
+}
+```
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+S` / `Cmd+S` | Save to file |
+| `Ctrl+O` / `Cmd+O` | Open file (disabled in readonly) |
+| `Ctrl+Z` / `Cmd+Z` | Undo |
+| `Ctrl+Y` / `Cmd+Y` | Redo |
+| `Ctrl+Shift+Z` / `Cmd+Shift+Z` | Redo (alternative) |
+| `Ctrl+A` / `Cmd+A` | Select all |
+| `Ctrl+C` / `Cmd+C` | Copy |
+| `Ctrl+X` / `Cmd+X` | Cut |
+| `Ctrl+V` / `Cmd+V` | Paste |
+| `Tab` | Expand collapsed node at cursor |
+| `Shift+Tab` | Collapse innermost node containing cursor |
 
 ## Events
 

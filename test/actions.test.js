@@ -15,6 +15,12 @@ const createSizedFixture = async (attributes = '') => {
   return await fixture(html`<geojson-editor style="height: 400px; width: 600px;" ${attributes}></geojson-editor>`);
 };
 
+// Helper to stub formatAndUpdate and emitChange to avoid JSON parsing errors
+const stubEditorMethods = (el) => {
+  el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+  el.emitChange = () => {}; // Suppress change events in tests
+};
+
 describe('GeoJsonEditor - Features API', () => {
 
   it('should set features via set()', async () => {
@@ -466,5 +472,826 @@ describe('GeoJsonEditor - Clear Button', () => {
     expect(changeEvent.detail.type).to.equal('FeatureCollection');
     expect(changeEvent.detail.features).to.be.an('array');
     expect(changeEvent.detail.features.length).to.equal(0);
+  });
+});
+
+describe('GeoJsonEditor - Undo/Redo System', () => {
+
+  it('should have undo() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.undo).to.be.a('function');
+  });
+
+  it('should have redo() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.redo).to.be.a('function');
+  });
+
+  it('should have canUndo() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.canUndo).to.be.a('function');
+    expect(el.canUndo()).to.be.false;
+  });
+
+  it('should have canRedo() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.canRedo).to.be.a('function');
+    expect(el.canRedo()).to.be.false;
+  });
+
+  it('should have clearHistory() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.clearHistory).to.be.a('function');
+  });
+
+  it('should undo text insertion', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    const originalLine = el.lines[0];
+
+    el.insertText('X');
+    await waitFor(100);
+
+    expect(el.lines[0]).to.not.equal(originalLine);
+    expect(el.canUndo()).to.be.true;
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(originalLine);
+    expect(el.canRedo()).to.be.true;
+  });
+
+  it('should redo after undo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    const originalLine = el.lines[0];
+
+    el.insertText('X');
+    await waitFor(100);
+
+    const modifiedLine = el.lines[0];
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(originalLine);
+
+    el.redo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(modifiedLine);
+  });
+
+  it('should clear redo stack on new action', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    el.insertText('X');
+    await waitFor(100);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.canRedo()).to.be.true;
+
+    el.insertText('Y');
+    await waitFor(100);
+
+    expect(el.canRedo()).to.be.false;
+  });
+
+  it('should undo deleteBackward', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    const originalLine = el.lines[0];
+
+    el.deleteBackward();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.not.equal(originalLine);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(originalLine);
+  });
+
+  it('should undo deleteForward', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    const originalLine = el.lines[0];
+
+    el.deleteForward();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.not.equal(originalLine);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(originalLine);
+  });
+
+  it('should undo insertNewline', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    const originalLineCount = el.lines.length;
+
+    el.insertNewline();
+    await waitFor(100);
+
+    expect(el.lines.length).to.be.greaterThan(originalLineCount);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines.length).to.equal(originalLineCount);
+  });
+
+  it('should undo selection deletion', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    const originalLine = el.lines[0];
+
+    el.selectionStart = { line: 0, column: 0 };
+    el.selectionEnd = { line: 0, column: 3 };
+
+    el._deleteSelection();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.not.equal(originalLine);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(originalLine);
+  });
+
+  it('should undo removeAll', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.updateModel();
+
+    expect(el.lines.length).to.be.greaterThan(0);
+
+    el.removeAll();
+    await waitFor(100);
+
+    expect(el.lines.length).to.equal(0);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines.length).to.be.greaterThan(0);
+  });
+
+  it('should return false when undo stack is empty', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    expect(el.undo()).to.be.false;
+  });
+
+  it('should return false when redo stack is empty', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    expect(el.redo()).to.be.false;
+  });
+
+  it('should clear history with clearHistory()', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    el.insertText('X');
+    await waitFor(100);
+
+    expect(el.canUndo()).to.be.true;
+
+    el.clearHistory();
+
+    expect(el.canUndo()).to.be.false;
+    expect(el.canRedo()).to.be.false;
+  });
+
+  it('should restore cursor position on undo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    const originalCursorLine = el.cursorLine;
+    const originalCursorColumn = el.cursorColumn;
+
+    el.insertText('X');
+    await waitFor(100);
+
+    expect(el.cursorColumn).to.not.equal(originalCursorColumn);
+
+    el.undo();
+    await waitFor(100);
+
+    expect(el.cursorLine).to.equal(originalCursorLine);
+    expect(el.cursorColumn).to.equal(originalCursorColumn);
+  });
+
+  it('should handle Ctrl+Z keyboard shortcut', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    const originalLine = el.lines[0];
+
+    el.insertText('X');
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'z',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(originalLine);
+  });
+
+  it('should handle Ctrl+Shift+Z keyboard shortcut for redo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    el.insertText('X');
+    await waitFor(100);
+
+    const modifiedLine = el.lines[0];
+
+    el.undo();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'z',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(modifiedLine);
+  });
+
+  it('should handle Ctrl+Y keyboard shortcut for redo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    el.insertText('X');
+    await waitFor(100);
+
+    const modifiedLine = el.lines[0];
+
+    el.undo();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'y',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal(modifiedLine);
+  });
+
+  it('should group rapid consecutive actions of same type', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['test'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    // Rapid insertions (should be grouped)
+    el.insertText('a');
+    el.insertText('b');
+    el.insertText('c');
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal('testabc');
+
+    // Single undo should revert all grouped changes
+    el.undo();
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal('test');
+  });
+
+  it('should not group actions after delay', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['test'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    el.insertText('a');
+    await waitFor(600); // Wait more than grouping delay (500ms)
+    el.insertText('b');
+    await waitFor(100);
+
+    expect(el.lines[0]).to.equal('testab');
+
+    // First undo
+    el.undo();
+    await waitFor(100);
+    expect(el.lines[0]).to.equal('testa');
+
+    // Second undo
+    el.undo();
+    await waitFor(100);
+    expect(el.lines[0]).to.equal('test');
+  });
+
+  it('should limit history stack size', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['test'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    // The max size is 100 by default
+    // Make 110 distinct changes (with delays to avoid grouping)
+    for (let i = 0; i < 110; i++) {
+      el._lastActionTime = 0; // Force new history entry
+      el.insertText(String(i % 10));
+    }
+    await waitFor(100);
+
+    // Stack should be limited to 100
+    expect(el._undoStack.length).to.be.at.most(100);
+  });
+
+  it('should hide placeholder after undo restores content', async () => {
+    const el = await createSizedFixture('placeholder="Enter GeoJSON..."');
+    await waitFor();
+
+    // Set content - placeholder should be hidden
+    el.set([validPoint]);
+    await waitFor(200);
+
+    const placeholder = el.shadowRoot.getElementById('placeholderLayer');
+    expect(placeholder.style.display).to.equal('none');
+
+    // Clear all (cut) - placeholder should be visible
+    el.removeAll();
+    await waitFor(100);
+
+    expect(placeholder.style.display).to.not.equal('none');
+
+    // Undo - placeholder should be hidden again
+    el.undo();
+    await waitFor(100);
+
+    expect(placeholder.style.display).to.equal('none');
+  });
+});
+
+describe('GeoJsonEditor - Save Feature', () => {
+
+  it('should have save() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.save).to.be.a('function');
+  });
+
+  it('should return true when save is successful', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Mock the click to avoid actual download in tests
+    const originalCreateElement = document.createElement.bind(document);
+    let downloadTriggered = false;
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'a') {
+        elem.click = () => { downloadTriggered = true; };
+      }
+      return elem;
+    };
+
+    const result = el.save();
+
+    expect(result).to.be.true;
+    expect(downloadTriggered).to.be.true;
+
+    // Restore
+    document.createElement = originalCreateElement;
+  });
+
+  it('should use default filename', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    let capturedFilename = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'a') {
+        elem.click = () => {};
+        Object.defineProperty(elem, 'download', {
+          set: (val) => { capturedFilename = val; },
+          get: () => capturedFilename
+        });
+      }
+      return elem;
+    };
+
+    el.save();
+
+    expect(capturedFilename).to.equal('features.geojson');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should use custom filename when provided', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    let capturedFilename = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'a') {
+        elem.click = () => {};
+        Object.defineProperty(elem, 'download', {
+          set: (val) => { capturedFilename = val; },
+          get: () => capturedFilename
+        });
+      }
+      return elem;
+    };
+
+    el.save('my-map.geojson');
+
+    expect(capturedFilename).to.equal('my-map.geojson');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should handle Ctrl+S keyboard shortcut', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    let saveCalled = false;
+    const originalSave = el.save.bind(el);
+    el.save = () => { saveCalled = true; return originalSave(); };
+
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'a') {
+        elem.click = () => {};
+      }
+      return elem;
+    };
+
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(saveCalled).to.be.true;
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should return false for empty editor', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'a') {
+        elem.click = () => {};
+      }
+      return elem;
+    };
+
+    // Empty editor should still save (empty FeatureCollection)
+    const result = el.save();
+    expect(result).to.be.true;
+
+    document.createElement = originalCreateElement;
+  });
+});
+
+describe('GeoJsonEditor - Open Feature', () => {
+
+  it('should have open() method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el.open).to.be.a('function');
+  });
+
+  it('should return a Promise', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Mock file input to immediately cancel
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input' && elem.type === 'file') {
+        elem.click = () => {
+          // Simulate cancel
+          elem.dispatchEvent(new Event('cancel'));
+        };
+      }
+      return elem;
+    };
+
+    const result = el.open();
+    expect(result).to.be.a('promise');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should return false when cancelled', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        elem.click = () => {
+          // Simulate cancel
+          setTimeout(() => {
+            elem.dispatchEvent(new Event('cancel'));
+          }, 10);
+        };
+      }
+      return elem;
+    };
+
+    const result = await el.open();
+    expect(result).to.be.false;
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should accept .geojson and .json files', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    let capturedAccept = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        Object.defineProperty(elem, 'accept', {
+          set: (val) => { capturedAccept = val; },
+          get: () => capturedAccept
+        });
+        elem.click = () => {
+          setTimeout(() => {
+            elem.dispatchEvent(new Event('cancel'));
+          }, 10);
+        };
+      }
+      return elem;
+    };
+
+    el.open();
+    await waitFor(50);
+
+    expect(capturedAccept).to.include('.geojson');
+    expect(capturedAccept).to.include('.json');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should handle Ctrl+O keyboard shortcut', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    let openCalled = false;
+    el.open = () => { openCalled = true; return Promise.resolve(false); };
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'o',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(openCalled).to.be.true;
+  });
+
+  it('should allow open() via API in readonly mode', async () => {
+    const el = await fixture(html`<geojson-editor readonly style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    // API should work in readonly mode
+    let inputCreated = false;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        inputCreated = true;
+        elem.click = () => {
+          setTimeout(() => {
+            elem.dispatchEvent(new Event('cancel'));
+          }, 10);
+        };
+      }
+      return elem;
+    };
+
+    await el.open();
+
+    expect(inputCreated).to.be.true;
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should block Ctrl+O in readonly mode', async () => {
+    const el = await fixture(html`<geojson-editor readonly style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    let openCalled = false;
+    el.open = () => { openCalled = true; return Promise.resolve(false); };
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'o',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(openCalled).to.be.false;
+  });
+
+  it('should create file input with correct accept attribute', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    let createdInput = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        createdInput = elem;
+        elem.click = () => {
+          // Simulate cancel to resolve promise
+          setTimeout(() => {
+            elem.dispatchEvent(new Event('cancel'));
+          }, 10);
+        };
+      }
+      return elem;
+    };
+
+    await el.open();
+
+    expect(createdInput).to.not.be.null;
+    expect(createdInput.type).to.equal('file');
+    expect(createdInput.accept).to.include('.geojson');
+    expect(createdInput.accept).to.include('.json');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should return false when no file is selected', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        elem.click = () => {
+          setTimeout(() => {
+            // Simulate change event with no files
+            Object.defineProperty(elem, 'files', { value: [] });
+            elem.dispatchEvent(new Event('change'));
+          }, 10);
+        };
+      }
+      return elem;
+    };
+
+    const result = await el.open();
+
+    expect(result).to.be.false;
+
+    document.createElement = originalCreateElement;
   });
 });

@@ -78,6 +78,14 @@ class GeoJsonEditor extends HTMLElement {
     
     // ========== Theme ==========
     this.themes = { dark: {}, light: {} };
+
+    // ========== Undo/Redo History ==========
+    this._undoStack = [];         // Stack of previous states
+    this._redoStack = [];         // Stack of undone states
+    this._maxHistorySize = 100;   // Maximum history entries
+    this._lastActionTime = 0;     // Timestamp of last action (for grouping)
+    this._lastActionType = null;  // Type of last action (for grouping)
+    this._groupingDelay = 500;    // ms - actions within this delay are grouped
   }
 
   // ========== Render Cache ==========
@@ -85,6 +93,133 @@ class GeoJsonEditor extends HTMLElement {
     this._lastStartIndex = -1;
     this._lastEndIndex = -1;
     this._lastTotalLines = -1;
+  }
+
+  // ========== Undo/Redo System ==========
+
+  /**
+   * Create a snapshot of current editor state
+   * @returns {Object} State snapshot
+   */
+  _createSnapshot() {
+    return {
+      lines: [...this.lines],
+      cursorLine: this.cursorLine,
+      cursorColumn: this.cursorColumn,
+      timestamp: Date.now()
+    };
+  }
+
+  /**
+   * Restore editor state from snapshot
+   * @param {Object} snapshot - State to restore
+   */
+  _restoreSnapshot(snapshot) {
+    this.lines = [...snapshot.lines];
+    this.cursorLine = snapshot.cursorLine;
+    this.cursorColumn = snapshot.cursorColumn;
+    this.updateModel();
+    this._invalidateRenderCache();
+    this.scheduleRender();
+    this.updatePlaceholderVisibility();
+    this.emitChange();
+  }
+
+  /**
+   * Save current state to undo stack before making changes
+   * @param {string} actionType - Type of action (insert, delete, paste, etc.)
+   */
+  _saveToHistory(actionType = 'edit') {
+    const now = Date.now();
+    const shouldGroup = (
+      actionType === this._lastActionType &&
+      (now - this._lastActionTime) < this._groupingDelay
+    );
+
+    // If same action type within grouping delay, don't create new entry
+    if (!shouldGroup) {
+      const snapshot = this._createSnapshot();
+      this._undoStack.push(snapshot);
+
+      // Limit stack size
+      if (this._undoStack.length > this._maxHistorySize) {
+        this._undoStack.shift();
+      }
+
+      // Clear redo stack on new action
+      this._redoStack = [];
+    }
+
+    this._lastActionTime = now;
+    this._lastActionType = actionType;
+  }
+
+  /**
+   * Undo last action
+   * @returns {boolean} True if undo was performed
+   */
+  undo() {
+    if (this._undoStack.length === 0) return false;
+
+    // Save current state to redo stack
+    this._redoStack.push(this._createSnapshot());
+
+    // Restore previous state
+    const previousState = this._undoStack.pop();
+    this._restoreSnapshot(previousState);
+
+    // Reset action tracking
+    this._lastActionType = null;
+    this._lastActionTime = 0;
+
+    return true;
+  }
+
+  /**
+   * Redo previously undone action
+   * @returns {boolean} True if redo was performed
+   */
+  redo() {
+    if (this._redoStack.length === 0) return false;
+
+    // Save current state to undo stack
+    this._undoStack.push(this._createSnapshot());
+
+    // Restore next state
+    const nextState = this._redoStack.pop();
+    this._restoreSnapshot(nextState);
+
+    // Reset action tracking
+    this._lastActionType = null;
+    this._lastActionTime = 0;
+
+    return true;
+  }
+
+  /**
+   * Clear undo/redo history
+   */
+  clearHistory() {
+    this._undoStack = [];
+    this._redoStack = [];
+    this._lastActionType = null;
+    this._lastActionTime = 0;
+  }
+
+  /**
+   * Check if undo is available
+   * @returns {boolean}
+   */
+  canUndo() {
+    return this._undoStack.length > 0;
+  }
+
+  /**
+   * Check if redo is available
+   * @returns {boolean}
+   */
+  canRedo() {
+    return this._redoStack.length > 0;
   }
 
   // ========== Unique ID Generation ==========
@@ -191,14 +326,16 @@ class GeoJsonEditor extends HTMLElement {
    * @param {Object} range - The range info {startLine, endLine}
    */
   _deleteCollapsedNode(range) {
+    this._saveToHistory('delete');
+
     // Remove all lines from startLine to endLine
     const count = range.endLine - range.startLine + 1;
     this.lines.splice(range.startLine, count);
-    
+
     // Position cursor at the line where the node was
     this.cursorLine = Math.min(range.startLine, this.lines.length - 1);
     this.cursorColumn = 0;
-    
+
     this.formatAndUpdate();
   }
 
@@ -553,6 +690,11 @@ class GeoJsonEditor extends HTMLElement {
    * Set the editor content from a string value
    */
   setValue(value) {
+    // Save to history only if there's existing content
+    if (this.lines.length > 0) {
+      this._saveToHistory('setValue');
+    }
+
     if (!value || !value.trim()) {
       this.lines = [];
     } else {
@@ -569,7 +711,7 @@ class GeoJsonEditor extends HTMLElement {
         this.lines = value.split('\n');
       }
     }
-    
+
     // Clear state for new content
     this.collapsedNodes.clear();
     this.hiddenFeatures.clear();
@@ -1171,6 +1313,34 @@ class GeoJsonEditor extends HTMLElement {
           this._selectAll();
         }
         break;
+      case 'z':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          if (e.shiftKey) {
+            this.redo();
+          } else {
+            this.undo();
+          }
+        }
+        break;
+      case 'y':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          this.redo();
+        }
+        break;
+      case 's':
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          this.save();
+        }
+        break;
+      case 'o':
+        if ((e.ctrlKey || e.metaKey) && !this.hasAttribute('readonly')) {
+          e.preventDefault();
+          this.open();
+        }
+        break;
       case 'Tab':
         e.preventDefault();
         this._handleTab(e.shiftKey, ctx);
@@ -1287,11 +1457,13 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   insertNewline() {
+    this._saveToHistory('newline');
+
     if (this.cursorLine < this.lines.length) {
       const line = this.lines[this.cursorLine];
       const before = line.substring(0, this.cursorColumn);
       const after = line.substring(this.cursorColumn);
-      
+
       this.lines[this.cursorLine] = before;
       this.lines.splice(this.cursorLine + 1, 0, after);
       this.cursorLine++;
@@ -1301,11 +1473,13 @@ class GeoJsonEditor extends HTMLElement {
       this.cursorLine = this.lines.length - 1;
       this.cursorColumn = 0;
     }
-    
+
     this.formatAndUpdate();
   }
 
   deleteBackward() {
+    this._saveToHistory('delete');
+
     if (this.cursorColumn > 0) {
       const line = this.lines[this.cursorLine];
       this.lines[this.cursorLine] = line.substring(0, this.cursorColumn - 1) + line.substring(this.cursorColumn);
@@ -1319,11 +1493,13 @@ class GeoJsonEditor extends HTMLElement {
       this.lines.splice(this.cursorLine, 1);
       this.cursorLine--;
     }
-    
+
     this.formatAndUpdate();
   }
 
   deleteForward() {
+    this._saveToHistory('delete');
+
     if (this.cursorLine < this.lines.length) {
       const line = this.lines[this.cursorLine];
       if (this.cursorColumn < line.length) {
@@ -1334,7 +1510,7 @@ class GeoJsonEditor extends HTMLElement {
         this.lines.splice(this.cursorLine + 1, 1);
       }
     }
-    
+
     this.formatAndUpdate();
   }
 
@@ -1633,9 +1809,11 @@ class GeoJsonEditor extends HTMLElement {
    */
   _deleteSelection() {
     if (!this._hasSelection()) return false;
-    
+
+    this._saveToHistory('delete');
+
     const { start, end } = this._normalizeSelection();
-    
+
     if (start.line === end.line) {
       // Single line selection
       const line = this.lines[start.line];
@@ -1647,12 +1825,12 @@ class GeoJsonEditor extends HTMLElement {
       this.lines[start.line] = startLine + endLine;
       this.lines.splice(start.line + 1, end.line - start.line);
     }
-    
+
     this.cursorLine = start.line;
     this.cursorColumn = start.column;
     this.selectionStart = null;
     this.selectionEnd = null;
-    
+
     return true;
   }
 
@@ -1661,10 +1839,10 @@ class GeoJsonEditor extends HTMLElement {
     if (this._hasSelection()) {
       this._deleteSelection();
     }
-    
+
     // Block insertion in hidden collapsed zones
     if (this._getCollapsedRangeForLine(this.cursorLine)) return;
-    
+
     // On closing line, only allow after bracket
     const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
     if (onClosingLine) {
@@ -1672,7 +1850,7 @@ class GeoJsonEditor extends HTMLElement {
       const bracketPos = this._getClosingBracketPos(line);
       if (this.cursorColumn <= bracketPos) return;
     }
-    
+
     // On collapsed opening line, only allow before bracket
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
     if (onCollapsed) {
@@ -1680,7 +1858,10 @@ class GeoJsonEditor extends HTMLElement {
       const bracketPos = line.search(/[{\[]/);
       if (this.cursorColumn > bracketPos) return;
     }
-    
+
+    // Save to history before making changes
+    this._saveToHistory('insert');
+
     // Handle empty editor case
     if (this.lines.length === 0) {
       // Split text by newlines to properly handle multi-line paste
@@ -1728,11 +1909,13 @@ class GeoJsonEditor extends HTMLElement {
     e.preventDefault();
     if (this._hasSelection()) {
       e.clipboardData.setData('text/plain', this._getSelectedText());
+      this._saveToHistory('cut');
       this._deleteSelection();
       this.formatAndUpdate();
     } else {
       // Cut all content
       e.clipboardData.setData('text/plain', this.getContent());
+      this._saveToHistory('cut');
       this.lines = [];
       this.cursorLine = 0;
       this.cursorColumn = 0;
@@ -2475,6 +2658,9 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   removeAll() {
+    if (this.lines.length > 0) {
+      this._saveToHistory('removeAll');
+    }
     const removed = this._parseFeatures();
     this.lines = [];
     this.collapsedNodes.clear();
@@ -2498,6 +2684,113 @@ class GeoJsonEditor extends HTMLElement {
 
   emit() {
     this.emitChange();
+  }
+
+  /**
+   * Save GeoJSON to a file (triggers download)
+   * @param {string} filename - Optional filename (default: 'features.geojson')
+   * @returns {boolean} True if save was successful
+   */
+  save(filename = 'features.geojson') {
+    try {
+      const features = this._parseFeatures();
+      const geojson = {
+        type: 'FeatureCollection',
+        features: features
+      };
+      const json = JSON.stringify(geojson, null, 2);
+      const blob = new Blob([json], { type: 'application/geo+json' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Open a GeoJSON file from the client filesystem
+   * Note: Available even in readonly mode via API (only Ctrl+O shortcut is blocked)
+   * @returns {Promise<boolean>} Promise that resolves to true if file was loaded successfully
+   */
+  open() {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.geojson,.json,application/geo+json,application/json';
+      input.style.display = 'none';
+
+      input.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) {
+          document.body.removeChild(input);
+          resolve(false);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const content = event.target.result;
+            const parsed = JSON.parse(content);
+
+            // Extract features from various GeoJSON formats
+            let features = [];
+            if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+              features = parsed.features;
+            } else if (parsed.type === 'Feature') {
+              features = [parsed];
+            } else if (Array.isArray(parsed)) {
+              features = parsed;
+            } else {
+              // Invalid GeoJSON structure
+              document.body.removeChild(input);
+              resolve(false);
+              return;
+            }
+
+            // Validate features
+            for (const feature of features) {
+              this._validateFeature(feature);
+            }
+
+            // Load features into editor
+            this._saveToHistory('open');
+            this.set(features);
+            this.clearHistory(); // Clear history after opening new file
+            document.body.removeChild(input);
+            resolve(true);
+          } catch (err) {
+            document.body.removeChild(input);
+            resolve(false);
+          }
+        };
+
+        reader.onerror = () => {
+          document.body.removeChild(input);
+          resolve(false);
+        };
+
+        reader.readAsText(file);
+      });
+
+      // Handle cancel (no file selected)
+      input.addEventListener('cancel', () => {
+        document.body.removeChild(input);
+        resolve(false);
+      });
+
+      document.body.appendChild(input);
+      input.click();
+    });
   }
 
   _parseFeatures() {
