@@ -33,7 +33,6 @@ class GeoJsonEditor extends HTMLElement {
     this.featureRanges = new Map(); // featureKey -> {startLine, endLine, featureIndex}
     
     // ========== View State ==========
-    this.scrollTop = 0;
     this.viewportHeight = 0;
     this.lineHeight = 19.5;       // CSS: line-height * font-size = 1.5 * 13px
     this.bufferLines = 5;         // Extra lines to render above/below viewport
@@ -56,6 +55,13 @@ class GeoJsonEditor extends HTMLElement {
     
     // ========== Theme ==========
     this.themes = { dark: {}, light: {} };
+  }
+
+  // ========== Render Cache ==========
+  _invalidateRenderCache() {
+    this._lastStartIndex = -1;
+    this._lastEndIndex = -1;
+    this._lastTotalLines = -1;
   }
 
   // ========== Unique ID Generation ==========
@@ -391,7 +397,7 @@ class GeoJsonEditor extends HTMLElement {
       
       // Focus textarea
       hiddenTextarea.focus();
-      this._lastStartIndex = -1;
+      this._invalidateRenderCache();
       this.scheduleRender();
     });
     
@@ -417,7 +423,7 @@ class GeoJsonEditor extends HTMLElement {
         viewport.scrollTop += scrollSpeed;
       }
       
-      this._lastStartIndex = -1;
+      this._invalidateRenderCache();
       this.scheduleRender();
     });
     
@@ -429,13 +435,13 @@ class GeoJsonEditor extends HTMLElement {
     // Focus/blur handling to show/hide cursor
     hiddenTextarea.addEventListener('focus', () => {
       editorWrapper.classList.add('focused');
-      this._lastStartIndex = -1; // Force re-render to show cursor
+      this._invalidateRenderCache(); // Force re-render to show cursor
       this.scheduleRender();
     });
 
     hiddenTextarea.addEventListener('blur', () => {
       editorWrapper.classList.remove('focused');
-      this._lastStartIndex = -1; // Force re-render to hide cursor
+      this._invalidateRenderCache(); // Force re-render to hide cursor
       this.scheduleRender();
     });
 
@@ -443,7 +449,6 @@ class GeoJsonEditor extends HTMLElement {
     let isRendering = false;
     viewport.addEventListener('scroll', () => {
       if (isRendering) return;
-      this.scrollTop = viewport.scrollTop;
       this.syncGutterScroll();
       
       // Use requestAnimationFrame to batch scroll updates
@@ -757,7 +762,7 @@ class GeoJsonEditor extends HTMLElement {
     }
     
     // Reset render cache to force re-render
-    this._lastStartIndex = -1;
+    this._invalidateRenderCache();
     this._lastEndIndex = -1;
     this._lastTotalLines = -1;
   }
@@ -1090,106 +1095,25 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   handleKeydown(e) {
-    // Check if cursor is in a collapsed zone
-    const inCollapsedZone = this._getCollapsedRangeForLine(this.cursorLine);
-    const onCollapsedNode = this._getCollapsedNodeAtLine(this.cursorLine);
-    const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
-    
+    // Build context for collapsed zone detection
+    const ctx = {
+      inCollapsedZone: this._getCollapsedRangeForLine(this.cursorLine),
+      onCollapsedNode: this._getCollapsedNodeAtLine(this.cursorLine),
+      onClosingLine: this._getCollapsedClosingLine(this.cursorLine)
+    };
+
     switch (e.key) {
       case 'Enter':
         e.preventDefault();
-        // Block in collapsed zones
-        if (onCollapsedNode || inCollapsedZone) return;
-        // On closing line, before bracket -> block
-        if (onClosingLine) {
-          const line = this.lines[this.cursorLine];
-          const bracketPos = this._getClosingBracketPos(line);
-          if (bracketPos >= 0 && this.cursorColumn <= bracketPos) {
-            return;
-          }
-          // After bracket, allow normal enter (add new line)
-        }
-        this.insertNewline();
+        this._handleEnter(ctx);
         break;
       case 'Backspace':
         e.preventDefault();
-        // Delete selection if any
-        if (this._hasSelection()) {
-          this._deleteSelection();
-          this.formatAndUpdate();
-          return;
-        }
-        // On closing line
-        if (onClosingLine) {
-          const line = this.lines[this.cursorLine];
-          const bracketPos = this._getClosingBracketPos(line);
-          if (bracketPos >= 0 && this.cursorColumn > bracketPos + 1) {
-            // After bracket, allow delete
-            this.deleteBackward();
-            return;
-          } else if (this.cursorColumn === bracketPos + 1) {
-            // Just after bracket, delete whole node
-            this._deleteCollapsedNode(onClosingLine);
-            return;
-          }
-          // On or before bracket, delete whole node
-          this._deleteCollapsedNode(onClosingLine);
-          return;
-        }
-        // If on collapsed node opening line at position 0, delete whole node
-        if (onCollapsedNode && this.cursorColumn === 0) {
-          this._deleteCollapsedNode(onCollapsedNode);
-          return;
-        }
-        // Block inside collapsed zones
-        if (inCollapsedZone) return;
-        // On opening line, allow editing before and at bracket
-        if (onCollapsedNode) {
-          const line = this.lines[this.cursorLine];
-          const bracketPos = line.search(/[{\[]/);
-          if (this.cursorColumn > bracketPos + 1) {
-            // After bracket, delete whole node
-            this._deleteCollapsedNode(onCollapsedNode);
-            return;
-          }
-        }
-        this.deleteBackward();
+        this._handleBackspace(ctx);
         break;
       case 'Delete':
         e.preventDefault();
-        // Delete selection if any
-        if (this._hasSelection()) {
-          this._deleteSelection();
-          this.formatAndUpdate();
-          return;
-        }
-        // On closing line
-        if (onClosingLine) {
-          const line = this.lines[this.cursorLine];
-          const bracketPos = this._getClosingBracketPos(line);
-          if (bracketPos >= 0 && this.cursorColumn > bracketPos) {
-            // After bracket, allow delete
-            this.deleteForward();
-            return;
-          }
-          // On or before bracket, delete whole node
-          this._deleteCollapsedNode(onClosingLine);
-          return;
-        }
-        // If on collapsed node opening line
-        if (onCollapsedNode) {
-          const line = this.lines[this.cursorLine];
-          const bracketPos = line.search(/[{\[]/);
-          if (this.cursorColumn > bracketPos) {
-            // After bracket, delete whole node
-            this._deleteCollapsedNode(onCollapsedNode);
-            return;
-          }
-          // Before bracket, allow editing key name
-        }
-        // Block inside collapsed zones
-        if (inCollapsedZone) return;
-        this.deleteForward();
+        this._handleDelete(ctx);
         break;
       case 'ArrowUp':
         e.preventDefault();
@@ -1209,55 +1133,130 @@ class GeoJsonEditor extends HTMLElement {
         break;
       case 'Home':
         e.preventDefault();
-        this._handleHomeEnd('home', e.shiftKey, onClosingLine);
+        this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine);
         break;
       case 'End':
         e.preventDefault();
-        this._handleHomeEnd('end', e.shiftKey, onClosingLine);
+        this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine);
         break;
       case 'a':
-        // Ctrl+A or Cmd+A: select all
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
           this._selectAll();
-          return;
         }
         break;
       case 'Tab':
         e.preventDefault();
-        
-        // Shift+Tab: collapse the containing expanded node
-        if (e.shiftKey) {
-          const containingNode = this._getContainingExpandedNode(this.cursorLine);
-          if (containingNode) {
-            // Find the position just after the opening bracket
-            const startLine = this.lines[containingNode.startLine];
-            const bracketPos = startLine.search(/[{\[]/);
-            
-            this.toggleCollapse(containingNode.nodeId);
-            
-            // Move cursor to just after the opening bracket
-            this.cursorLine = containingNode.startLine;
-            this.cursorColumn = bracketPos >= 0 ? bracketPos + 1 : startLine.length;
-            this._clearSelection();
-            this._scrollToCursor();
-          }
-          return;
-        }
-        
-        // Tab: expand collapsed node if on one
-        if (onCollapsedNode) {
-          this.toggleCollapse(onCollapsedNode.nodeId);
-          return;
-        }
-        if (onClosingLine) {
-          this.toggleCollapse(onClosingLine.nodeId);
-          return;
-        }
-        
-        // Block in hidden collapsed zones
-        if (inCollapsedZone) return;
+        this._handleTab(e.shiftKey, ctx);
         break;
+    }
+  }
+
+  _handleEnter(ctx) {
+    // Block in collapsed zones
+    if (ctx.onCollapsedNode || ctx.inCollapsedZone) return;
+    // On closing line, before bracket -> block
+    if (ctx.onClosingLine) {
+      const line = this.lines[this.cursorLine];
+      const bracketPos = this._getClosingBracketPos(line);
+      if (bracketPos >= 0 && this.cursorColumn <= bracketPos) {
+        return;
+      }
+    }
+    this.insertNewline();
+  }
+
+  _handleBackspace(ctx) {
+    // Delete selection if any
+    if (this._hasSelection()) {
+      this._deleteSelection();
+      this.formatAndUpdate();
+      return;
+    }
+    // On closing line
+    if (ctx.onClosingLine) {
+      const line = this.lines[this.cursorLine];
+      const bracketPos = this._getClosingBracketPos(line);
+      if (bracketPos >= 0 && this.cursorColumn > bracketPos + 1) {
+        this.deleteBackward();
+        return;
+      }
+      this._deleteCollapsedNode(ctx.onClosingLine);
+      return;
+    }
+    // If on collapsed node opening line at position 0, delete whole node
+    if (ctx.onCollapsedNode && this.cursorColumn === 0) {
+      this._deleteCollapsedNode(ctx.onCollapsedNode);
+      return;
+    }
+    // Block inside collapsed zones
+    if (ctx.inCollapsedZone) return;
+    // On opening line, allow editing before bracket
+    if (ctx.onCollapsedNode) {
+      const line = this.lines[this.cursorLine];
+      const bracketPos = line.search(/[{\[]/);
+      if (this.cursorColumn > bracketPos + 1) {
+        this._deleteCollapsedNode(ctx.onCollapsedNode);
+        return;
+      }
+    }
+    this.deleteBackward();
+  }
+
+  _handleDelete(ctx) {
+    // Delete selection if any
+    if (this._hasSelection()) {
+      this._deleteSelection();
+      this.formatAndUpdate();
+      return;
+    }
+    // On closing line
+    if (ctx.onClosingLine) {
+      const line = this.lines[this.cursorLine];
+      const bracketPos = this._getClosingBracketPos(line);
+      if (bracketPos >= 0 && this.cursorColumn > bracketPos) {
+        this.deleteForward();
+        return;
+      }
+      this._deleteCollapsedNode(ctx.onClosingLine);
+      return;
+    }
+    // If on collapsed node opening line
+    if (ctx.onCollapsedNode) {
+      const line = this.lines[this.cursorLine];
+      const bracketPos = line.search(/[{\[]/);
+      if (this.cursorColumn > bracketPos) {
+        this._deleteCollapsedNode(ctx.onCollapsedNode);
+        return;
+      }
+    }
+    // Block inside collapsed zones
+    if (ctx.inCollapsedZone) return;
+    this.deleteForward();
+  }
+
+  _handleTab(isShiftKey, ctx) {
+    // Shift+Tab: collapse the containing expanded node
+    if (isShiftKey) {
+      const containingNode = this._getContainingExpandedNode(this.cursorLine);
+      if (containingNode) {
+        const startLine = this.lines[containingNode.startLine];
+        const bracketPos = startLine.search(/[{\[]/);
+        this.toggleCollapse(containingNode.nodeId);
+        this.cursorLine = containingNode.startLine;
+        this.cursorColumn = bracketPos >= 0 ? bracketPos + 1 : startLine.length;
+        this._clearSelection();
+        this._scrollToCursor();
+      }
+      return;
+    }
+    // Tab: expand collapsed node if on one
+    if (ctx.onCollapsedNode) {
+      this.toggleCollapse(ctx.onCollapsedNode.nodeId);
+      return;
+    }
+    if (ctx.onClosingLine) {
+      this.toggleCollapse(ctx.onClosingLine.nodeId);
     }
   }
 
@@ -1339,7 +1338,7 @@ class GeoJsonEditor extends HTMLElement {
     const maxCol = this.lines[this.cursorLine]?.length || 0;
     this.cursorColumn = Math.min(this.cursorColumn, maxCol);
     
-    this._lastStartIndex = -1;
+    this._invalidateRenderCache();
     this._scrollToCursor();
     this.scheduleRender();
   }
@@ -1348,124 +1347,103 @@ class GeoJsonEditor extends HTMLElement {
    * Move cursor horizontally with smart navigation around collapsed nodes
    */
   moveCursorHorizontal(delta) {
+    if (delta > 0) {
+      this._moveCursorRight();
+    } else {
+      this._moveCursorLeft();
+    }
+    this._invalidateRenderCache();
+    this._scrollToCursor();
+    this.scheduleRender();
+  }
+
+  _moveCursorRight() {
     const line = this.lines[this.cursorLine];
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
     const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
-    
-    if (delta > 0) {
-      // Moving right
-      if (onClosingLine) {
-        const bracketPos = this._getClosingBracketPos(line);
-        if (this.cursorColumn < bracketPos) {
-          // Before bracket, jump to bracket
-          this.cursorColumn = bracketPos;
-        } else if (this.cursorColumn >= line.length) {
-          // At end, go to next line
-          if (this.cursorLine < this.lines.length - 1) {
-            this.cursorLine++;
-            this.cursorColumn = 0;
-          }
-        } else {
-          // On or after bracket, move normally
-          this.cursorColumn++;
-        }
-      } else if (onCollapsed) {
-        const bracketPos = line.search(/[{\[]/);
-        if (this.cursorColumn < bracketPos) {
-          // Before bracket, move normally
-          this.cursorColumn++;
-        } else if (this.cursorColumn === bracketPos) {
-          // On bracket, go to after bracket
-          this.cursorColumn = bracketPos + 1;
-        } else {
-          // After bracket, jump to closing line at bracket
-          this.cursorLine = onCollapsed.endLine;
-          const closingLine = this.lines[this.cursorLine];
-          this.cursorColumn = this._getClosingBracketPos(closingLine);
-        }
+
+    if (onClosingLine) {
+      const bracketPos = this._getClosingBracketPos(line);
+      if (this.cursorColumn < bracketPos) {
+        this.cursorColumn = bracketPos;
       } else if (this.cursorColumn >= line.length) {
-        // Move to next line
         if (this.cursorLine < this.lines.length - 1) {
           this.cursorLine++;
           this.cursorColumn = 0;
-          // Skip hidden collapsed zones
-          const collapsed = this._getCollapsedRangeForLine(this.cursorLine);
-          if (collapsed) {
-            this.cursorLine = collapsed.endLine;
-            this.cursorColumn = 0;
-          }
         }
       } else {
         this.cursorColumn++;
       }
+    } else if (onCollapsed) {
+      const bracketPos = line.search(/[{\[]/);
+      if (this.cursorColumn < bracketPos) {
+        this.cursorColumn++;
+      } else if (this.cursorColumn === bracketPos) {
+        this.cursorColumn = bracketPos + 1;
+      } else {
+        this.cursorLine = onCollapsed.endLine;
+        this.cursorColumn = this._getClosingBracketPos(this.lines[this.cursorLine]);
+      }
+    } else if (this.cursorColumn >= line.length) {
+      if (this.cursorLine < this.lines.length - 1) {
+        this.cursorLine++;
+        this.cursorColumn = 0;
+        const collapsed = this._getCollapsedRangeForLine(this.cursorLine);
+        if (collapsed) {
+          this.cursorLine = collapsed.endLine;
+          this.cursorColumn = 0;
+        }
+      }
     } else {
-      // Moving left
-      if (onClosingLine) {
-        const bracketPos = this._getClosingBracketPos(line);
-        if (this.cursorColumn > bracketPos + 1) {
-          // After bracket, move normally
-          this.cursorColumn--;
-        } else if (this.cursorColumn === bracketPos + 1) {
-          // Just after bracket, jump to opening line after bracket
-          this.cursorLine = onClosingLine.startLine;
-          const openLine = this.lines[this.cursorLine];
-          const openBracketPos = openLine.search(/[{\[]/);
-          this.cursorColumn = openBracketPos + 1;
-        } else {
-          // On bracket, jump to opening line after bracket
-          this.cursorLine = onClosingLine.startLine;
-          const openLine = this.lines[this.cursorLine];
-          const openBracketPos = openLine.search(/[{\[]/);
-          this.cursorColumn = openBracketPos + 1;
-        }
-      } else if (onCollapsed) {
-        const bracketPos = line.search(/[{\[]/);
-        if (this.cursorColumn > bracketPos + 1) {
-          // After bracket, go to just after bracket
-          this.cursorColumn = bracketPos + 1;
-        } else if (this.cursorColumn === bracketPos + 1) {
-          // Just after bracket, go to bracket
-          this.cursorColumn = bracketPos;
-        } else if (this.cursorColumn > 0) {
-          // Before bracket, move normally
-          this.cursorColumn--;
-        } else {
-          // At start, go to previous line
-          if (this.cursorLine > 0) {
-            this.cursorLine--;
-            this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
-          }
-        }
+      this.cursorColumn++;
+    }
+  }
+
+  _moveCursorLeft() {
+    const line = this.lines[this.cursorLine];
+    const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
+    const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
+
+    if (onClosingLine) {
+      const bracketPos = this._getClosingBracketPos(line);
+      if (this.cursorColumn > bracketPos + 1) {
+        this.cursorColumn--;
+      } else {
+        // Jump to opening line after bracket
+        this.cursorLine = onClosingLine.startLine;
+        const openLine = this.lines[this.cursorLine];
+        this.cursorColumn = openLine.search(/[{\[]/) + 1;
+      }
+    } else if (onCollapsed) {
+      const bracketPos = line.search(/[{\[]/);
+      if (this.cursorColumn > bracketPos + 1) {
+        this.cursorColumn = bracketPos + 1;
+      } else if (this.cursorColumn === bracketPos + 1) {
+        this.cursorColumn = bracketPos;
       } else if (this.cursorColumn > 0) {
         this.cursorColumn--;
       } else if (this.cursorLine > 0) {
-        // Move to previous line
         this.cursorLine--;
-        
-        // Check if previous line is closing line of collapsed
-        const closing = this._getCollapsedClosingLine(this.cursorLine);
-        if (closing) {
-          // Go to end of closing line
-          this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
+        this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
+      }
+    } else if (this.cursorColumn > 0) {
+      this.cursorColumn--;
+    } else if (this.cursorLine > 0) {
+      this.cursorLine--;
+      const closing = this._getCollapsedClosingLine(this.cursorLine);
+      if (closing) {
+        this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
+      } else {
+        const collapsed = this._getCollapsedRangeForLine(this.cursorLine);
+        if (collapsed) {
+          this.cursorLine = collapsed.startLine;
+          const openLine = this.lines[this.cursorLine];
+          this.cursorColumn = openLine.search(/[{\[]/) + 1;
         } else {
-          // Check if previous line is inside collapsed zone
-          const collapsed = this._getCollapsedRangeForLine(this.cursorLine);
-          if (collapsed) {
-            // Jump to opening line after bracket
-            this.cursorLine = collapsed.startLine;
-            const openLine = this.lines[this.cursorLine];
-            const bracketPos = openLine.search(/[{\[]/);
-            this.cursorColumn = bracketPos + 1;
-          } else {
-            this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
-          }
+          this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
         }
       }
     }
-    
-    this._lastStartIndex = -1;
-    this._scrollToCursor();
-    this.scheduleRender();
   }
 
   /**
@@ -1490,17 +1468,6 @@ class GeoJsonEditor extends HTMLElement {
     // Scroll down if cursor is below viewport
     else if (cursorY + this.lineHeight > viewportBottom) {
       viewport.scrollTop = cursorY + this.lineHeight - viewport.clientHeight;
-    }
-  }
-
-  /**
-   * Legacy moveCursor for compatibility
-   */
-  moveCursor(deltaLine, deltaCol) {
-    if (deltaLine !== 0) {
-      this.moveCursorSkipCollapsed(deltaLine);
-    } else if (deltaCol !== 0) {
-      this.moveCursorHorizontal(deltaCol);
     }
   }
 
@@ -1558,7 +1525,7 @@ class GeoJsonEditor extends HTMLElement {
       this.selectionEnd = null;
     }
     
-    this._lastStartIndex = -1;
+    this._invalidateRenderCache();
     this._scrollToCursor();
     this.scheduleRender();
   }
@@ -1573,7 +1540,7 @@ class GeoJsonEditor extends HTMLElement {
     this.cursorLine = lastLine;
     this.cursorColumn = this.lines[lastLine]?.length || 0;
     
-    this._lastStartIndex = -1;
+    this._invalidateRenderCache();
     this._scrollToCursor();
     this.scheduleRender();
   }
@@ -1885,7 +1852,7 @@ class GeoJsonEditor extends HTMLElement {
     
     // Use updateView - don't rebuild nodeId mappings since content didn't change
     this.updateView();
-    this._lastStartIndex = -1; // Force re-render
+    this._invalidateRenderCache(); // Force re-render
     this.scheduleRender();
   }
 

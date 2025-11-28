@@ -95,50 +95,13 @@
 }
 
 /* ========== Gutter Controls ========== */
-.color-indicator, .collapse-button, .boolean-checkbox {
+.collapse-button {
   width: 12px;
   height: 12px;
   border-radius: 2px;
   cursor: pointer;
   transition: transform 0.1s;
   flex-shrink: 0;
-}
-
-.color-indicator {
-  border: 1px solid #555;
-}
-.color-indicator:hover {
-  transform: scale(1.2);
-  border-color: #fff;
-}
-
-.boolean-checkbox {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: 1.5px solid var(--control-border, #c0c0c0);
-  border-radius: 2px;
-  margin: 0;
-  position: relative;
-}
-.boolean-checkbox:checked {
-  border-color: var(--control-color, #000080);
-}
-.boolean-checkbox:checked::after {
-  content: '✔';
-  color: var(--control-color, #000080);
-  font-size: 11px;
-  font-weight: bold;
-  position: absolute;
-  top: -3px;
-  right: -1px;
-}
-.boolean-checkbox:hover {
-  transform: scale(1.2);
-  border-color: var(--control-color, #000080);
-}
-
-.collapse-button {
   background: transparent;
   border: none;
   color: var(--json-punct, #a9b7c6);
@@ -166,25 +129,6 @@
     opacity: 1;
   }
 }
-
-.visibility-button {
-  width: 14px;
-  height: 14px;
-  background: transparent;
-  color: var(--control-color, #000080);
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.1s;
-  flex-shrink: 0;
-  opacity: 0.7;
-  padding: 0;
-  font-size: 11px;
-}
-.visibility-button:hover { opacity: 1; transform: scale(1.15); }
-.visibility-button.hidden { opacity: 0.35; }
 
 /* ========== Editor Content ========== */
 .editor-content {
@@ -303,9 +247,6 @@
 .geojson-type { color: var(--geojson-type, #008000); font-weight: 600; }
 .geojson-type-invalid { color: var(--geojson-type-invalid, #f00); font-weight: 600; }
 
-/* Hidden marker - invisible but present for data */
-.d-none { display: none; }
-
 /* Collapsed node styling */
 .collapsed-bracket-array,
 .collapsed-bracket-object {
@@ -316,7 +257,6 @@
   content: '…';
   color: var(--json-punct, #888);
 }
-.collapsed-content { display: none; }
 
 /* ========== Prefix/Suffix ========== */
 .prefix-wrapper, .suffix-wrapper {
@@ -399,11 +339,6 @@
 .viewport::-webkit-scrollbar-thumb:hover { background: var(--control-color, #000080); }
 .viewport { scrollbar-width: thin; scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8); }
 
-/* ========== Selection highlight ========== */
-.line .selected {
-  background: rgba(51, 153, 255, 0.3);
-}
-
 /* ========== Inline Controls (using ::before pseudo-elements) ========== */
 
 /* Shared styles for inline control pseudo-elements */
@@ -453,9 +388,6 @@
 }
 
 /* Feature visibility using ::before on the line (placed in indentation space) */
-.line.has-visibility {
-  position: relative;
-}
 .line.has-visibility::before {
   content: '👁';
   position: absolute;
