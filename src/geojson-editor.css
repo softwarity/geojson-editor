@@ -1,0 +1,465 @@
+/* Base reset - protect against inherited styles */
+:host *, :host *::before, :host *::after {
+  box-sizing: border-box;
+  font: normal normal 13px/1.5 'Courier New', Courier, monospace;
+  font-variant: normal;
+  letter-spacing: 0;
+  word-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  text-indent: 0;
+}
+
+:host {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  height: 400px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:host([readonly]) .editor-wrapper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(-45deg, rgba(128,128,128,0.08), rgba(128,128,128,0.08) 3px, transparent 3px, transparent 12px);
+  z-index: 1;
+}
+
+:host([readonly]) .hidden-textarea { cursor: text; }
+
+.editor-wrapper {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  background: var(--bg-color, #fff);
+  display: flex;
+  overflow: hidden;
+}
+
+/* ========== Gutter ========== */
+.gutter {
+  width: 50px;
+  background: var(--gutter-bg, #f0f0f0);
+  border-right: 1px solid var(--gutter-border, #e0e0e0);
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.gutter-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  padding: 8px 0;
+}
+
+.gutter-scroll-content {
+  position: relative;
+  width: 100%;
+}
+
+.gutter-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  will-change: transform;
+}
+
+.gutter-line {
+  height: 19.5px; /* line-height * font-size = 1.5 * 13px */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+}
+
+.line-number {
+  font-size: 11px;
+  color: var(--gutter-text, #999);
+  user-select: none;
+  min-width: 20px;
+  text-align: right;
+}
+
+.collapse-column {
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* ========== Gutter Controls ========== */
+.color-indicator, .collapse-button, .boolean-checkbox {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: transform 0.1s;
+  flex-shrink: 0;
+}
+
+.color-indicator {
+  border: 1px solid #555;
+}
+.color-indicator:hover {
+  transform: scale(1.2);
+  border-color: #fff;
+}
+
+.boolean-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1.5px solid var(--control-border, #c0c0c0);
+  border-radius: 2px;
+  margin: 0;
+  position: relative;
+}
+.boolean-checkbox:checked {
+  border-color: var(--control-color, #000080);
+}
+.boolean-checkbox:checked::after {
+  content: '✔';
+  color: var(--control-color, #000080);
+  font-size: 11px;
+  font-weight: bold;
+  position: absolute;
+  top: -3px;
+  right: -1px;
+}
+.boolean-checkbox:hover {
+  transform: scale(1.2);
+  border-color: var(--control-color, #000080);
+}
+
+.collapse-button {
+  background: transparent;
+  border: none;
+  color: var(--json-punct, #a9b7c6);
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.collapse-button.collapsed {
+  opacity: 1;
+}
+.gutter:hover .collapse-button {
+  opacity: 1;
+}
+.collapse-button:hover {
+  transform: scale(1.2);
+}
+
+/* Touch devices: always show collapse buttons */
+@media (hover: none), (pointer: coarse) {
+  .collapse-button {
+    opacity: 1;
+  }
+}
+
+.visibility-button {
+  width: 14px;
+  height: 14px;
+  background: transparent;
+  color: var(--control-color, #000080);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+  flex-shrink: 0;
+  opacity: 0.7;
+  padding: 0;
+  font-size: 11px;
+}
+.visibility-button:hover { opacity: 1; transform: scale(1.15); }
+.visibility-button.hidden { opacity: 0.35; }
+
+/* ========== Editor Content ========== */
+.editor-content {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Hidden textarea for input capture (Monaco-style) */
+.hidden-textarea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  padding: 0;
+  margin: 0;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  z-index: -1;
+  pointer-events: none;
+  caret-color: transparent;
+}
+
+/* Viewport container with scroll */
+.viewport {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 8px 12px;
+  overscroll-behavior: contain; /* Prevent scroll chaining to parent */
+}
+
+/* Scroll content - defines total scrollable height */
+.scroll-content {
+  position: relative;
+  width: 100%;
+}
+
+/* Lines container - positioned via transform */
+.lines-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  will-change: transform;
+}
+
+/* Single line */
+.line {
+  height: 19.5px; /* line-height * font-size */
+  white-space: pre;
+  display: block;
+  position: relative;
+}
+
+/* Cursor - positioned absolutely to not affect text layout */
+.cursor {
+  position: absolute;
+  width: 2px;
+  height: 1em;
+  background: var(--caret-color, #000);
+  top: 0.15em;
+  pointer-events: none;
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Selection highlight */
+.selection {
+  position: absolute;
+  height: 100%;
+  top: 0;
+  background: var(--selection-color, rgba(51, 153, 255, 0.3));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.line-hidden > span { 
+  opacity: 0.35; 
+  filter: grayscale(50%); 
+}
+
+.line-collapsed {
+  display: none;
+}
+
+/* Placeholder */
+.placeholder-layer {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  color: #6a6a6a;
+  pointer-events: none;
+  z-index: 0;
+  white-space: pre;
+}
+
+/* ========== Syntax Highlighting ========== */
+.json-key { color: var(--json-key, #660e7a); }
+.json-string { color: var(--json-string, #008000); }
+.json-number { color: var(--json-number, #00f); }
+.json-boolean, .json-null { color: var(--json-boolean, #000080); }
+.json-punctuation { color: var(--json-punct, #000); }
+.json-key-invalid { color: var(--json-key-invalid, #f00); }
+.json-error { color: var(--json-error, #f00); }
+
+.geojson-key { color: var(--geojson-key, #660e7a); font-weight: 600; }
+.geojson-type { color: var(--geojson-type, #008000); font-weight: 600; }
+.geojson-type-invalid { color: var(--geojson-type-invalid, #f00); font-weight: 600; }
+
+/* Hidden marker - invisible but present for data */
+.d-none { display: none; }
+
+/* Collapsed node styling */
+.collapsed-bracket-array,
+.collapsed-bracket-object {
+  color: var(--json-punct, #000);
+}
+.collapsed-bracket-array::after,
+.collapsed-bracket-object::after {
+  content: '…';
+  color: var(--json-punct, #888);
+}
+.collapsed-content { display: none; }
+
+/* ========== Prefix/Suffix ========== */
+.prefix-wrapper, .suffix-wrapper {
+  display: flex;
+  flex-shrink: 0;
+  background: var(--bg-color, #fff);
+}
+
+.prefix-gutter, .suffix-gutter {
+  width: 50px;
+  background: var(--gutter-bg, #f0f0f0);
+  border-right: 1px solid var(--gutter-border, #e0e0e0);
+  flex-shrink: 0;
+}
+
+.editor-prefix, .editor-suffix {
+  flex: 1;
+  padding: 4px 12px;
+  color: var(--text-color, #000);
+  background: var(--bg-color, #fff);
+  user-select: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  opacity: 0.6;
+}
+
+.prefix-wrapper { border-bottom: 1px solid rgba(255,255,255,0.1); }
+.suffix-wrapper { border-top: 1px solid rgba(255,255,255,0.1); position: relative; }
+
+.clear-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-color, #000);
+  opacity: 0.3;
+  cursor: pointer;
+  font-size: 0.65rem;
+  width: 1rem;
+  height: 1rem;
+  padding: 0.15rem 0 0 0;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s, background 0.2s;
+}
+.clear-btn:hover { opacity: 0.7; background: rgba(255,255,255,0.1); }
+.clear-btn[hidden] { display: none; }
+
+/* ========== Scrollbar ========== */
+.viewport::-webkit-scrollbar { width: 10px; height: 10px; }
+.viewport::-webkit-scrollbar-track { background: var(--control-bg, #e8e8e8); }
+.viewport::-webkit-scrollbar-thumb { background: var(--control-border, #c0c0c0); border-radius: 5px; }
+.viewport::-webkit-scrollbar-thumb:hover { background: var(--control-color, #000080); }
+.viewport { scrollbar-width: thin; scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8); }
+
+/* ========== Selection highlight ========== */
+.line .selected {
+  background: rgba(51, 153, 255, 0.3);
+}
+
+/* ========== Inline Controls (using ::before pseudo-elements) ========== */
+
+/* Color swatch before hex values - positioned outside the span with negative left */
+.json-color {
+  position: relative;
+  /* No padding - pseudo-element is positioned outside */
+}
+.json-color::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: -1px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--swatch-color);
+  border: 1px solid var(--json-punct, #a9b7c6);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.json-color:hover::before {
+  transform: translateY(-50%) scale(1.2);
+  border-color: var(--control-color, #000080);
+}
+
+/* Boolean checkbox using ::before - positioned outside the span with negative left */
+.json-boolean {
+  position: relative;
+  /* No padding - pseudo-element is positioned outside */
+}
+.json-boolean::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: -1px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--control-border, #c0c0c0);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+.json-bool-true::before {
+  content: '✔';
+  border-color: var(--control-color, #000080);
+  color: var(--control-color, #000080);
+  font-size: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 8px;
+}
+.json-boolean:hover::before {
+  transform: translateY(-50%) scale(1.2);
+  border-color: var(--control-color, #000080);
+}
+
+/* Feature visibility using ::before on the line (placed in indentation space) */
+.line.has-visibility {
+  position: relative;
+}
+.line.has-visibility::before {
+  content: '👁';
+  position: absolute;
+  left: 0;
+  top: 3px;
+  font-size: 10px;
+  color: var(--control-color, #000080);
+  opacity: 0.6;
+  cursor: pointer;
+  z-index: 1;
+}
+.line.has-visibility:hover::before {
+  opacity: 1;
+  transform: scale(1.15);
+}
+.line.has-visibility.feature-hidden::before {
+  opacity: 0.5;
+}

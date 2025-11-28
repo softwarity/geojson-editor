@@ -160,7 +160,6 @@ editor.addEventListener('error', (e) => {
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
-| `default-properties` | `string` | `""` | Default properties to add to features (see [Default Properties](#default-properties)) |
 
 **Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. All nodes can be manually expanded/collapsed by clicking the toggle button.
 
@@ -174,66 +173,6 @@ The `dark-selector` attribute determines when the dark theme is active. If the s
 - `html.dark` - HTML element has `dark` class (Tailwind CSS): `<html class="dark">`
 - `html[data-bs-theme=dark]` - HTML has Bootstrap theme attribute: `<html data-bs-theme="dark">`
 - Empty string `""` - Uses component's `data-color-scheme` attribute as fallback
-
-### Default Properties
-
-The `default-properties` attribute allows you to define default properties that will be automatically added to features. This is useful for setting visualization attributes (fill color, stroke color, opacity, etc.) that your mapping framework can use for styling.
-
-**Behavior:**
-- Default properties are **injected directly into the editor content** when features are added (via API or paste/typing)
-- Properties are only added if not already defined on the feature (existing properties are never overwritten)
-- Users can see and modify the default values in the editor
-
-#### Simple Format (all features)
-
-Apply the same default properties to all features:
-
-```html
-<geojson-editor default-properties='{"fill-color": "#1a465b", "stroke-color": "#000", "stroke-width": 2}'></geojson-editor>
-```
-
-#### Conditional Format (based on geometry type or properties)
-
-Apply different default properties based on conditions using an array of rules. Conditions support dot notation for nested properties:
-
-```html
-<geojson-editor default-properties='[
-  {"match": {"geometry.type": "Polygon"}, "values": {"fill-color": "#1a465b", "fill-opacity": 0.5}},
-  {"match": {"geometry.type": "LineString"}, "values": {"stroke-color": "#ff0000", "stroke-width": 3}},
-  {"match": {"geometry.type": "Point"}, "values": {"marker-color": "#00ff00"}}
-]'></geojson-editor>
-```
-
-#### Conditional on Feature Properties
-
-You can also match on existing feature properties:
-
-```html
-<geojson-editor default-properties='[
-  {"match": {"properties.type": "airport"}, "values": {"marker-symbol": "airport", "marker-color": "#0000ff"}},
-  {"match": {"properties.category": "water"}, "values": {"fill-color": "#0066cc"}},
-  {"values": {"stroke-width": 1}}
-]'></geojson-editor>
-```
-
-#### Combined: Conditionals with Fallback
-
-Rules without a `match` condition apply to all features (use as fallback). All matching rules are applied, with later rules taking precedence for the same property:
-
-```html
-<geojson-editor default-properties='[
-  {"values": {"stroke-width": 1, "stroke-color": "#333"}},
-  {"match": {"geometry.type": "Polygon"}, "values": {"fill-color": "#1a465b", "fill-opacity": 0.3}},
-  {"match": {"properties.highlighted": true}, "values": {"stroke-color": "#ff0000", "stroke-width": 3}}
-]'></geojson-editor>
-```
-
-In this example:
-- All features get `stroke-width: 1` and `stroke-color: "#333"` by default
-- Polygons additionally get fill styling
-- Features with `properties.highlighted: true` override the stroke styling
-
-**Use Case:** This feature is designed to work seamlessly with mapping libraries like Mapbox GL, Leaflet, OpenLayers, etc. You can define default visualization properties that your layer styling can reference, without manually editing each feature.
 
 ## API Methods
 

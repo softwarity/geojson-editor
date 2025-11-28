@@ -223,9 +223,45 @@
     }
 
     .editor-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin: 0 0 0.5rem 0;
       color: var(--text-primary);
       font-weight: 600;
+    }
+
+    .editor-label .editor-actions {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .editor-label .editor-actions .editor-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+      font-weight: normal;
+      cursor: pointer;
+    }
+
+    .editor-label .editor-actions button {
+      padding: 0.2rem 0.4rem;
+      font-size: 0.9rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+
+    .editor-label .editor-actions button:hover {
+      background: var(--accent-color);
+      color: white;
+      border-color: var(--accent-color);
     }
 
     .map-container {
@@ -725,44 +761,24 @@ Example:
 { "type": "Feature", "geometry": {...} }</textarea>
           <small style="color: #666; font-size: 0.85rem;">Shown when editor is empty</small>
         </div>
-        <div style="display: flex; gap: 2rem; flex-wrap: wrap;">
-          <div class="checkbox-group">
-            <input type="checkbox" id="readonlyCheck">
-            <label for="readonlyCheck">Readonly mode</label>
-            <small style="color: #888; font-size: 0.8rem; margin-left: 0.5rem;">— disable editing</small>
-          </div>
-        </div>
         <div class="info-box">
           <strong>Note:</strong> Edit features directly (comma-separated). The component wraps them in a FeatureCollection and emits the complete structure on change events.
         </div>
-      </div>
-
-      <div class="controls-section">
-        <h4>Default Properties</h4>
-        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
-          Define default properties to add to features on <code>change</code> events. Useful for visualization styling (fill-color, stroke-color, etc.) in your mapping framework. Properties are only added if not already defined on the feature.
-        </p>
-        <div class="control-group" style="margin-bottom: 1rem;">
-          <label for="defaultPropsSelect">Preset Examples</label>
-          <select id="defaultPropsSelect">
-            <option value="">None (disabled)</option>
-            <option value="simple">Simple (all features)</option>
-            <option value="geometry">By Geometry Type</option>
-            <option value="combined" selected>Combined (fallback + conditions)</option>
-          </select>
-        </div>
-        <div class="control-group">
-          <label for="defaultPropsInput">Configuration (JSON)</label>
-          <textarea id="defaultPropsInput" rows="6" style="font-size: 0.8rem;"></textarea>
-          <small style="color: #666; font-size: 0.85rem;">Edit the JSON or select a preset above</small>
-        </div>
-        <div id="defaultPropsDescription" class="info-box" style="margin-top: 1rem;"></div>
       </div>
     </div>
 
     <div class="editor-map-row">
       <div class="editor-container">
-        <div class="editor-label">GeoJSON Editor</div>
+        <div class="editor-label">
+          <span>GeoJSON Editor</span>
+          <div class="editor-actions">
+            <label class="editor-checkbox">
+              <input type="checkbox" id="readonlyToggle" onchange="toggleReadonly()">
+              <span>Readonly</span>
+            </label>
+            <button id="resetBtn" onclick="resetEditor()" title="Reset to original sample">↺</button>
+          </div>
+        </div>
         <geojson-editor id="editor"></geojson-editor>
       </div>
       <div class="map-container">
@@ -912,67 +928,9 @@ Example:
     const colorSchemeSelect = document.getElementById('colorSchemeSelect');
     const selectorPreview = document.getElementById('selectorPreview');
     const selectorDescription = document.getElementById('selectorDescription');
-    const readonlyCheck = document.getElementById('readonlyCheck');
     const themeModal = document.getElementById('themeModal');
     const themeTextarea = document.getElementById('themeTextarea');
     const themePresetMainSelect = document.getElementById('themePresetMainSelect');
-    const defaultPropsSelect = document.getElementById('defaultPropsSelect');
-    const defaultPropsInput = document.getElementById('defaultPropsInput');
-    const defaultPropsDescription = document.getElementById('defaultPropsDescription');
-
-    // Default properties presets
-    const defaultPropsPresets = {
-      '': {
-        value: '',
-        description: '<strong>Disabled:</strong> No default properties will be added to features.'
-      },
-      'simple': {
-        value: JSON.stringify({
-          "fill-color": "#1a465b",
-          "fill-opacity": 0.5,
-          "stroke-color": "#0d2633",
-          "stroke-width": 2
-        }, null, 2),
-        description: '<strong>Simple:</strong> Apply the same default styling properties to all features. Great for consistent visualization.'
-      },
-      'geometry': {
-        value: JSON.stringify([
-          { "match": { "geometry.type": "Polygon" }, "values": { "fill-color": "#58a6ff", "fill-opacity": 0.4, "stroke-color": "#58a6ff" } },
-          { "match": { "geometry.type": "LineString" }, "values": { "stroke-color": "#a371f7", "stroke-width": 3 } },
-          { "match": { "geometry.type": "Point" }, "values": { "fill-color": "#f85149", "stroke-color": "#ffffff", "stroke-width": 2 } }
-        ], null, 2),
-        description: '<strong>By Geometry Type:</strong> Apply different styles based on geometry type (Polygon, LineString, Point). Each type gets distinct colors.'
-      },
-      'combined': {
-        value: JSON.stringify([
-          { "values": { "stroke-width": 2, "stroke-color": "#333333" } },
-          { "match": { "geometry.type": "Polygon" }, "values": { "fill-color": "#238636", "fill-opacity": 0.3 } },
-          { "match": { "geometry.type": "Point" }, "values": { "fill-color": "#f85149" } },
-          { "match": { "properties.highlighted": true }, "values": { "stroke-color": "#ff0000", "stroke-width": 4 } }
-        ], null, 2),
-        description: '<strong>Combined:</strong> First rule applies to all features (fallback). Following rules add/override for specific conditions. Try adding <code>"highlighted": true</code> to a feature\'s properties!'
-      }
-    };
-
-    // Handle default properties preset selection
-    defaultPropsSelect.addEventListener('change', (e) => {
-      const preset = defaultPropsPresets[e.target.value];
-      defaultPropsInput.value = preset.value;
-      defaultPropsDescription.innerHTML = preset.description;
-      updateEditor();
-    });
-
-    // Handle manual edit of default properties
-    defaultPropsInput.addEventListener('input', () => {
-      updateEditor();
-    });
-
-    // Initialize default properties UI
-    function initDefaultPropsUI() {
-      const preset = defaultPropsPresets[defaultPropsSelect.value];
-      defaultPropsInput.value = preset.value;
-      defaultPropsDescription.innerHTML = preset.description;
-    }
 
     // Initialize MapLibre map with globe projection
     const map = new maplibregl.Map({
@@ -1652,18 +1610,11 @@ Example:
       editor.setAttribute('placeholder', placeholderInput.value);
       editor.setAttribute('dark-selector', darkSelector);
 
-      if (readonlyCheck.checked) {
+      const readonlyToggle = document.getElementById('readonlyToggle');
+      if (readonlyToggle && readonlyToggle.checked) {
         editor.setAttribute('readonly', '');
       } else {
         editor.removeAttribute('readonly');
-      }
-
-      // Apply default-properties attribute
-      const defaultPropsValue = defaultPropsInput.value.trim();
-      if (defaultPropsValue) {
-        editor.setAttribute('default-properties', defaultPropsValue);
-      } else {
-        editor.removeAttribute('default-properties');
       }
 
       updateHTMLCode();
@@ -1672,10 +1623,10 @@ Example:
     // Update HTML code display
     function updateHTMLCode() {
       const placeholder = placeholderInput.value;
-      const readonly = readonlyCheck.checked;
+      const readonlyToggle = document.getElementById('readonlyToggle');
+      const readonly = readonlyToggle ? readonlyToggle.checked : false;
       const scheme = colorSchemeSelect.value;
       const isDark = scheme === 'dark';
-      const defaultPropsValue = defaultPropsInput.value.trim();
 
       // Parse selector to understand its type
       const selectorTarget = parseSelector(darkSelector);
@@ -1685,16 +1636,6 @@ Example:
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (readonly) attrs.push('readonly');
       if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
-      if (defaultPropsValue) {
-        // Minify the JSON for the HTML output
-        try {
-          const minified = JSON.stringify(JSON.parse(defaultPropsValue));
-          attrs.push(`default-properties='${minified}'`);
-        } catch (e) {
-          // If invalid JSON, use as-is
-          attrs.push(`default-properties='${defaultPropsValue.replace(/'/g, "\\'")}'`);
-        }
-      }
 
       // Build HTML tag attributes based on selector type
       let htmlAttrs = 'lang="en"';
@@ -1771,7 +1712,6 @@ Example:
 
     // Listen to input changes
     placeholderInput.addEventListener('input', updateEditor);
-    readonlyCheck.addEventListener('change', updateEditor);
 
     // Color scheme change - applies to the selector target and updates HTML code
     colorSchemeSelect.addEventListener('change', () => {
@@ -2026,9 +1966,26 @@ editor.setTheme(${themeTextarea.value});`;
       editor.removeAll();
     }
 
+    // Toggle readonly mode
+    function toggleReadonly() {
+      const readonlyToggle = document.getElementById('readonlyToggle');
+      
+      if (readonlyToggle.checked) {
+        editor.setAttribute('readonly', '');
+      } else {
+        editor.removeAttribute('readonly');
+      }
+      
+      updateHTMLCode();
+    }
+
+    // Reset editor to original sample data
+    function resetEditor() {
+      loadSampleData();
+    }
+
     // Load initial sample automatically after component is ready
     customElements.whenDefined('geojson-editor').then(() => {
-      initDefaultPropsUI();
       updateEditor();
       applyColorScheme();
       loadSampleData();
