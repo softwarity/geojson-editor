@@ -350,17 +350,21 @@ class GeoJsonEditor extends HTMLElement {
         const rect = lineEl.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         if (clickX < 14) {
+          // Block render until click is processed to prevent DOM destruction
+          this._blockRender = true;
           return;
         }
       }
-      
+
       // Skip if clicking on an inline control pseudo-element (positioned with negative left)
-      if (e.target.classList.contains('json-color') || 
+      if (e.target.classList.contains('json-color') ||
           e.target.classList.contains('json-boolean')) {
         const rect = e.target.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         // Pseudo-element is at left: -8px, so clickX will be negative when clicking on it
         if (clickX < 0 && clickX >= -8) {
+          // Block render until click is processed to prevent DOM destruction
+          this._blockRender = true;
           return;
         }
       }
@@ -453,8 +457,21 @@ class GeoJsonEditor extends HTMLElement {
       }
     });
 
+    // Composition handling for international keyboards (dead keys)
+    hiddenTextarea.addEventListener('compositionstart', () => {
+      this._isComposing = true;
+    });
+
+    hiddenTextarea.addEventListener('compositionend', () => {
+      this._isComposing = false;
+      // Process the final composed text
+      this.handleInput();
+    });
+
     // Input handling (hidden textarea)
     hiddenTextarea.addEventListener('input', () => {
+      // Skip input during composition (dead keys on international keyboards)
+      if (this._isComposing) return;
       this.handleInput();
     });
 
@@ -756,11 +773,15 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   renderViewport() {
+    // Skip render if blocked (during inline control click to prevent DOM destruction)
+    if (this._blockRender) {
+      return;
+    }
     const viewport = this.shadowRoot.getElementById('viewport');
     const linesContainer = this.shadowRoot.getElementById('linesContainer');
     const scrollContent = this.shadowRoot.getElementById('scrollContent');
     const gutterContent = this.shadowRoot.getElementById('gutterContent');
-    
+
     if (!viewport || !linesContainer) return;
     
     this.viewportHeight = viewport.clientHeight;
@@ -923,7 +944,8 @@ class GeoJsonEditor extends HTMLElement {
     if (!this._charWidth) {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      ctx.font = '13px monospace';
+      // Use exact same font as CSS: 'Courier New', Courier, monospace at 13px
+      ctx.font = "13px 'Courier New', Courier, monospace";
       this._charWidth = ctx.measureText('M').width;
     }
     return this._charWidth;
@@ -1668,8 +1690,11 @@ class GeoJsonEditor extends HTMLElement {
     
     // Handle empty editor case
     if (this.lines.length === 0) {
-      this.lines = [text];
-      this.cursorColumn = text.length;
+      // Split text by newlines to properly handle multi-line paste
+      const textLines = text.split('\n');
+      this.lines = textLines;
+      this.cursorLine = textLines.length - 1;
+      this.cursorColumn = textLines[textLines.length - 1].length;
     } else if (this.cursorLine < this.lines.length) {
       const line = this.lines[this.cursorLine];
       this.lines[this.cursorLine] = line.substring(0, this.cursorColumn) + text + line.substring(this.cursorColumn);
@@ -1682,11 +1707,17 @@ class GeoJsonEditor extends HTMLElement {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
     if (text) {
+      const wasEmpty = this.lines.length === 0;
       this.insertText(text);
-      // Auto-collapse coordinates after pasting new content
-      requestAnimationFrame(() => {
+      // Auto-collapse coordinates after pasting into empty editor
+      if (wasEmpty && this.lines.length > 0) {
+        // Cancel pending render, collapse first, then render once
+        if (this.renderTimer) {
+          cancelAnimationFrame(this.renderTimer);
+          this.renderTimer = null;
+        }
         this.autoCollapseCoordinates();
-      });
+      }
     }
   }
 
@@ -1721,29 +1752,42 @@ class GeoJsonEditor extends HTMLElement {
    */
   _getPositionFromClick(e) {
     const viewport = this.shadowRoot.getElementById('viewport');
+    const linesContainer = this.shadowRoot.getElementById('linesContainer');
     const rect = viewport.getBoundingClientRect();
-    
+
     const paddingTop = 8;
-    const paddingLeft = 12;
-    
+
     const y = e.clientY - rect.top + viewport.scrollTop - paddingTop;
-    const x = e.clientX - rect.left - paddingLeft;
-    
     const visibleLineIndex = Math.floor(y / this.lineHeight);
-    
+
     let line = 0;
     let column = 0;
-    
+
     if (visibleLineIndex >= 0 && visibleLineIndex < this.visibleLines.length) {
       const lineData = this.visibleLines[visibleLineIndex];
       line = lineData.index;
-      
+
+      // Get actual line element to calculate column position accurately
+      const lineEl = linesContainer?.querySelector(`.line[data-line-index="${lineData.index}"]`);
       const charWidth = this._getCharWidth();
-      const rawColumn = Math.round(x / charWidth);
-      const lineLength = lineData.content?.length || 0;
-      column = Math.max(0, Math.min(rawColumn, lineLength));
+
+      if (lineEl) {
+        // Use line element's actual position for accurate column calculation
+        const lineRect = lineEl.getBoundingClientRect();
+        const clickRelativeToLine = e.clientX - lineRect.left;
+        const rawColumn = Math.round(clickRelativeToLine / charWidth);
+        const lineLength = lineData.content?.length || 0;
+        column = Math.max(0, Math.min(rawColumn, lineLength));
+      } else {
+        // Fallback to padding-based calculation if line element not found
+        const paddingLeft = 12;
+        const x = e.clientX - rect.left + viewport.scrollLeft - paddingLeft;
+        const rawColumn = Math.round(x / charWidth);
+        const lineLength = lineData.content?.length || 0;
+        column = Math.max(0, Math.min(rawColumn, lineLength));
+      }
     }
-    
+
     return { line, column };
   }
 
@@ -1766,16 +1810,21 @@ class GeoJsonEditor extends HTMLElement {
   }
   
   handleEditorClick(e) {
+    // Unblock render now that click is being processed
+    this._blockRender = false;
+
     // Line-level visibility button (pseudo-element ::before on .line.has-visibility)
     const lineEl = e.target.closest('.line.has-visibility');
     if (lineEl) {
       const rect = lineEl.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
-      // Pseudo-element is at the start of the line, check first ~14px
       if (clickX < 14) {
         e.preventDefault();
         e.stopPropagation();
-        this.toggleFeatureVisibility(lineEl.dataset.featureKey);
+        const featureKey = lineEl.dataset.featureKey;
+        if (featureKey) {
+          this.toggleFeatureVisibility(featureKey);
+        }
         return;
       }
     }
@@ -1842,27 +1891,28 @@ class GeoJsonEditor extends HTMLElement {
 
   autoCollapseCoordinates() {
     const ranges = this._findCollapsibleRanges();
-    
+
     for (const range of ranges) {
       if (range.nodeKey === 'coordinates') {
         this.collapsedNodes.add(range.nodeId);
       }
     }
-    
-    // Use updateView since nodeIds were just assigned by updateModel/setValue
-    this.updateView();
+
+    // Rebuild everything to ensure consistent state after collapse changes
+    // This is especially important after paste into empty editor
+    this.updateModel();
     this.scheduleRender();
   }
 
   // ========== Feature Visibility ==========
-  
+
   toggleFeatureVisibility(featureKey) {
     if (this.hiddenFeatures.has(featureKey)) {
       this.hiddenFeatures.delete(featureKey);
     } else {
       this.hiddenFeatures.add(featureKey);
     }
-    
+
     // Use updateView - content didn't change, just visibility
     this.updateView();
     this.scheduleRender();
@@ -2292,64 +2342,69 @@ class GeoJsonEditor extends HTMLElement {
     });
     
     // Type values - "type": "Value" - but NOT inside properties context
+    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
     if (context !== 'properties') {
       result = result.replace(
-        /<span class="geojson-key">"type"<\/span><span class="json-punctuation">:<\/span>\s*"([^"]*)"/g, 
-        (match, type) => {
+        /<span class="geojson-key">"type"<\/span><span class="json-punctuation">:<\/span>(\s*)"([^"]*)"/g,
+        (match, space, type) => {
           const isValid = type === 'Feature' || type === 'FeatureCollection' || GEOMETRY_TYPES.includes(type);
           const cls = isValid ? 'geojson-type' : 'geojson-type-invalid';
-          return `<span class="geojson-key">"type"</span><span class="json-punctuation">:</span> <span class="${cls}">"${type}"</span>`;
+          return `<span class="geojson-key">"type"</span><span class="json-punctuation">:</span>${space}<span class="${cls}">"${type}"</span>`;
         }
       );
     }
-    
+
     // String values (not already wrapped in spans)
+    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
     result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)\s*"([^"]*)"/g, 
-      (match, colon, val) => {
+      /(<span class="json-punctuation">:<\/span>)(\s*)"([^"]*)"/g,
+      (match, colon, space, val) => {
         // Don't double-wrap if already has a span after colon
         if (match.includes('geojson-type') || match.includes('json-string')) return match;
-        
+
         // Check if it's a color value (hex) - use ::before for swatch via CSS class
         if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(val)) {
-          return `${colon} <span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
+          return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
         }
-        
-        return `${colon} <span class="json-string">"${val}"</span>`;
+
+        return `${colon}${space}<span class="json-string">"${val}"</span>`;
       }
     );
-    
+
     // Numbers after colon
+    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
     result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi, 
-      '$1 <span class="json-number">$2</span>'
+      /(<span class="json-punctuation">:<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi,
+      '$1$2<span class="json-number">$3</span>'
     );
-    
+
     // Numbers in arrays (after [ or ,)
     result = result.replace(
-      /(<span class="json-punctuation">[\[,]<\/span>)\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi, 
-      '$1<span class="json-number">$2</span>'
+      /(<span class="json-punctuation">[\[,]<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi,
+      '$1$2<span class="json-number">$3</span>'
     );
-    
+
     // Standalone numbers at start of line (coordinates arrays)
     result = result.replace(
       /^(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gim,
       '$1<span class="json-number">$2</span>'
     );
-    
+
     // Booleans - use ::before for checkbox via CSS class
+    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
     result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)\s*(true|false)/g, 
-      (match, colon, val) => {
+      /(<span class="json-punctuation">:<\/span>)(\s*)(true|false)/g,
+      (match, colon, space, val) => {
         const checkedClass = val === 'true' ? ' json-bool-true' : ' json-bool-false';
-        return `${colon} <span class="json-boolean${checkedClass}">${val}</span>`;
+        return `${colon}${space}<span class="json-boolean${checkedClass}">${val}</span>`;
       }
     );
-    
+
     // Null
+    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
     result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)\s*(null)/g, 
-      '$1 <span class="json-null">$2</span>'
+      /(<span class="json-punctuation">:<\/span>)(\s*)(null)/g,
+      '$1$2<span class="json-null">$3</span>'
     );
     
     // Collapsed bracket indicator - just add the class, CSS ::after adds the "...]" or "...}"

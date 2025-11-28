@@ -273,3 +273,291 @@ describe('GeoJsonEditor - Format and Update', () => {
     expect(el.cursorColumn).to.be.at.least(0);
   });
 });
+
+describe('GeoJsonEditor - Invalid JSON Handling', () => {
+
+  // Helper to suppress error events during test (prevents test framework from catching them)
+  const suppressErrors = (el) => {
+    el.addEventListener('error', (e) => {
+      e.stopPropagation();
+    });
+  };
+
+  it('should allow editing after pasting invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Paste invalid JSON (missing closing brace)
+    const invalidJson = '{"type": "Feature", "geometry": null';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Editor should have content
+    expect(el.lines.length).to.be.greaterThan(0);
+
+    // Should be able to move cursor
+    el.cursorLine = 0;
+    el.cursorColumn = 5;
+    el.moveCursorHorizontal(1);
+
+    expect(el.cursorColumn).to.equal(6);
+  });
+
+  it('should not block cursor movement with invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Paste invalid JSON
+    const invalidJson = '{"type": "Feature"';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Set cursor position
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    // Move right should work
+    el.moveCursorHorizontal(1);
+    expect(el.cursorColumn).to.equal(1);
+
+    // Move right again
+    el.moveCursorHorizontal(1);
+    expect(el.cursorColumn).to.equal(2);
+  });
+
+  it('should not have collapsed nodes for invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Paste invalid JSON
+    const invalidJson = '{"type": "Feature", "geometry": {';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Should not have any collapsed nodes since JSON is invalid
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should allow text insertion with invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Paste invalid JSON
+    const invalidJson = '{"type": "Feature"';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    const initialContent = el.getContent();
+
+    // Set cursor at end
+    el.cursorLine = 0;
+    el.cursorColumn = el.lines[0].length;
+
+    // Insert more text
+    el.insertText('}');
+    await waitFor(200);
+
+    // Content should have changed
+    expect(el.getContent()).to.not.equal(initialContent);
+  });
+
+  it('should handle multi-line invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Paste multi-line invalid JSON
+    // Note: When pasting into empty editor, invalid JSON stays on single line
+    // because formatAndUpdate can't parse it to split into multiple lines
+    const invalidJson = `{
+  "type": "Feature",
+  "geometry": {
+    "type": "Point"`;
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Editor should have content (may be single line for invalid JSON)
+    expect(el.lines.length).to.be.greaterThan(0);
+    expect(el.getContent()).to.include('Feature');
+
+    // Should be able to move cursor within the line
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+    el.moveCursorHorizontal(1);
+
+    expect(el.cursorColumn).to.equal(1);
+  });
+
+  it('should not block input handler with invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await focusEditor(el);
+    await waitFor();
+
+    // Paste invalid JSON
+    const invalidJson = '{"broken": ';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Cursor at end of line
+    el.cursorLine = 0;
+    el.cursorColumn = el.lines[0].length;
+
+    // Simulate typing more characters
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.value = '"value"';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await waitFor(200);
+
+    // Content should have the new text
+    expect(el.getContent()).to.include('value');
+  });
+
+  it('should emit error event for invalid JSON', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    let errorEvent = null;
+    el.addEventListener('error', (e) => {
+      e.stopPropagation();
+      errorEvent = e;
+    });
+
+    // Paste invalid JSON
+    const invalidJson = '{"type": "Feature"';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    expect(errorEvent).to.exist;
+    expect(errorEvent.detail.error).to.be.a('string');
+  });
+
+  it('should allow editing with malformed JSON that has unmatched braces', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // This specific invalid JSON was reported to block all editing
+    const invalidJson = `{ "type"
+  {
+    "type": "MultiPoint",
+    "coordinates": [
+      [15.407, 46.665],
+      [14.900, 46.206],
+      [14.905, 46.296],
+      [15.386, 46.183]
+    ]`;
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Editor should have multiple lines (properly split)
+    expect(el.lines.length).to.equal(9);
+
+    // Set cursor to a valid position
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    // Should be able to move cursor right
+    el.moveCursorHorizontal(1);
+    expect(el.cursorColumn).to.equal(1);
+
+    // Should be able to type characters
+    const initialContent = el.getContent();
+    el.cursorColumn = el.lines[0].length;
+    el.insertText('x');
+    await waitFor(200);
+    expect(el.getContent()).to.not.equal(initialContent);
+  });
+
+  it('should allow editing after paste with autoCollapseCoordinates on invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Simulate what handlePaste does for empty editor
+    const invalidJson = `{ "type"
+  {
+    "type": "MultiPoint",
+    "coordinates": [
+      [15.407, 46.665],
+      [14.900, 46.206],
+      [14.905, 46.296],
+      [15.386, 46.183]
+    ]`;
+
+    const wasEmpty = el.lines.length === 0;
+    el.insertText(invalidJson);
+
+    // Simulate autoCollapseCoordinates like handlePaste does
+    if (wasEmpty && el.lines.length > 0) {
+      if (el.renderTimer) {
+        cancelAnimationFrame(el.renderTimer);
+        el.renderTimer = null;
+      }
+      el.autoCollapseCoordinates();
+    }
+    await waitFor(200);
+
+    // Should have 9 lines
+    expect(el.lines.length).to.equal(9);
+
+    // Coordinates should be collapsed
+    expect(el.collapsedNodes.size).to.equal(1);
+
+    // Should still be able to move cursor on line 0
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+    el.moveCursorHorizontal(1);
+    expect(el.cursorColumn).to.equal(1);
+
+    // Should be able to navigate to other visible lines
+    el.cursorLine = 1;
+    el.cursorColumn = 0;
+    el.moveCursorHorizontal(1);
+    expect(el.cursorColumn).to.equal(1);
+  });
+
+  it('should insert newline at correct cursor position with single-line invalid JSON', async () => {
+    const el = await createSizedFixture();
+    suppressErrors(el);
+    await waitFor();
+
+    // Single line invalid JSON (incomplete)
+    const invalidJson = '{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[15.40709171,46.66454198],[14.89978682,46.20643583]]},"properties":{"numPoints":2}';
+    el.insertText(invalidJson);
+    await waitFor(200);
+
+    // Should be on a single line (invalid JSON doesn't get formatted)
+    expect(el.lines.length).to.equal(1);
+    expect(el.lines[0]).to.equal(invalidJson);
+
+    // Position cursor after "geometry":{
+    // Find position of "geometry":{ in the string
+    const geomPos = invalidJson.indexOf('"geometry":{');
+    const cursorPos = geomPos + '"geometry":{'.length;
+
+    el.cursorLine = 0;
+    el.cursorColumn = cursorPos;
+
+    // Insert newline
+    el.insertNewline();
+    await waitFor(200);
+
+    // Should now have 2 lines
+    expect(el.lines.length).to.equal(2);
+
+    // First line should be everything before cursor
+    expect(el.lines[0]).to.equal(invalidJson.substring(0, cursorPos));
+
+    // Second line should be everything after cursor
+    expect(el.lines[1]).to.equal(invalidJson.substring(cursorPos));
+
+    // Cursor should be at start of new line
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(0);
+  });
+});

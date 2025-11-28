@@ -355,14 +355,69 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     // Get the first feature key from featureRanges
     const keys = Array.from(el.featureRanges.keys());
     expect(keys.length).to.be.greaterThan(0);
-    
+
     const featureKey = keys[0];
-    
+
     // Toggle visibility
     el.toggleFeatureVisibility(featureKey);
     await waitFor(200);
-    
+
     // Check the feature is marked as hidden
+    expect(el.hiddenFeatures.has(featureKey)).to.be.true;
+  });
+
+  it('should toggle visibility on first click after paste into empty editor', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Simulate empty editor state
+    expect(el.lines.length).to.equal(0);
+
+    // Simulate paste by directly calling insertText (like handlePaste does)
+    const geojsonText = JSON.stringify(validPoint, null, 2);
+    el.insertText(geojsonText);
+
+    // Simulate autoCollapseCoordinates (called by handlePaste for empty editor)
+    if (el.renderTimer) {
+      cancelAnimationFrame(el.renderTimer);
+      el.renderTimer = null;
+    }
+    el.autoCollapseCoordinates();
+    await waitFor(200);
+
+    // Verify features are rendered with visibility button
+    const visibilityLines = el.shadowRoot.querySelectorAll('.line.has-visibility');
+    expect(visibilityLines.length).to.be.greaterThan(0);
+
+    const firstVisibilityLine = visibilityLines[0];
+    const featureKey = firstVisibilityLine.dataset.featureKey;
+    expect(featureKey).to.exist;
+
+    // Simulate mousedown on visibility button area (clickX < 14)
+    const rect = firstVisibilityLine.getBoundingClientRect();
+    const mousedownEvent = new MouseEvent('mousedown', {
+      bubbles: true,
+      clientX: rect.left + 5,
+      clientY: rect.top + 5
+    });
+    firstVisibilityLine.dispatchEvent(mousedownEvent);
+
+    // Verify render is blocked
+    expect(el._blockRender).to.be.true;
+
+    // Simulate click on visibility button area
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      clientX: rect.left + 5,
+      clientY: rect.top + 5
+    });
+    firstVisibilityLine.dispatchEvent(clickEvent);
+    await waitFor(100);
+
+    // Verify render is unblocked
+    expect(el._blockRender).to.be.false;
+
+    // Verify visibility was toggled on first click
     expect(el.hiddenFeatures.has(featureKey)).to.be.true;
   });
 });
