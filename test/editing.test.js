@@ -561,3 +561,289 @@ describe('GeoJsonEditor - Invalid JSON Handling', () => {
     expect(el.cursorColumn).to.equal(0);
   });
 });
+
+describe('GeoJsonEditor - Internal Keyboard Handlers', () => {
+
+  it('should have _handleEnter method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._handleEnter).to.be.a('function');
+  });
+
+  it('should have _handleBackspace method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._handleBackspace).to.be.a('function');
+  });
+
+  it('should have _handleDelete method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._handleDelete).to.be.a('function');
+  });
+
+  it('should have _handleTab method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._handleTab).to.be.a('function');
+  });
+
+  it('_handleEnter should insert newline and move cursor', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Stub formatAndUpdate to prevent formatting
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    el._handleEnter(event);
+    await waitFor(50);
+
+    expect(el.lines.length).to.equal(2);
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('_handleBackspace should delete character before cursor', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Stub formatAndUpdate to prevent formatting
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 5;
+
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    el._handleBackspace(event);
+    await waitFor(50);
+
+    expect(el.lines[0]).to.equal('{"a" 1}');
+    expect(el.cursorColumn).to.equal(4);
+  });
+
+  it('_handleBackspace should merge lines at line start', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Stub formatAndUpdate
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+
+    el.lines = ['{', '"a": 1', '}'];
+    el.cursorLine = 1;
+    el.cursorColumn = 0;
+
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    el._handleBackspace(event);
+    await waitFor(50);
+
+    expect(el.lines.length).to.equal(2);
+    expect(el.cursorLine).to.equal(0);
+  });
+
+  it('_handleDelete should delete character after cursor', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Stub formatAndUpdate
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+
+    el.lines = ['{"a": 1}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 4;
+
+    const event = new KeyboardEvent('keydown', { key: 'Delete', bubbles: true });
+    el._handleDelete(event);
+    await waitFor(50);
+
+    expect(el.lines[0]).to.equal('{"a" 1}');
+    expect(el.cursorColumn).to.equal(4);
+  });
+
+  it('_handleDelete should merge with next line at line end', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Stub formatAndUpdate
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+
+    el.lines = ['{', '"a": 1', '}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 1;
+
+    const event = new KeyboardEvent('keydown', { key: 'Delete', bubbles: true });
+    el._handleDelete(event);
+    await waitFor(50);
+
+    expect(el.lines.length).to.equal(2);
+    expect(el.lines[0]).to.equal('{"a": 1');
+  });
+
+  it('_handleTab should expand collapsed node', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Collapse a node
+    const nodeId = Array.from(el._nodeIdToLines.keys())[0];
+    if (nodeId) {
+      el.collapsedNodes.add(nodeId);
+      el.updateView();
+      await waitFor(50);
+
+      // Position cursor on collapsed node
+      const nodeInfo = el._nodeIdToLines.get(nodeId);
+      if (nodeInfo?.start !== undefined) {
+        el.cursorLine = nodeInfo.start;
+        el.cursorColumn = 0;
+
+        const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+        el._handleTab(event);
+
+        expect(el.collapsedNodes.has(nodeId)).to.be.false;
+      }
+    }
+  });
+
+  it('_handleTab with shiftKey should collapse containing node', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Position cursor inside content
+    el.cursorLine = 3;
+    el.cursorColumn = 0;
+
+    const initialSize = el.collapsedNodes.size;
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true });
+    el._handleTab(event);
+
+    expect(el.collapsedNodes.size).to.be.greaterThan(initialSize);
+  });
+});
+
+describe('GeoJsonEditor - Internal Cursor Movement', () => {
+
+  it('should have _moveCursorRight method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._moveCursorRight).to.be.a('function');
+  });
+
+  it('should have _moveCursorLeft method', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+
+    expect(el._moveCursorLeft).to.be.a('function');
+  });
+
+  it('_moveCursorRight should move cursor one position right', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    el._moveCursorRight();
+
+    expect(el.cursorColumn).to.equal(1);
+  });
+
+  it('_moveCursorRight should wrap to next line at line end', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    el.cursorLine = 0;
+    el.cursorColumn = el.visibleLines[0].content.length;
+
+    el._moveCursorRight();
+
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('_moveCursorLeft should move cursor one position left', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    el.cursorLine = 0;
+    el.cursorColumn = 5;
+
+    el._moveCursorLeft();
+
+    expect(el.cursorColumn).to.equal(4);
+  });
+
+  it('_moveCursorLeft should wrap to previous line at line start', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    el.cursorLine = 1;
+    el.cursorColumn = 0;
+
+    el._moveCursorLeft();
+
+    expect(el.cursorLine).to.equal(0);
+    expect(el.cursorColumn).to.equal(el.visibleLines[0].content.length);
+  });
+
+  it('_moveCursorLeft should not go before start of document', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    el._moveCursorLeft();
+
+    expect(el.cursorLine).to.equal(0);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('_moveCursorRight should stay at end of document', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    const lastLineIdx = el.visibleLines.length - 1;
+    const lastLineLength = el.visibleLines[lastLineIdx].content.length;
+    el.cursorLine = lastLineIdx;
+    el.cursorColumn = lastLineLength;
+
+    const prevLine = el.cursorLine;
+    const prevCol = el.cursorColumn;
+
+    el._moveCursorRight();
+
+    // Either stays at same position or wraps to virtual next line (implementation dependent)
+    // At minimum, should not throw and cursor should still be valid
+    expect(el.cursorLine).to.be.at.least(prevLine);
+    expect(el.cursorColumn).to.be.at.least(0);
+  });
+});

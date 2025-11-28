@@ -8,6 +8,29 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
 const GEOJSON_KEYS = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
 const GEOMETRY_TYPES = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
 
+// Pre-compiled regex patterns for performance (avoid re-creation on each call)
+const RE_CONTEXT_GEOMETRY = /"geometry"\s*:/;
+const RE_CONTEXT_PROPERTIES = /"properties"\s*:/;
+const RE_CONTEXT_FEATURES = /"features"\s*:/;
+const RE_COLLAPSED_BRACKET = /^(\s*"[^"]+"\s*:\s*)([{\[])/;
+const RE_COLLAPSED_ROOT = /^(\s*)([{\[]),?\s*$/;
+const RE_ESCAPE_AMP = /&/g;
+const RE_ESCAPE_LT = /</g;
+const RE_ESCAPE_GT = />/g;
+const RE_PUNCTUATION = /([{}[\],:])/g;
+const RE_JSON_KEYS = /"([^"]+)"(<span class="json-punctuation">:<\/span>)/g;
+const RE_TYPE_VALUES = /<span class="geojson-key">"type"<\/span><span class="json-punctuation">:<\/span>(\s*)"([^"]*)"/g;
+const RE_STRING_VALUES = /(<span class="json-punctuation">:<\/span>)(\s*)"([^"]*)"/g;
+const RE_COLOR_HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const RE_NUMBERS_COLON = /(<span class="json-punctuation">:<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi;
+const RE_NUMBERS_ARRAY = /(<span class="json-punctuation">[\[,]<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi;
+const RE_NUMBERS_START = /^(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gim;
+const RE_BOOLEANS = /(<span class="json-punctuation">:<\/span>)(\s*)(true|false)/g;
+const RE_NULL = /(<span class="json-punctuation">:<\/span>)(\s*)(null)/g;
+const RE_UNRECOGNIZED = /(<\/span>|^)([^<]+)(<span|$)/g;
+const RE_WHITESPACE_ONLY = /^\s*$/;
+const RE_WHITESPACE_SPLIT = /(\s+)/;
+
 /**
  * GeoJSON Editor Web Component
  * Monaco-like architecture with virtualized line rendering
@@ -581,9 +604,12 @@ class GeoJsonEditor extends HTMLElement {
    * Rebuilds line-to-nodeId mapping while preserving collapsed state
    */
   updateModel() {
+    // Invalidate context map cache since content changed
+    this._contextMapCache = null;
+
     // Rebuild lineToNodeId mapping (may shift due to edits)
     this._rebuildNodeIdMappings();
-    
+
     this.computeFeatureRanges();
     this.computeLineMetadata();
     this.computeVisibleLines();
@@ -2233,178 +2259,164 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   _buildContextMap() {
+    // Memoization: return cached result if content hasn't changed
+    const linesLength = this.lines.length;
+    if (this._contextMapCache &&
+        this._contextMapLinesLength === linesLength &&
+        this._contextMapFirstLine === this.lines[0] &&
+        this._contextMapLastLine === this.lines[linesLength - 1]) {
+      return this._contextMapCache;
+    }
+
     const contextMap = new Map();
     const contextStack = [];
     let pendingContext = null;
-    
-    for (let i = 0; i < this.lines.length; i++) {
+
+    for (let i = 0; i < linesLength; i++) {
       const line = this.lines[i];
       const currentContext = contextStack[contextStack.length - 1]?.context || 'Feature';
       contextMap.set(i, currentContext);
-      
+
       // Check for context-changing keys
-      if (/"geometry"\s*:/.test(line)) pendingContext = 'geometry';
-      else if (/"properties"\s*:/.test(line)) pendingContext = 'properties';
-      else if (/"features"\s*:/.test(line)) pendingContext = 'Feature';
-      
+      if (RE_CONTEXT_GEOMETRY.test(line)) pendingContext = 'geometry';
+      else if (RE_CONTEXT_PROPERTIES.test(line)) pendingContext = 'properties';
+      else if (RE_CONTEXT_FEATURES.test(line)) pendingContext = 'Feature';
+
       // Track brackets
       const openBraces = (line.match(/\{/g) || []).length;
       const closeBraces = (line.match(/\}/g) || []).length;
       const openBrackets = (line.match(/\[/g) || []).length;
       const closeBrackets = (line.match(/\]/g) || []).length;
-      
+
       for (let j = 0; j < openBraces + openBrackets; j++) {
         contextStack.push({ context: pendingContext || currentContext, isArray: j >= openBraces });
         pendingContext = null;
       }
-      
+
       for (let j = 0; j < closeBraces + closeBrackets && contextStack.length > 0; j++) {
         contextStack.pop();
       }
     }
-    
+
+    // Cache the result
+    this._contextMapCache = contextMap;
+    this._contextMapLinesLength = linesLength;
+    this._contextMapFirstLine = this.lines[0];
+    this._contextMapLastLine = this.lines[linesLength - 1];
+
     return contextMap;
   }
 
   _highlightSyntax(text, context, meta) {
     if (!text) return '';
-    
+
     // For collapsed nodes, truncate the text at the opening bracket
     let displayText = text;
     let collapsedBracket = null;
-    
+
     if (meta?.collapseButton?.isCollapsed) {
       // Match "key": { or "key": [
-      const bracketMatch = text.match(/^(\s*"[^"]+"\s*:\s*)([{\[])/);
+      const bracketMatch = text.match(RE_COLLAPSED_BRACKET);
       // Also match standalone { or [ (root Feature objects)
-      const rootMatch = !bracketMatch && text.match(/^(\s*)([{\[]),?\s*$/);
-      
+      const rootMatch = !bracketMatch && text.match(RE_COLLAPSED_ROOT);
+
       if (bracketMatch) {
-        // Keep only the part up to and including the opening bracket
         displayText = bracketMatch[1] + bracketMatch[2];
         collapsedBracket = bracketMatch[2];
       } else if (rootMatch) {
-        // Root object - just keep the bracket
         displayText = rootMatch[1] + rootMatch[2];
         collapsedBracket = rootMatch[2];
       }
     }
-    
+
     // Escape HTML first
     let result = displayText
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
-    
+      .replace(RE_ESCAPE_AMP, '&amp;')
+      .replace(RE_ESCAPE_LT, '&lt;')
+      .replace(RE_ESCAPE_GT, '&gt;');
+
     // Punctuation FIRST (before other replacements can interfere)
-    result = result.replace(/([{}[\],:])/g, '<span class="json-punctuation">$1</span>');
-    
+    result = result.replace(RE_PUNCTUATION, '<span class="json-punctuation">$1</span>');
+
     // JSON keys - match "key" followed by :
     // In properties context, all keys are treated as regular JSON keys
-    result = result.replace(/"([^"]+)"(<span class="json-punctuation">:<\/span>)/g, (match, key, colon) => {
+    RE_JSON_KEYS.lastIndex = 0;
+    result = result.replace(RE_JSON_KEYS, (match, key, colon) => {
       if (context !== 'properties' && GEOJSON_KEYS.includes(key)) {
         return `<span class="geojson-key">"${key}"</span>${colon}`;
       }
       return `<span class="json-key">"${key}"</span>${colon}`;
     });
-    
+
     // Type values - "type": "Value" - but NOT inside properties context
-    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
     if (context !== 'properties') {
-      result = result.replace(
-        /<span class="geojson-key">"type"<\/span><span class="json-punctuation">:<\/span>(\s*)"([^"]*)"/g,
-        (match, space, type) => {
-          const isValid = type === 'Feature' || type === 'FeatureCollection' || GEOMETRY_TYPES.includes(type);
-          const cls = isValid ? 'geojson-type' : 'geojson-type-invalid';
-          return `<span class="geojson-key">"type"</span><span class="json-punctuation">:</span>${space}<span class="${cls}">"${type}"</span>`;
-        }
-      );
+      RE_TYPE_VALUES.lastIndex = 0;
+      result = result.replace(RE_TYPE_VALUES, (match, space, type) => {
+        const isValid = type === 'Feature' || type === 'FeatureCollection' || GEOMETRY_TYPES.includes(type);
+        const cls = isValid ? 'geojson-type' : 'geojson-type-invalid';
+        return `<span class="geojson-key">"type"</span><span class="json-punctuation">:</span>${space}<span class="${cls}">"${type}"</span>`;
+      });
     }
 
     // String values (not already wrapped in spans)
-    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
-    result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)(\s*)"([^"]*)"/g,
-      (match, colon, space, val) => {
-        // Don't double-wrap if already has a span after colon
-        if (match.includes('geojson-type') || match.includes('json-string')) return match;
-
-        // Check if it's a color value (hex) - use ::before for swatch via CSS class
-        if (/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(val)) {
-          return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
-        }
-
-        return `${colon}${space}<span class="json-string">"${val}"</span>`;
+    RE_STRING_VALUES.lastIndex = 0;
+    result = result.replace(RE_STRING_VALUES, (match, colon, space, val) => {
+      if (match.includes('geojson-type') || match.includes('json-string')) return match;
+      if (RE_COLOR_HEX.test(val)) {
+        return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
       }
-    );
+      return `${colon}${space}<span class="json-string">"${val}"</span>`;
+    });
 
     // Numbers after colon
-    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
-    result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi,
-      '$1$2<span class="json-number">$3</span>'
-    );
+    RE_NUMBERS_COLON.lastIndex = 0;
+    result = result.replace(RE_NUMBERS_COLON, '$1$2<span class="json-number">$3</span>');
 
     // Numbers in arrays (after [ or ,)
-    result = result.replace(
-      /(<span class="json-punctuation">[\[,]<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi,
-      '$1$2<span class="json-number">$3</span>'
-    );
+    RE_NUMBERS_ARRAY.lastIndex = 0;
+    result = result.replace(RE_NUMBERS_ARRAY, '$1$2<span class="json-number">$3</span>');
 
     // Standalone numbers at start of line (coordinates arrays)
-    result = result.replace(
-      /^(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gim,
-      '$1<span class="json-number">$2</span>'
-    );
+    RE_NUMBERS_START.lastIndex = 0;
+    result = result.replace(RE_NUMBERS_START, '$1<span class="json-number">$2</span>');
 
     // Booleans - use ::before for checkbox via CSS class
-    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
-    result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)(\s*)(true|false)/g,
-      (match, colon, space, val) => {
-        const checkedClass = val === 'true' ? ' json-bool-true' : ' json-bool-false';
-        return `${colon}${space}<span class="json-boolean${checkedClass}">${val}</span>`;
-      }
-    );
+    RE_BOOLEANS.lastIndex = 0;
+    result = result.replace(RE_BOOLEANS, (match, colon, space, val) => {
+      const checkedClass = val === 'true' ? ' json-bool-true' : ' json-bool-false';
+      return `${colon}${space}<span class="json-boolean${checkedClass}">${val}</span>`;
+    });
 
     // Null
-    // IMPORTANT: Preserve original spacing by capturing and re-emitting whitespace
-    result = result.replace(
-      /(<span class="json-punctuation">:<\/span>)(\s*)(null)/g,
-      '$1$2<span class="json-null">$3</span>'
-    );
-    
-    // Collapsed bracket indicator - just add the class, CSS ::after adds the "...]" or "...}"
+    RE_NULL.lastIndex = 0;
+    result = result.replace(RE_NULL, '$1$2<span class="json-null">$3</span>');
+
+    // Collapsed bracket indicator
     if (collapsedBracket) {
       const bracketClass = collapsedBracket === '[' ? 'collapsed-bracket-array' : 'collapsed-bracket-object';
-      // Replace the last punctuation span (the opening bracket) with collapsed style class
       result = result.replace(
         new RegExp(`<span class="json-punctuation">\\${collapsedBracket}<\\/span>$`),
         `<span class="${bracketClass}">${collapsedBracket}</span>`
       );
     }
-    
-    // Mark unrecognized text as error - text that's not inside a span and not just whitespace
-    // This catches invalid JSON like unquoted strings, malformed values, etc.
-    result = result.replace(
-      /(<\/span>|^)([^<]+)(<span|$)/g,
-      (match, before, text, after) => {
-        // Skip if text is only whitespace or empty
-        if (!text || /^\s*$/.test(text)) return match;
-        // Check for unrecognized words/tokens (not whitespace, not just spaces/commas)
-        // Keep whitespace as-is, wrap any non-whitespace unrecognized token
-        const parts = text.split(/(\s+)/);
-        let hasError = false;
-        const processed = parts.map(part => {
-          // If it's whitespace, keep it
-          if (/^\s*$/.test(part)) return part;
-          // Mark as error
-          hasError = true;
-          return `<span class="json-error">${part}</span>`;
-        }).join('');
-        return hasError ? before + processed + after : match;
-      }
-    );
+
+    // Mark unrecognized text as error
+    RE_UNRECOGNIZED.lastIndex = 0;
+    result = result.replace(RE_UNRECOGNIZED, (match, before, text, after) => {
+      if (!text || RE_WHITESPACE_ONLY.test(text)) return match;
+      // Check for unrecognized words/tokens (not whitespace, not just spaces/commas)
+      // Keep whitespace as-is, wrap any non-whitespace unrecognized token
+      const parts = text.split(RE_WHITESPACE_SPLIT);
+      let hasError = false;
+      const processed = parts.map(part => {
+        // If it's whitespace, keep it
+        if (RE_WHITESPACE_ONLY.test(part)) return part;
+        // Mark as error
+        hasError = true;
+        return `<span class="json-error">${part}</span>`;
+      }).join('');
+      return hasError ? before + processed + after : match;
+    });
     
     // Note: visibility is now handled at line level (has-visibility class on .line element)
     
