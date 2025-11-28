@@ -163,8 +163,10 @@ The demo page (`demo/index.html`) includes comprehensive examples:
    - FeatureCollection output (prefix/suffix display)
    - Color scheme (Dark/Light)
    - Readonly mode
-   - Collapsible nodes
-   - Color picker
+   - Collapsible nodes (Tab/Shift+Tab)
+   - Virtualized rendering
+   - Inline color picker
+   - Boolean toggle checkbox
    - Feature visibility toggle
    - Theme customization
    - Features API (in browser console)
@@ -292,15 +294,22 @@ Use browser DevTools to debug:
 // In browser console
 const editor = document.querySelector('geojson-editor');
 
-// Access Shadow DOM
-editor.shadowRoot.querySelector('textarea').value
+// Access core data model
+editor.lines                 // Array of line strings
+editor.visibleLines          // Lines currently displayed
+editor.collapsedNodes        // Set of collapsed node IDs
 
-// Get current theme
-editor.getTheme()
+// Access Shadow DOM
+editor.shadowRoot.querySelector('.viewport')
+editor.shadowRoot.querySelector('.hidden-textarea')
+
+// Test features API
+editor.set([{ type: 'Feature', geometry: null, properties: {} }])
+editor.getAll()
 
 // Set custom theme
 editor.setTheme({
-  dark: { background: '#000000', textColor: '#ffffff' }
+  dark: { bgColor: '#000000', textColor: '#ffffff' }
 })
 ```
 
@@ -390,10 +399,14 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all unit tests
+- [ ] `npm test` passes all 178 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
-- [ ] All features work (collapse, color picker, themes, etc.)
+- [ ] All features work:
+  - Collapse/expand with Tab/Shift+Tab
+  - Inline color picker
+  - Boolean checkbox toggle
+  - Themes (dark/light)
 - [ ] `npm run build` completes successfully
 - [ ] `dist/geojson-editor.js` exists and is not empty
 - [ ] No console errors in browser DevTools
@@ -405,6 +418,7 @@ Before submitting changes, verify:
 - [ ] Readonly mode works (clear button hidden)
 - [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
 - [ ] `error` events fire with invalid JSON/GeoJSON
+- [ ] Virtualized rendering works for large GeoJSON
 
 ## Making Changes
 

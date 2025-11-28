@@ -59,7 +59,8 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **GeoJSON-Aware Highlighting** - Distinct colors for GeoJSON keywords (`type`, `coordinates`, `geometry`, etc.)
 - **GeoJSON Type Validation** - Valid types (`Point`, `LineString`, `Polygon`, etc.) highlighted distinctly; invalid types (`LinearRing`, unknown types) shown with error styling (colors configurable via theme)
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
-- **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); `coordinates` auto-collapsed on load
+- **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); use Tab to expand and Shift+Tab to collapse; `coordinates` auto-collapsed on load
+- **Virtualized Rendering** - Monaco-like architecture: only visible lines are rendered to DOM for optimal performance with large GeoJSON files
 - **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
 - **Color Picker** - Built-in color picker for hex color properties (`#rrggbb`) in left gutter; click to open native color picker
 - **Boolean Checkbox** - Inline checkbox for boolean properties in left gutter; toggle to switch between `true`/`false` and emit changes (e.g., `marker: true` to show vertices)
@@ -161,7 +162,7 @@ editor.addEventListener('error', (e) => {
 | `readonly` | `boolean` | `false` | Make editor read-only |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
 
-**Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. All nodes can be manually expanded/collapsed by clicking the toggle button.
+**Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. Use Tab to expand and Shift+Tab to collapse nodes, or click the gutter toggle.
 
 ### Dark Selector Syntax
 
