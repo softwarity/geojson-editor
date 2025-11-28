@@ -37,6 +37,22 @@ const simulateInput = async (editor, text) => {
 
 describe('GeoJsonEditor - Text Insertion', () => {
 
+  it('should insert text in empty editor', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+    
+    // Ensure editor is empty
+    expect(el.lines.length).to.equal(0);
+    
+    // Insert text
+    el.insertText('{"type": "Feature"}');
+    await waitFor(50);
+    
+    // Should have content now
+    expect(el.lines.length).to.be.greaterThan(0);
+    expect(el.getContent()).to.include('Feature');
+  });
+
   it('should have insertNewline method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     

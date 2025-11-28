@@ -1648,7 +1648,11 @@ class GeoJsonEditor extends HTMLElement {
       if (this.cursorColumn > bracketPos) return;
     }
     
-    if (this.cursorLine < this.lines.length) {
+    // Handle empty editor case
+    if (this.lines.length === 0) {
+      this.lines = [text];
+      this.cursorColumn = text.length;
+    } else if (this.cursorLine < this.lines.length) {
       const line = this.lines[this.cursorLine];
       this.lines[this.cursorLine] = line.substring(0, this.cursorColumn) + text + line.substring(this.cursorColumn);
       this.cursorColumn += text.length;
