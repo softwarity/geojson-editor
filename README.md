@@ -193,9 +193,9 @@ Programmatic manipulation of features:
 
 | Method | Description |
 |--------|-------------|
-| `set(input)` | Replace all features (throws if invalid) |
-| `add(input)` | Add features at the end (throws if invalid) |
-| `insertAt(input, index)` | Insert at index (negative = from end: -1 = before last) (throws if invalid) |
+| `set(input, options?)` | Replace all features (throws if invalid) |
+| `add(input, options?)` | Add features at the end (throws if invalid) |
+| `insertAt(input, index, options?)` | Insert at index (negative = from end: -1 = before last) (throws if invalid) |
 | `removeAt(index)` | Remove feature at index (negative = from end), returns removed feature |
 | `removeAll()` | Remove all features, returns array of removed features |
 | `get(index)` | Get feature at index (negative = from end) |
@@ -206,6 +206,42 @@ Programmatic manipulation of features:
 - **FeatureCollection** → extracts the `features` array
 - **Feature[]** → uses the array directly
 - **Feature** → wraps in an array
+
+**Options Parameter:** `set()`, `add()`, `insertAt()`, and `open()` accept an optional `options` object:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `collapsed` | `string[]` \| `function` | `['coordinates']` | Attributes to collapse after loading |
+
+The `collapsed` option controls which JSON nodes are automatically collapsed:
+- **`string[]`**: Static list of attribute names to collapse (e.g., `['coordinates', 'properties']`)
+- **`function(feature, index) => string[]`**: Dynamic function returning attributes per feature
+- **`'$root'`**: Special keyword to collapse entire features
+- **Empty array `[]`**: Disables auto-collapse (nothing collapsed)
+
+```javascript
+// Default: only coordinates collapsed
+editor.set(features);
+
+// Collapse coordinates and properties
+editor.set(features, { collapsed: ['coordinates', 'properties'] });
+
+// Collapse entire features
+editor.set(features, { collapsed: ['$root'] });
+
+// No auto-collapse
+editor.set(features, { collapsed: [] });
+
+// Dynamic: collapse geometry only for Points
+editor.set(features, {
+  collapsed: (feature, index) => {
+    if (feature.geometry?.type === 'Point') {
+      return ['geometry'];
+    }
+    return ['coordinates'];
+  }
+});
+```
 
 **Validation:** All input features are validated before adding. Invalid features throw an `Error` with a descriptive message. A valid Feature must have:
 - `type: "Feature"`
@@ -316,7 +352,7 @@ Open a GeoJSON file from the client filesystem:
 
 | Method | Description |
 |--------|-------------|
-| `open()` | Open file dialog, returns `Promise<boolean>` (true if loaded successfully) |
+| `open(options?)` | Open file dialog, returns `Promise<boolean>` (true if loaded successfully) |
 
 **Keyboard shortcut:**
 - `Ctrl+O` / `Cmd+O` - Open file dialog
@@ -334,6 +370,9 @@ const success = await editor.open();
 if (success) {
   console.log('File loaded:', editor.getAll());
 }
+
+// Open with custom collapse options
+const success = await editor.open({ collapsed: ['$root'] });
 ```
 
 ## Keyboard Shortcuts

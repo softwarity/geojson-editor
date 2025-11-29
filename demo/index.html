@@ -661,6 +661,54 @@
     .form-group { margin-bottom: 1rem; }
     .form-group:last-of-type { margin-bottom: 0; }
 
+    /* Collapsed checkboxes */
+    .collapsed-checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      padding: 0.5rem;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+    }
+    .collapsed-checkboxes label {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      margin: 0;
+    }
+    .collapsed-checkboxes input[type="checkbox"] {
+      cursor: pointer;
+    }
+
+    /* Collapsed default hint */
+    .collapsed-default-hint {
+      font-weight: normal;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* API call preview */
+    .api-call-preview {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+    .api-call-preview pre {
+      margin: 0;
+      padding: 0.75rem;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .api-call-preview code {
+      font-family: var(--font-mono);
+      white-space: pre;
+    }
+
     /* Toast animations */
     @keyframes toastFadeIn {
       from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
@@ -671,6 +719,7 @@
       to { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
     }
   </style>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
@@ -904,14 +953,27 @@ Example:
         <div id="apiFormSet" style="display: none;">
           <div class="form-group">
             <label for="apiSetFormat">Input Format</label>
-            <select id="apiSetFormat" onchange="loadApiSample('set')">
+            <select id="apiSetFormat" onchange="loadApiSample('set'); updateApiCallPreview('set')">
               <option value="feature-collection">FeatureCollection</option>
               <option value="features">Feature[]</option>
               <option value="feature">Feature</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Preview (read-only)</label>
+            <label>Collapsed Attributes <span class="collapsed-default-hint" id="apiSetDefaultHint">(default: coordinates)</span></label>
+            <div class="collapsed-checkboxes">
+              <label><input type="checkbox" value="$root" onchange="updateApiCallPreview('set')"> $root</label>
+              <label><input type="checkbox" value="coordinates" onchange="updateApiCallPreview('set')"> coordinates</label>
+              <label><input type="checkbox" value="geometry" onchange="updateApiCallPreview('set')"> geometry</label>
+              <label><input type="checkbox" value="properties" onchange="updateApiCallPreview('set')"> properties</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>API Call</label>
+            <div id="apiSetCallPreview" class="api-call-preview"><pre><code class="language-javascript"></code></pre></div>
+          </div>
+          <div class="form-group">
+            <label>Data Preview (read-only)</label>
             <div id="apiSetPreview" class="api-code-preview json-highlight">
               <pre><code></code></pre>
             </div>
@@ -922,14 +984,27 @@ Example:
         <div id="apiFormAdd" style="display: none;">
           <div class="form-group">
             <label for="apiAddFormat">Input Format</label>
-            <select id="apiAddFormat" onchange="loadApiSample('add')">
+            <select id="apiAddFormat" onchange="loadApiSample('add'); updateApiCallPreview('add')">
               <option value="feature-collection">FeatureCollection</option>
               <option value="features">Feature[]</option>
               <option value="feature">Feature</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Preview (read-only)</label>
+            <label>Collapsed Attributes <span class="collapsed-default-hint" id="apiAddDefaultHint">(default: coordinates)</span></label>
+            <div class="collapsed-checkboxes">
+              <label><input type="checkbox" value="$root" onchange="updateApiCallPreview('add')"> $root</label>
+              <label><input type="checkbox" value="coordinates" onchange="updateApiCallPreview('add')"> coordinates</label>
+              <label><input type="checkbox" value="geometry" onchange="updateApiCallPreview('add')"> geometry</label>
+              <label><input type="checkbox" value="properties" onchange="updateApiCallPreview('add')"> properties</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>API Call</label>
+            <div id="apiAddCallPreview" class="api-call-preview"><pre><code class="language-javascript"></code></pre></div>
+          </div>
+          <div class="form-group">
+            <label>Data Preview (read-only)</label>
             <div id="apiAddPreview" class="api-code-preview json-highlight">
               <pre><code></code></pre>
             </div>
@@ -940,21 +1015,34 @@ Example:
         <div id="apiFormInsertAt" style="display: none;">
           <div class="form-group">
             <label for="apiInsertAtFormat">Input Format</label>
-            <select id="apiInsertAtFormat" onchange="loadApiSample('insertAt')">
+            <select id="apiInsertAtFormat" onchange="loadApiSample('insertAt'); updateApiCallPreview('insertAt')">
               <option value="feature-collection">FeatureCollection</option>
               <option value="features">Feature[]</option>
               <option value="feature">Feature</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Preview (read-only)</label>
-            <div id="apiInsertAtPreview" class="api-code-preview json-highlight">
-              <pre><code></code></pre>
+            <label for="apiInsertAtIndex">Index (negative = from end)</label>
+            <input type="number" id="apiInsertAtIndex" value="0" oninput="updateApiCallPreview('insertAt')" />
+          </div>
+          <div class="form-group">
+            <label>Collapsed Attributes <span class="collapsed-default-hint" id="apiInsertAtDefaultHint">(default: coordinates)</span></label>
+            <div class="collapsed-checkboxes">
+              <label><input type="checkbox" value="$root" onchange="updateApiCallPreview('insertAt')"> $root</label>
+              <label><input type="checkbox" value="coordinates" onchange="updateApiCallPreview('insertAt')"> coordinates</label>
+              <label><input type="checkbox" value="geometry" onchange="updateApiCallPreview('insertAt')"> geometry</label>
+              <label><input type="checkbox" value="properties" onchange="updateApiCallPreview('insertAt')"> properties</label>
             </div>
           </div>
           <div class="form-group">
-            <label for="apiInsertAtIndex">Index (negative = from end)</label>
-            <input type="number" id="apiInsertAtIndex" value="0" />
+            <label>API Call</label>
+            <div id="apiInsertAtCallPreview" class="api-call-preview"><pre><code class="language-javascript"></code></pre></div>
+          </div>
+          <div class="form-group">
+            <label>Data Preview (read-only)</label>
+            <div id="apiInsertAtPreview" class="api-code-preview json-highlight">
+              <pre><code></code></pre>
+            </div>
           </div>
         </div>
 
@@ -1888,6 +1976,73 @@ editor.setTheme(${themeTextarea.value});`;
     // Cache for loaded samples
     const apiSampleCache = {};
 
+    // Get selected collapsed attributes for a method
+    function getCollapsedAttributes(method) {
+      const methodName = method.charAt(0).toUpperCase() + method.slice(1);
+      const form = document.getElementById(`apiForm${methodName}`);
+      if (!form) return ['coordinates'];
+
+      const checkboxes = form.querySelectorAll('.collapsed-checkboxes input[type="checkbox"]:checked');
+      return Array.from(checkboxes).map(cb => cb.value);
+    }
+
+    // Get format label for display
+    function getFormatLabel(format) {
+      const labels = {
+        'feature-collection': 'featureCollection',
+        'features': 'features',
+        'feature': 'feature'
+      };
+      return labels[format] || format;
+    }
+
+    // Update API call preview
+    function updateApiCallPreview(method) {
+      const methodName = method.charAt(0).toUpperCase() + method.slice(1);
+      const formatSelect = document.getElementById(`api${methodName}Format`);
+      const previewDiv = document.getElementById(`api${methodName}CallPreview`);
+      const defaultHint = document.getElementById(`api${methodName}DefaultHint`);
+
+      if (!formatSelect || !previewDiv) return;
+
+      const format = formatSelect.value;
+      const formatLabel = getFormatLabel(format);
+      const collapsed = getCollapsedAttributes(method);
+
+      // Show/hide default hint based on selection
+      const isUsingDefault = collapsed.length === 0;
+      if (defaultHint) {
+        defaultHint.style.display = isUsingDefault ? 'inline' : 'none';
+      }
+
+      // Build code string with proper formatting
+      let callStr = '';
+      if (method === 'set') {
+        if (isUsingDefault) {
+          callStr = `editor.set(${formatLabel});`;
+        } else {
+          callStr = `editor.set(${formatLabel}, {\n  collapsed: ${JSON.stringify(collapsed)}\n});`;
+        }
+      } else if (method === 'add') {
+        if (isUsingDefault) {
+          callStr = `editor.add(${formatLabel});`;
+        } else {
+          callStr = `editor.add(${formatLabel}, {\n  collapsed: ${JSON.stringify(collapsed)}\n});`;
+        }
+      } else if (method === 'insertAt') {
+        const index = document.getElementById('apiInsertAtIndex')?.value || '0';
+        if (isUsingDefault) {
+          callStr = `editor.insertAt(${formatLabel}, ${index});`;
+        } else {
+          callStr = `editor.insertAt(${formatLabel}, ${index}, {\n  collapsed: ${JSON.stringify(collapsed)}\n});`;
+        }
+      }
+
+      // Apply Prism.js highlighting
+      const highlighted = Prism.highlight(callStr, Prism.languages.javascript, 'javascript');
+      previewDiv.querySelector('code').innerHTML = highlighted;
+    }
+
     // Load sample file for API method
     async function loadApiSample(method) {
       const formatSelect = document.getElementById(`api${method.charAt(0).toUpperCase() + method.slice(1)}Format`);
@@ -1938,9 +2093,10 @@ editor.setTheme(${themeTextarea.value});`;
       };
       apiModalTitle.textContent = titles[method] || method;
 
-      // Load sample for set/add/insertAt
+      // Load sample and update API call preview for set/add/insertAt
       if (method === 'set' || method === 'add' || method === 'insertAt') {
         loadApiSample(method);
+        updateApiCallPreview(method);
       }
 
       apiModal.style.display = 'flex';
@@ -1966,7 +2122,13 @@ editor.setTheme(${themeTextarea.value});`;
             const data = apiSampleCache[cacheKey];
             if (!data) throw new Error('Sample not loaded');
             const parsed = JSON.parse(data);
-            editor.set(parsed);
+            const collapsed = getCollapsedAttributes('set');
+            // If nothing selected, use default (no options = ['coordinates'])
+            if (collapsed.length === 0) {
+              editor.set(parsed);
+            } else {
+              editor.set(parsed, { collapsed });
+            }
             break;
           }
           case 'add': {
@@ -1975,7 +2137,13 @@ editor.setTheme(${themeTextarea.value});`;
             const data = apiSampleCache[cacheKey];
             if (!data) throw new Error('Sample not loaded');
             const parsed = JSON.parse(data);
-            editor.add(parsed);
+            const collapsed = getCollapsedAttributes('add');
+            // If nothing selected, use default (no options = ['coordinates'])
+            if (collapsed.length === 0) {
+              editor.add(parsed);
+            } else {
+              editor.add(parsed, { collapsed });
+            }
             break;
           }
           case 'insertAt': {
@@ -1985,7 +2153,13 @@ editor.setTheme(${themeTextarea.value});`;
             if (!data) throw new Error('Sample not loaded');
             const parsed = JSON.parse(data);
             const index = parseInt(document.getElementById('apiInsertAtIndex').value, 10);
-            editor.insertAt(parsed, index);
+            const collapsed = getCollapsedAttributes('insertAt');
+            // If nothing selected, use default (no options = ['coordinates'])
+            if (collapsed.length === 0) {
+              editor.insertAt(parsed, index);
+            } else {
+              editor.insertAt(parsed, index, { collapsed });
+            }
             break;
           }
           case 'removeAt': {

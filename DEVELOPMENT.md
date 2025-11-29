@@ -85,17 +85,17 @@ test/rendering.test.js:
   ✓ GeoJsonEditor - Basic Rendering > should render with default state
 test/editing.test.js:
   ✓ GeoJsonEditor - Text Insertion > should have insertNewline method
-test/actions.test.js:
-  ✓ GeoJsonEditor - Feature Visibility > should toggle feature visibility
+test/api.test.js:
+  ✓ GeoJsonEditor - Features API > should set features via set()
   ...
 
-Chromium: 178 passed, 0 failed
-Finished running tests in 12s, all tests passed! 🎉
+Chromium: 286 passed, 0 failed
+Finished running tests in 21s, all tests passed! 🎉
 ```
 
 ### Test Organization
 
-Tests are split across 6 themed files for better maintainability:
+Tests are split across 7 themed files for better maintainability:
 
 | File | Purpose |
 |------|---------|
@@ -104,7 +104,8 @@ Tests are split across 6 themed files for better maintainability:
 | `interactions.test.js` | Cursor, selection, navigation, scroll |
 | `editing.test.js` | Text insertion, deletion, newlines |
 | `highlighting.test.js` | Syntax highlighting, themes, gutter |
-| `actions.test.js` | Features API, collapse/expand, visibility |
+| `api.test.js` | Features API, collapse/expand, visibility, collapsed option |
+| `shortcuts.test.js` | Keyboard shortcuts (Ctrl+Z, Ctrl+S, Ctrl+O, Tab) |
 
 ### Coverage Report
 
@@ -251,7 +252,8 @@ geojson-editor/
 │   ├── interactions.test.js    # Cursor, selection, navigation, scroll
 │   ├── editing.test.js         # Text insertion, deletion, features API
 │   ├── highlighting.test.js    # Syntax highlighting, themes
-│   ├── actions.test.js         # Features API, collapse, visibility
+│   ├── api.test.js             # Features API, collapse, visibility, collapsed option
+│   ├── shortcuts.test.js       # Keyboard shortcuts (Ctrl+Z/S/O, Tab)
 │   └── fixtures/
 │       └── geojson-samples.js  # Shared test data
 ├── demo/
@@ -399,7 +401,7 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all 178 unit tests
+- [ ] `npm test` passes all 286 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work:
@@ -415,6 +417,7 @@ Before submitting changes, verify:
 - [ ] Feature visibility toggle works (eye icon)
 - [ ] Clear button works (✕ in suffix area)
 - [ ] Features API works (set, add, insertAt, removeAt, removeAll, get, getAll, emit)
+- [ ] Features API options work (collapsed option with $root, coordinates, etc.)
 - [ ] Readonly mode works (clear button hidden)
 - [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
 - [ ] `error` events fire with invalid JSON/GeoJSON

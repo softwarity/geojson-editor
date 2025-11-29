@@ -432,7 +432,7 @@ describe('GeoJsonEditor - Collapse/Expand', () => {
 
   it('should have toggleCollapse method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
+
     expect(el.toggleCollapse).to.be.a('function');
   });
 
@@ -500,13 +500,13 @@ describe('GeoJsonEditor - Feature Visibility', () => {
 
   it('should track hidden features', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
+
     expect(el.hiddenFeatures).to.be.instanceOf(Set);
   });
 
   it('should have toggleFeatureVisibility method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
+
     expect(el.toggleFeatureVisibility).to.be.a('function');
   });
 
@@ -530,7 +530,7 @@ describe('GeoJsonEditor - Feature Visibility', () => {
 
     const featureKey = '0';
     el.toggleFeatureVisibility(featureKey);
-    
+
     expect(el.hiddenFeatures.has(featureKey)).to.be.true;
   });
 
@@ -544,7 +544,7 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     const featureKey = '0';
     el.hiddenFeatures.add(featureKey);
     el.toggleFeatureVisibility(featureKey);
-    
+
     expect(el.hiddenFeatures.has(featureKey)).to.be.false;
   });
 
@@ -672,7 +672,7 @@ describe('GeoJsonEditor - Clear Button', () => {
   });
 });
 
-describe('GeoJsonEditor - Undo/Redo System', () => {
+describe('GeoJsonEditor - Undo/Redo API', () => {
 
   it('should have undo() method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
@@ -960,91 +960,6 @@ describe('GeoJsonEditor - Undo/Redo System', () => {
     expect(el.cursorColumn).to.equal(originalCursorColumn);
   });
 
-  it('should handle Ctrl+Z keyboard shortcut', async () => {
-    const el = await createSizedFixture();
-    await waitFor();
-
-    stubEditorMethods(el);
-
-    el.lines = ['{"a": 1}'];
-    el.cursorLine = 0;
-    el.cursorColumn = 0;
-
-    const originalLine = el.lines[0];
-
-    el.insertText('X');
-    await waitFor(100);
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'z',
-      ctrlKey: true,
-      bubbles: true
-    });
-    el.handleKeydown(event);
-    await waitFor(100);
-
-    expect(el.lines[0]).to.equal(originalLine);
-  });
-
-  it('should handle Ctrl+Shift+Z keyboard shortcut for redo', async () => {
-    const el = await createSizedFixture();
-    await waitFor();
-
-    stubEditorMethods(el);
-
-    el.lines = ['{"a": 1}'];
-    el.cursorLine = 0;
-    el.cursorColumn = 0;
-
-    el.insertText('X');
-    await waitFor(100);
-
-    const modifiedLine = el.lines[0];
-
-    el.undo();
-    await waitFor(100);
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'z',
-      ctrlKey: true,
-      shiftKey: true,
-      bubbles: true
-    });
-    el.handleKeydown(event);
-    await waitFor(100);
-
-    expect(el.lines[0]).to.equal(modifiedLine);
-  });
-
-  it('should handle Ctrl+Y keyboard shortcut for redo', async () => {
-    const el = await createSizedFixture();
-    await waitFor();
-
-    stubEditorMethods(el);
-
-    el.lines = ['{"a": 1}'];
-    el.cursorLine = 0;
-    el.cursorColumn = 0;
-
-    el.insertText('X');
-    await waitFor(100);
-
-    const modifiedLine = el.lines[0];
-
-    el.undo();
-    await waitFor(100);
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'y',
-      ctrlKey: true,
-      bubbles: true
-    });
-    el.handleKeydown(event);
-    await waitFor(100);
-
-    expect(el.lines[0]).to.equal(modifiedLine);
-  });
-
   it('should group rapid consecutive actions of same type', async () => {
     const el = await createSizedFixture();
     await waitFor();
@@ -1145,7 +1060,7 @@ describe('GeoJsonEditor - Undo/Redo System', () => {
   });
 });
 
-describe('GeoJsonEditor - Save Feature', () => {
+describe('GeoJsonEditor - Save API', () => {
 
   it('should have save() method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
@@ -1236,38 +1151,6 @@ describe('GeoJsonEditor - Save Feature', () => {
     document.createElement = originalCreateElement;
   });
 
-  it('should handle Ctrl+S keyboard shortcut', async () => {
-    const el = await createSizedFixture();
-    await waitFor();
-
-    el.set([validPoint]);
-    await waitFor(200);
-
-    let saveCalled = false;
-    const originalSave = el.save.bind(el);
-    el.save = () => { saveCalled = true; return originalSave(); };
-
-    const originalCreateElement = document.createElement.bind(document);
-    document.createElement = (tag) => {
-      const elem = originalCreateElement(tag);
-      if (tag === 'a') {
-        elem.click = () => {};
-      }
-      return elem;
-    };
-
-    const event = new KeyboardEvent('keydown', {
-      key: 's',
-      ctrlKey: true,
-      bubbles: true
-    });
-    el.handleKeydown(event);
-
-    expect(saveCalled).to.be.true;
-
-    document.createElement = originalCreateElement;
-  });
-
   it('should return false for empty editor', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
@@ -1289,7 +1172,7 @@ describe('GeoJsonEditor - Save Feature', () => {
   });
 });
 
-describe('GeoJsonEditor - Open Feature', () => {
+describe('GeoJsonEditor - Open API', () => {
 
   it('should have open() method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
@@ -1375,23 +1258,6 @@ describe('GeoJsonEditor - Open Feature', () => {
     document.createElement = originalCreateElement;
   });
 
-  it('should handle Ctrl+O keyboard shortcut', async () => {
-    const el = await createSizedFixture();
-    await waitFor();
-
-    let openCalled = false;
-    el.open = () => { openCalled = true; return Promise.resolve(false); };
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'o',
-      ctrlKey: true,
-      bubbles: true
-    });
-    el.handleKeydown(event);
-
-    expect(openCalled).to.be.true;
-  });
-
   it('should allow open() via API in readonly mode', async () => {
     const el = await fixture(html`<geojson-editor readonly style="height: 400px; width: 600px;"></geojson-editor>`);
     await waitFor();
@@ -1417,23 +1283,6 @@ describe('GeoJsonEditor - Open Feature', () => {
     expect(inputCreated).to.be.true;
 
     document.createElement = originalCreateElement;
-  });
-
-  it('should block Ctrl+O in readonly mode', async () => {
-    const el = await fixture(html`<geojson-editor readonly style="height: 400px; width: 600px;"></geojson-editor>`);
-    await waitFor();
-
-    let openCalled = false;
-    el.open = () => { openCalled = true; return Promise.resolve(false); };
-
-    const event = new KeyboardEvent('keydown', {
-      key: 'o',
-      ctrlKey: true,
-      bubbles: true
-    });
-    el.handleKeydown(event);
-
-    expect(openCalled).to.be.false;
   });
 
   it('should create file input with correct accept attribute', async () => {
@@ -1490,5 +1339,152 @@ describe('GeoJsonEditor - Open Feature', () => {
     expect(result).to.be.false;
 
     document.createElement = originalCreateElement;
+  });
+});
+
+describe('GeoJsonEditor - Collapsed Option', () => {
+
+  it('should collapse coordinates by default with set()', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Check that coordinates nodes are collapsed
+    const ranges = el._findCollapsibleRanges();
+    const coordinatesRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordinatesRange).to.exist;
+    expect(el.collapsedNodes.has(coordinatesRange.nodeId)).to.be.true;
+  });
+
+  it('should not collapse anything with empty collapsed array', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Nothing should be collapsed
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should collapse specified attributes', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: ['geometry'] });
+    await waitFor(200);
+
+    // Check that geometry is collapsed but not coordinates (since we specified custom)
+    const ranges = el._findCollapsibleRanges();
+    const geometryRange = ranges.find(r => r.nodeKey === 'geometry');
+    expect(geometryRange).to.exist;
+    expect(el.collapsedNodes.has(geometryRange.nodeId)).to.be.true;
+  });
+
+  it('should collapse $root to collapse entire feature', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: ['$root'] });
+    await waitFor(200);
+
+    // Check that root feature is collapsed
+    const ranges = el._findCollapsibleRanges();
+    const rootRange = ranges.find(r => r.isRootFeature);
+    expect(rootRange).to.exist;
+    expect(el.collapsedNodes.has(rootRange.nodeId)).to.be.true;
+  });
+
+  it('should accept function for dynamic collapsed', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const features = [validPoint, validPolygon];
+    el.set(features, {
+      collapsed: (feature) => {
+        // Collapse coordinates for Polygon, nothing for Point
+        if (feature.geometry?.type === 'Polygon') {
+          return ['coordinates'];
+        }
+        return [];
+      }
+    });
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+
+    // Find coordinates ranges - should have 2 (one per feature)
+    const coordinatesRanges = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coordinatesRanges.length).to.equal(2);
+
+    // Only the Polygon's coordinates should be collapsed
+    // The Polygon is second in the array, so its coordinates should be collapsed
+    let collapsedCount = 0;
+    for (const range of coordinatesRanges) {
+      if (el.collapsedNodes.has(range.nodeId)) {
+        collapsedCount++;
+      }
+    }
+    expect(collapsedCount).to.equal(1);
+  });
+
+  it('should work with add() and collapsed option', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    el.add([validPolygon], { collapsed: ['geometry', 'properties'] });
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const geometryRanges = ranges.filter(r => r.nodeKey === 'geometry');
+
+    // Both features have geometry, both should be collapsed
+    for (const range of geometryRanges) {
+      expect(el.collapsedNodes.has(range.nodeId)).to.be.true;
+    }
+  });
+
+  it('should work with insertAt() and collapsed option', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Use empty collapsed for initial set to not collapse anything
+    el.set([validPoint, validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    const newFeature = { type: 'Feature', geometry: null, properties: { name: 'inserted' } };
+    el.insertAt(newFeature, 1, { collapsed: ['properties'] });
+    await waitFor(200);
+
+    // insertAt applies collapsed to all features after insertion
+    const ranges = el._findCollapsibleRanges();
+    const propertiesRanges = ranges.filter(r => r.nodeKey === 'properties');
+
+    // 3 features = 3 properties nodes
+    expect(propertiesRanges.length).to.equal(3);
+
+    // All properties should be collapsed (insertAt re-applies collapsed to all)
+    const collapsedProperties = propertiesRanges.filter(r => el.collapsedNodes.has(r.nodeId));
+    expect(collapsedProperties.length).to.equal(3);
+  });
+
+  it('should collapse multiple attributes', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: ['coordinates', 'properties'] });
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coordinatesRange = ranges.find(r => r.nodeKey === 'coordinates');
+    const propertiesRange = ranges.find(r => r.nodeKey === 'properties');
+
+    expect(el.collapsedNodes.has(coordinatesRange.nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(propertiesRange.nodeId)).to.be.true;
   });
 });

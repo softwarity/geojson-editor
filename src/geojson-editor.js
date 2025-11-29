@@ -689,7 +689,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Set the editor content from a string value
    */
-  setValue(value) {
+  setValue(value, autoCollapse = true) {
     // Save to history only if there's existing content
     if (this.lines.length > 0) {
       this._saveToHistory('setValue');
@@ -719,18 +719,18 @@ class GeoJsonEditor extends HTMLElement {
     this._nodeIdToLines.clear();
     this.cursorLine = 0;
     this.cursorColumn = 0;
-    
+
     this.updateModel();
     this.scheduleRender();
     this.updatePlaceholderVisibility();
-    
-    // Auto-collapse coordinates
-    if (this.lines.length > 0) {
+
+    // Auto-collapse coordinates (unless disabled)
+    if (autoCollapse && this.lines.length > 0) {
       requestAnimationFrame(() => {
         this.autoCollapseCoordinates();
       });
     }
-    
+
     this.emitChange();
   }
 
@@ -2078,16 +2078,53 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   autoCollapseCoordinates() {
+    this._applyCollapsedOption(['coordinates']);
+  }
+
+  /**
+   * Apply collapsed option to nodes
+   * @param {string[]|function} collapsed - Attributes to collapse or function returning them
+   * @param {array} features - Features array for function mode (optional)
+   */
+  _applyCollapsedOption(collapsed, features = null) {
     const ranges = this._findCollapsibleRanges();
 
+    // Group ranges by feature (root nodes)
+    const featureRanges = ranges.filter(r => r.isRootFeature);
+
+    // Determine which attributes to collapse per feature
     for (const range of ranges) {
-      if (range.nodeKey === 'coordinates') {
+      let shouldCollapse = false;
+
+      if (typeof collapsed === 'function') {
+        // Find which feature this range belongs to
+        const featureIndex = featureRanges.findIndex(fr =>
+          range.startLine >= fr.startLine && range.endLine <= fr.endLine
+        );
+        const feature = features?.[featureIndex] || null;
+        const collapsedAttrs = collapsed(feature, featureIndex);
+
+        // Check if this range should be collapsed
+        if (range.isRootFeature) {
+          shouldCollapse = collapsedAttrs.includes('$root');
+        } else {
+          shouldCollapse = collapsedAttrs.includes(range.nodeKey);
+        }
+      } else if (Array.isArray(collapsed)) {
+        // Static list
+        if (range.isRootFeature) {
+          shouldCollapse = collapsed.includes('$root');
+        } else {
+          shouldCollapse = collapsed.includes(range.nodeKey);
+        }
+      }
+
+      if (shouldCollapse) {
         this.collapsedNodes.add(range.nodeId);
       }
     }
 
     // Rebuild everything to ensure consistent state after collapse changes
-    // This is especially important after paste into empty editor
     this.updateModel();
     this.scheduleRender();
   }
@@ -2715,26 +2752,45 @@ class GeoJsonEditor extends HTMLElement {
    * Replace all features in the editor
    * Accepts: FeatureCollection, Feature[], or single Feature
    * @param {object|array} input - Features to set
+   * @param {object} options - Optional settings
+   * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
+   *   - string[]: List of attributes to collapse (e.g., ['coordinates', 'geometry'])
+   *   - function(feature, index): Returns string[] of attributes to collapse per feature
+   *   - Use '$root' to collapse the entire feature
    * @throws {Error} If input is invalid
    */
-  set(input) {
+  set(input, options = {}) {
     const features = this._normalizeToFeatures(input);
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
-    this.setValue(formatted);
+    this.setValue(formatted, false); // Don't auto-collapse coordinates
+
+    // Apply collapsed option (default: ['coordinates'])
+    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
+    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
+      this._applyCollapsedOption(collapsed, features);
+    }
   }
 
   /**
    * Add features to the end of the editor
    * Accepts: FeatureCollection, Feature[], or single Feature
    * @param {object|array} input - Features to add
+   * @param {object} options - Optional settings
+   * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
    * @throws {Error} If input is invalid
    */
-  add(input) {
+  add(input, options = {}) {
     const newFeatures = this._normalizeToFeatures(input);
-    const features = this._parseFeatures();
-    features.push(...newFeatures);
-    const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
-    this.setValue(formatted);
+    const existingFeatures = this._parseFeatures();
+    const allFeatures = [...existingFeatures, ...newFeatures];
+    const formatted = allFeatures.map(f => JSON.stringify(f, null, 2)).join(',\n');
+    this.setValue(formatted, false); // Don't auto-collapse coordinates
+
+    // Apply collapsed option (default: ['coordinates'])
+    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
+    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
+      this._applyCollapsedOption(collapsed, allFeatures);
+    }
   }
 
   /**
@@ -2742,15 +2798,23 @@ class GeoJsonEditor extends HTMLElement {
    * Accepts: FeatureCollection, Feature[], or single Feature
    * @param {object|array} input - Features to insert
    * @param {number} index - Index to insert at (negative = from end)
+   * @param {object} options - Optional settings
+   * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
    * @throws {Error} If input is invalid
    */
-  insertAt(input, index) {
+  insertAt(input, index, options = {}) {
     const newFeatures = this._normalizeToFeatures(input);
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
     features.splice(Math.max(0, Math.min(idx, features.length)), 0, ...newFeatures);
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
-    this.setValue(formatted);
+    this.setValue(formatted, false); // Don't auto-collapse coordinates
+
+    // Apply collapsed option (default: ['coordinates'])
+    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
+    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
+      this._applyCollapsedOption(collapsed, features);
+    }
   }
 
   removeAt(index) {
@@ -2826,9 +2890,11 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Open a GeoJSON file from the client filesystem
    * Note: Available even in readonly mode via API (only Ctrl+O shortcut is blocked)
+   * @param {object} options - Optional settings
+   * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
    * @returns {Promise<boolean>} Promise that resolves to true if file was loaded successfully
    */
-  open() {
+  open(options = {}) {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -2854,7 +2920,7 @@ class GeoJsonEditor extends HTMLElement {
 
             // Load features into editor
             this._saveToHistory('open');
-            this.set(features);
+            this.set(features, options);
             this.clearHistory(); // Clear history after opening new file
             document.body.removeChild(input);
             resolve(true);
