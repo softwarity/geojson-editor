@@ -718,6 +718,29 @@
       from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
       to { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
     }
+
+    /* Footer */
+    .footer {
+      margin-top: 2rem;
+      padding: 1rem 1.5rem 0;
+      text-align: center;
+      border-top: 1px solid var(--border-default);
+    }
+    .footer a {
+      color: var(--text-muted);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: opacity 0.2s;
+    }
+    .footer a:hover {
+      opacity: 0.8;
+    }
+    .footer img {
+      width: 20px;
+      height: 20px;
+    }
   </style>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
@@ -908,6 +931,13 @@ Example:
       <pre id="htmlCode"></pre>
     </div>
 
+    <!-- Footer -->
+    <footer class="footer">
+      <a href="https://www.softwarity.io/" target="_blank" rel="noopener noreferrer">
+        <img src="https://www.softwarity.io/img/softwarity.svg" alt="Softwarity logo">
+        Made by Softwarity
+      </a>
+    </footer>
   </div>
 
   <!-- Theme Editor Modal -->
@@ -930,13 +960,6 @@ Example:
           <button class="btn-action" onclick="applyTheme()">Apply</button>
         </div>
       </div>
-    </div>
-    <!-- Footer -->
-    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border-default); text-align: center;">
-      <a href="https://www.softwarity.io/" target="_blank" rel="noopener noreferrer" style="color: var(--text-muted); text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
-        <img src="https://www.softwarity.io/img/softwarity.svg" alt="Softwarity" style="height: 20px; opacity: 0.7;">
-        <span>Made by Softwarity</span>
-      </a>
     </div>
   </div>
 
