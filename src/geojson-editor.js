@@ -1880,18 +1880,30 @@ class GeoJsonEditor extends HTMLElement {
   handlePaste(e) {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
-    if (text) {
-      const wasEmpty = this.lines.length === 0;
+    if (!text) return;
+
+    const wasEmpty = this.lines.length === 0;
+
+    // Try to parse as GeoJSON and normalize
+    try {
+      const parsed = JSON.parse(text);
+      const features = this._normalizeToFeatures(parsed);
+      // Valid GeoJSON - insert formatted features
+      const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
+      this.insertText(formatted);
+    } catch {
+      // Invalid GeoJSON - fallback to raw text insertion
       this.insertText(text);
-      // Auto-collapse coordinates after pasting into empty editor
-      if (wasEmpty && this.lines.length > 0) {
-        // Cancel pending render, collapse first, then render once
-        if (this.renderTimer) {
-          cancelAnimationFrame(this.renderTimer);
-          this.renderTimer = null;
-        }
-        this.autoCollapseCoordinates();
+    }
+
+    // Auto-collapse coordinates after pasting into empty editor
+    if (wasEmpty && this.lines.length > 0) {
+      // Cancel pending render, collapse first, then render once
+      if (this.renderTimer) {
+        cancelAnimationFrame(this.renderTimer);
+        this.renderTimer = null;
       }
+      this.autoCollapseCoordinates();
     }
   }
 
@@ -2625,25 +2637,120 @@ class GeoJsonEditor extends HTMLElement {
     return errors;
   }
 
+  /**
+   * Validate a single feature object
+   * @param {object} feature - The feature to validate
+   * @throws {Error} If the feature is invalid
+   */
+  _validateFeature(feature) {
+    if (!feature || typeof feature !== 'object') {
+      throw new Error('Feature must be an object');
+    }
+    if (feature.type !== 'Feature') {
+      throw new Error('Feature type must be "Feature"');
+    }
+    if (!('geometry' in feature)) {
+      throw new Error('Feature must have a geometry property');
+    }
+    if (!('properties' in feature)) {
+      throw new Error('Feature must have a properties property');
+    }
+    if (feature.geometry !== null) {
+      if (!feature.geometry || typeof feature.geometry !== 'object') {
+        throw new Error('Feature geometry must be an object or null');
+      }
+      if (!feature.geometry.type) {
+        throw new Error('Feature geometry must have a type');
+      }
+      if (!GEOMETRY_TYPES.includes(feature.geometry.type)) {
+        throw new Error(`Invalid geometry type: "${feature.geometry.type}"`);
+      }
+      if (!('coordinates' in feature.geometry)) {
+        throw new Error('Feature geometry must have coordinates');
+      }
+    }
+    if (feature.properties !== null && typeof feature.properties !== 'object') {
+      throw new Error('Feature properties must be an object or null');
+    }
+  }
+
+  /**
+   * Normalize input to an array of features
+   * Accepts: FeatureCollection, Feature[], or single Feature
+   * @param {object|array} input - Input to normalize
+   * @returns {array} Array of features
+   * @throws {Error} If input is invalid
+   */
+  _normalizeToFeatures(input) {
+    let features = [];
+
+    if (Array.isArray(input)) {
+      // Array of features
+      features = input;
+    } else if (input && typeof input === 'object') {
+      if (input.type === 'FeatureCollection' && Array.isArray(input.features)) {
+        // FeatureCollection
+        features = input.features;
+      } else if (input.type === 'Feature') {
+        // Single Feature
+        features = [input];
+      } else {
+        throw new Error('Input must be a Feature, array of Features, or FeatureCollection');
+      }
+    } else {
+      throw new Error('Input must be a Feature, array of Features, or FeatureCollection');
+    }
+
+    // Validate each feature
+    for (const feature of features) {
+      this._validateFeature(feature);
+    }
+
+    return features;
+  }
+
   // ========== Public API ==========
-  
-  set(features) {
-    if (!Array.isArray(features)) throw new Error('set() expects an array');
+
+  /**
+   * Replace all features in the editor
+   * Accepts: FeatureCollection, Feature[], or single Feature
+   * @param {object|array} input - Features to set
+   * @throws {Error} If input is invalid
+   */
+  set(input) {
+    const features = this._normalizeToFeatures(input);
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
     this.setValue(formatted);
   }
 
-  add(feature) {
+  /**
+   * Add features to the end of the editor
+   * Accepts: FeatureCollection, Feature[], or single Feature
+   * @param {object|array} input - Features to add
+   * @throws {Error} If input is invalid
+   */
+  add(input) {
+    const newFeatures = this._normalizeToFeatures(input);
     const features = this._parseFeatures();
-    features.push(feature);
-    this.set(features);
+    features.push(...newFeatures);
+    const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
+    this.setValue(formatted);
   }
 
-  insertAt(feature, index) {
+  /**
+   * Insert features at a specific index
+   * Accepts: FeatureCollection, Feature[], or single Feature
+   * @param {object|array} input - Features to insert
+   * @param {number} index - Index to insert at (negative = from end)
+   * @throws {Error} If input is invalid
+   */
+  insertAt(input, index) {
+    const newFeatures = this._normalizeToFeatures(input);
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
-    features.splice(Math.max(0, Math.min(idx, features.length)), 0, feature);
-    this.set(features);
+    features.splice(Math.max(0, Math.min(idx, features.length)), 0, ...newFeatures);
+    const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
+    this.setValue(formatted);
   }
 
   removeAt(index) {
@@ -2742,25 +2849,8 @@ class GeoJsonEditor extends HTMLElement {
             const content = event.target.result;
             const parsed = JSON.parse(content);
 
-            // Extract features from various GeoJSON formats
-            let features = [];
-            if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-              features = parsed.features;
-            } else if (parsed.type === 'Feature') {
-              features = [parsed];
-            } else if (Array.isArray(parsed)) {
-              features = parsed;
-            } else {
-              // Invalid GeoJSON structure
-              document.body.removeChild(input);
-              resolve(false);
-              return;
-            }
-
-            // Validate features
-            for (const feature of features) {
-              this._validateFeature(feature);
-            }
+            // Normalize and validate features
+            const features = this._normalizeToFeatures(parsed);
 
             // Load features into editor
             this._saveToHistory('open');

@@ -2,7 +2,8 @@ import { expect, fixture, html } from '@open-wc/testing';
 import GeoJsonEditor from '../src/geojson-editor.js';
 import {
   validPoint,
-  validPolygon
+  validPolygon,
+  validFeatureCollection
 } from './fixtures/geojson-samples.js';
 
 // Helper to wait for component to stabilize
@@ -212,8 +213,111 @@ describe('GeoJsonEditor - Copy/Cut/Paste', () => {
 
   it('should have handlePaste method', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
+
     expect(el.handlePaste).to.be.a('function');
+  });
+
+  it('should paste FeatureCollection and extract features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => JSON.stringify(validFeatureCollection)
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(200);
+
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+    expect(features[0].geometry.type).to.equal('Point');
+    expect(features[1].geometry.type).to.equal('LineString');
+  });
+
+  it('should paste single Feature', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => JSON.stringify(validPoint)
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(200);
+
+    const features = el.getAll();
+    expect(features.length).to.equal(1);
+    expect(features[0].geometry.type).to.equal('Point');
+  });
+
+  it('should paste array of Features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => JSON.stringify([validPoint, validPolygon])
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(200);
+
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+  });
+
+  it('should fallback to raw text when pasting invalid GeoJSON', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Suppress error events during test
+    el.addEventListener('error', (e) => e.stopPropagation());
+
+    const rawText = '{"some": "data"}';
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => rawText
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(200);
+
+    // Should contain the raw text since it's not valid GeoJSON
+    const content = el.getContent();
+    expect(content).to.include('some');
+    expect(content).to.include('data');
+  });
+
+  it('should fallback to raw text when pasting plain text', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Suppress error events during test
+    el.addEventListener('error', (e) => e.stopPropagation());
+
+    const rawText = 'Hello World';
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => rawText
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(200);
+
+    const content = el.getContent();
+    expect(content).to.include('Hello World');
   });
 
   it('should get selected text with _getSelectedText', async () => {

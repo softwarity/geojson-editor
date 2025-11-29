@@ -193,32 +193,48 @@ Programmatic manipulation of features:
 
 | Method | Description |
 |--------|-------------|
-| `set(features[])` | Replace all features with the given array (throws if invalid) |
-| `add(feature)` | Add a feature at the end (throws if invalid) |
-| `insertAt(feature, index)` | Insert at index (negative = from end: -1 = before last) (throws if invalid) |
+| `set(input)` | Replace all features (throws if invalid) |
+| `add(input)` | Add features at the end (throws if invalid) |
+| `insertAt(input, index)` | Insert at index (negative = from end: -1 = before last) (throws if invalid) |
 | `removeAt(index)` | Remove feature at index (negative = from end), returns removed feature |
 | `removeAll()` | Remove all features, returns array of removed features |
 | `get(index)` | Get feature at index (negative = from end) |
 | `getAll()` | Get all features as an array |
 | `emit()` | Emit the current document on the change event |
 
-**Validation:** `set()`, `add()`, and `insertAt()` validate features before adding. Invalid features throw an `Error` with a descriptive message. A valid Feature must have:
+**Flexible Input:** `set()`, `add()`, and `insertAt()` accept multiple input formats:
+- **FeatureCollection** → extracts the `features` array
+- **Feature[]** → uses the array directly
+- **Feature** → wraps in an array
+
+**Validation:** All input features are validated before adding. Invalid features throw an `Error` with a descriptive message. A valid Feature must have:
 - `type: "Feature"`
 - `geometry`: object with valid type (`Point`, `LineString`, `Polygon`, etc.) and `coordinates`, or `null`
 - `properties`: object or `null`
 
+**Smart Paste:** When pasting GeoJSON content (Ctrl+V), the editor automatically detects and normalizes the format (FeatureCollection, Feature[], or single Feature). Invalid GeoJSON falls back to raw text insertion.
+
 ```javascript
-// Set features
+// Set features from array
 editor.set([
   { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} },
   { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: {} }
 ]);
 
-// Add a feature
-editor.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: {} });
+// Set from FeatureCollection
+editor.set({
+  type: 'FeatureCollection',
+  features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} }]
+});
 
-// Insert at position 1
-editor.insertAt({ type: 'Feature', ... }, 1);
+// Set a single feature
+editor.set({ type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: {} });
+
+// Add multiple features at once
+editor.add([feature1, feature2]);
+
+// Insert FeatureCollection at position 1
+editor.insertAt(featureCollection, 1);
 
 // Remove last feature
 const removed = editor.removeAt(-1);

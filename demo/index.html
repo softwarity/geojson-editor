@@ -614,6 +614,34 @@
       color: var(--text-secondary);
     }
     .api-modal-body input[type="number"]:focus { outline: none; border-color: var(--accent-blue); }
+    .api-modal-body select {
+      width: 100%;
+      padding: 0.75rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      background: var(--bg-canvas);
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+    .api-modal-body select:focus { outline: none; border-color: var(--accent-blue); }
+    .api-code-preview {
+      max-height: 300px;
+      overflow: auto;
+      border: 1px solid var(--border-default);
+      border-radius: 4px;
+      background: var(--bg-canvas);
+    }
+    .api-code-preview pre {
+      margin: 0;
+      padding: 1rem;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .api-code-preview code {
+      font-family: var(--font-mono);
+    }
     .api-modal-actions {
       display: flex;
       gap: 0.5rem;
@@ -875,24 +903,54 @@ Example:
         <!-- set() form -->
         <div id="apiFormSet" style="display: none;">
           <div class="form-group">
-            <label for="apiSetTextarea">Features Array (JSON)</label>
-            <textarea id="apiSetTextarea" placeholder='[{"type": "Feature", "geometry": {...}, "properties": {...}}]'></textarea>
+            <label for="apiSetFormat">Input Format</label>
+            <select id="apiSetFormat" onchange="loadApiSample('set')">
+              <option value="feature-collection">FeatureCollection</option>
+              <option value="features">Feature[]</option>
+              <option value="feature">Feature</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Preview (read-only)</label>
+            <div id="apiSetPreview" class="api-code-preview json-highlight">
+              <pre><code></code></pre>
+            </div>
           </div>
         </div>
 
         <!-- add() form -->
         <div id="apiFormAdd" style="display: none;">
           <div class="form-group">
-            <label for="apiAddTextarea">Feature (JSON)</label>
-            <textarea id="apiAddTextarea" placeholder='{"type": "Feature", "geometry": {"type": "Point", "coordinates": [0, 0]}, "properties": {}}'></textarea>
+            <label for="apiAddFormat">Input Format</label>
+            <select id="apiAddFormat" onchange="loadApiSample('add')">
+              <option value="feature-collection">FeatureCollection</option>
+              <option value="features">Feature[]</option>
+              <option value="feature">Feature</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Preview (read-only)</label>
+            <div id="apiAddPreview" class="api-code-preview json-highlight">
+              <pre><code></code></pre>
+            </div>
           </div>
         </div>
 
         <!-- insertAt() form -->
         <div id="apiFormInsertAt" style="display: none;">
           <div class="form-group">
-            <label for="apiInsertAtTextarea">Feature (JSON)</label>
-            <textarea id="apiInsertAtTextarea" placeholder='{"type": "Feature", "geometry": {"type": "Point", "coordinates": [0, 0]}, "properties": {}}'></textarea>
+            <label for="apiInsertAtFormat">Input Format</label>
+            <select id="apiInsertAtFormat" onchange="loadApiSample('insertAt')">
+              <option value="feature-collection">FeatureCollection</option>
+              <option value="features">Feature[]</option>
+              <option value="feature">Feature</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Preview (read-only)</label>
+            <div id="apiInsertAtPreview" class="api-code-preview json-highlight">
+              <pre><code></code></pre>
+            </div>
           </div>
           <div class="form-group">
             <label for="apiInsertAtIndex">Index (negative = from end)</label>
@@ -1827,6 +1885,37 @@ editor.setTheme(${themeTextarea.value});`;
     const apiModalError = document.getElementById('apiModalError');
     let currentApiMethod = null;
 
+    // Cache for loaded samples
+    const apiSampleCache = {};
+
+    // Load sample file for API method
+    async function loadApiSample(method) {
+      const formatSelect = document.getElementById(`api${method.charAt(0).toUpperCase() + method.slice(1)}Format`);
+      const previewDiv = document.getElementById(`api${method.charAt(0).toUpperCase() + method.slice(1)}Preview`);
+      const format = formatSelect.value;
+      const filename = `./samples/${method}.${format}.geojson`;
+      const cacheKey = `${method}-${format}`;
+
+      try {
+        let data;
+        if (apiSampleCache[cacheKey]) {
+          data = apiSampleCache[cacheKey];
+        } else {
+          const response = await fetch(filename);
+          if (!response.ok) throw new Error(`Failed to load ${filename}`);
+          data = await response.text();
+          apiSampleCache[cacheKey] = data;
+        }
+
+        // Apply Prism.js highlighting
+        const highlighted = Prism.highlight(data, Prism.languages.json, 'json');
+        previewDiv.querySelector('code').innerHTML = highlighted;
+      } catch (error) {
+        console.error('Failed to load sample:', error);
+        previewDiv.querySelector('code').textContent = `Error: ${error.message}`;
+      }
+    }
+
     // Open API modal for a specific method
     function openApiModal(method) {
       currentApiMethod = method;
@@ -1842,33 +1931,16 @@ editor.setTheme(${themeTextarea.value});`;
 
       // Update title
       const titles = {
-        set: 'set(features[])',
-        add: 'add(feature)',
-        insertAt: 'insertAt(feature, index)',
+        set: 'set(input)',
+        add: 'add(input)',
+        insertAt: 'insertAt(input, index)',
         removeAt: 'removeAt(index)'
       };
       apiModalTitle.textContent = titles[method] || method;
 
-      // Pre-fill with sample feature for add/insertAt
-      if (method === 'add' || method === 'insertAt') {
-        const sampleFeature = {
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: [29.5, -3.0] },
-          properties: { name: 'New Point' }
-        };
-        const textarea = document.getElementById(method === 'add' ? 'apiAddTextarea' : 'apiInsertAtTextarea');
-        if (textarea && !textarea.value.trim()) {
-          textarea.value = JSON.stringify(sampleFeature, null, 2);
-        }
-      }
-
-      // Pre-fill set with current features
-      if (method === 'set') {
-        const textarea = document.getElementById('apiSetTextarea');
-        const currentFeatures = editor.getAll();
-        if (textarea) {
-          textarea.value = JSON.stringify(currentFeatures, null, 2);
-        }
+      // Load sample for set/add/insertAt
+      if (method === 'set' || method === 'add' || method === 'insertAt') {
+        loadApiSample(method);
       }
 
       apiModal.style.display = 'flex';
@@ -1889,26 +1961,31 @@ editor.setTheme(${themeTextarea.value});`;
       try {
         switch (currentApiMethod) {
           case 'set': {
-            const textarea = document.getElementById('apiSetTextarea');
-            const features = JSON.parse(textarea.value);
-            if (!Array.isArray(features)) {
-              throw new Error('Value must be an array of features');
-            }
-            editor.set(features);
+            const format = document.getElementById('apiSetFormat').value;
+            const cacheKey = `set-${format}`;
+            const data = apiSampleCache[cacheKey];
+            if (!data) throw new Error('Sample not loaded');
+            const parsed = JSON.parse(data);
+            editor.set(parsed);
             break;
           }
           case 'add': {
-            const textarea = document.getElementById('apiAddTextarea');
-            const feature = JSON.parse(textarea.value);
-            editor.add(feature);
+            const format = document.getElementById('apiAddFormat').value;
+            const cacheKey = `add-${format}`;
+            const data = apiSampleCache[cacheKey];
+            if (!data) throw new Error('Sample not loaded');
+            const parsed = JSON.parse(data);
+            editor.add(parsed);
             break;
           }
           case 'insertAt': {
-            const textarea = document.getElementById('apiInsertAtTextarea');
-            const indexInput = document.getElementById('apiInsertAtIndex');
-            const feature = JSON.parse(textarea.value);
-            const index = parseInt(indexInput.value, 10);
-            editor.insertAt(feature, index);
+            const format = document.getElementById('apiInsertAtFormat').value;
+            const cacheKey = `insertAt-${format}`;
+            const data = apiSampleCache[cacheKey];
+            if (!data) throw new Error('Sample not loaded');
+            const parsed = JSON.parse(data);
+            const index = parseInt(document.getElementById('apiInsertAtIndex').value, 10);
+            editor.insertAt(parsed, index);
             break;
           }
           case 'removeAt': {

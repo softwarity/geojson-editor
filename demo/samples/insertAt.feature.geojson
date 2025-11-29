@@ -1,0 +1,22 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [28.9784, 41.0082],
+      [32.8597, 39.9334]
+    ]
+  },
+  "properties": {
+    "label": "Istanbul-Ankara",
+    "stroke-color": "#cc6600",
+    "stroke-width": 2,
+    "icon": "airplane",
+    "icon-color": "#cc6600",
+    "icon-size": 16,
+    "icon-rotate": 45,
+    "icon-animation": true,
+    "icon-animation-loop": true,
+    "icon-animation-speed": 1.8
+  }
+}

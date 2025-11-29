@@ -4,7 +4,9 @@ import {
   validPointStr,
   validPolygonStr,
   validPoint,
-  validPolygon
+  validPolygon,
+  validFeatureCollection,
+  validLineString
 } from './fixtures/geojson-samples.js';
 
 // Helper to wait for component to stabilize
@@ -194,11 +196,13 @@ describe('GeoJsonEditor - Features API', () => {
     expect(feature).to.be.undefined;
   });
 
-  it('should throw error when set() receives non-array', async () => {
+  it('should throw error when set() receives invalid input', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
 
     expect(() => el.set('not an array')).to.throw();
+    expect(() => el.set(123)).to.throw();
+    expect(() => el.set(null)).to.throw();
   });
 
   it('should return count with getAll().length', async () => {
@@ -218,6 +222,199 @@ describe('GeoJsonEditor - Features API', () => {
     const features = el.getAll();
     expect(features).to.be.an('array');
     expect(features.length).to.equal(0);
+  });
+});
+
+describe('GeoJsonEditor - Flexible Input', () => {
+
+  // ========== set() flexible input ==========
+
+  it('should set() accept a FeatureCollection', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set(validFeatureCollection);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+    expect(features[0].geometry.type).to.equal('Point');
+    expect(features[1].geometry.type).to.equal('LineString');
+  });
+
+  it('should set() accept a single Feature', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set(validPoint);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(1);
+    expect(features[0].geometry.type).to.equal('Point');
+  });
+
+  it('should set() accept an array of Features', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPoint, validPolygon]);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+  });
+
+  // ========== add() flexible input ==========
+
+  it('should add() accept a FeatureCollection', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set(validPolygon);
+    await waitFor();
+
+    el.add(validFeatureCollection);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(3);
+    expect(features[0].geometry.type).to.equal('Polygon');
+    expect(features[1].geometry.type).to.equal('Point');
+    expect(features[2].geometry.type).to.equal('LineString');
+  });
+
+  it('should add() accept a single Feature', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.add(validPoint);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(1);
+  });
+
+  it('should add() accept an array of Features', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.add([validPoint, validPolygon]);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+  });
+
+  // ========== insertAt() flexible input ==========
+
+  it('should insertAt() accept a FeatureCollection', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor();
+
+    el.insertAt(validFeatureCollection, 0);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(3);
+    expect(features[0].geometry.type).to.equal('Point');
+    expect(features[1].geometry.type).to.equal('LineString');
+    expect(features[2].geometry.type).to.equal('Polygon');
+  });
+
+  it('should insertAt() accept a single Feature', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor();
+
+    el.insertAt(validPoint, 0);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+    expect(features[0].geometry.type).to.equal('Point');
+  });
+
+  it('should insertAt() accept an array of Features', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor();
+
+    el.insertAt([validPoint, validLineString], 0);
+    await waitFor();
+
+    const features = el.getAll();
+    expect(features.length).to.equal(3);
+    expect(features[0].geometry.type).to.equal('Point');
+    expect(features[1].geometry.type).to.equal('LineString');
+    expect(features[2].geometry.type).to.equal('Polygon');
+  });
+
+  // ========== Validation errors ==========
+
+  it('should throw error for invalid Feature in set()', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    const invalidFeature = { type: 'Feature', geometry: null };
+
+    expect(() => el.set(invalidFeature)).to.throw('properties');
+  });
+
+  it('should throw error for invalid geometry type', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    const invalidFeature = {
+      type: 'Feature',
+      geometry: { type: 'InvalidType', coordinates: [0, 0] },
+      properties: {}
+    };
+
+    expect(() => el.set(invalidFeature)).to.throw('Invalid geometry type');
+  });
+
+  it('should throw error for missing geometry in Feature', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    const invalidFeature = { type: 'Feature', properties: {} };
+
+    expect(() => el.set(invalidFeature)).to.throw('geometry');
+  });
+
+  it('should throw error for invalid Feature type', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    // When passed as a single object with type !== 'Feature', it's not recognized as a Feature
+    const invalidFeature = { type: 'NotAFeature', geometry: null, properties: {} };
+
+    expect(() => el.set(invalidFeature)).to.throw();
+  });
+
+  it('should throw error for invalid Feature in array', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    // When passed as an array, validation happens and type is checked
+    const invalidFeature = { type: 'NotAFeature', geometry: null, properties: {} };
+
+    expect(() => el.set([invalidFeature])).to.throw('type must be "Feature"');
+  });
+
+  it('should throw error for empty object', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    expect(() => el.set({})).to.throw();
   });
 });
 

@@ -283,29 +283,17 @@ describe('GeoJsonEditor - Events', () => {
     expect(event.detail.error).to.exist;
   });
 
-  it('should emit error for invalid geometry type', async () => {
+  it('should throw error for invalid geometry type in set()', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
-
-    const errorPromise = new Promise(resolve => {
-      el.addEventListener('error', (e) => {
-        e.stopPropagation();
-        resolve(e);
-      }, { once: true });
-    });
 
     const invalidFeature = {
       type: 'Feature',
       geometry: { type: 'InvalidType', coordinates: [0, 0] },
       properties: {}
     };
-    
-    el.set([invalidFeature]);
 
-    const event = await errorPromise;
-
-    expect(event.detail).to.exist;
-    expect(event.detail.errors).to.exist;
+    expect(() => el.set([invalidFeature])).to.throw('Invalid geometry type');
   });
 });
 

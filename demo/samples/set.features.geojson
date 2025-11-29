@@ -1,0 +1,247 @@
+[
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-118.2437, 34.0522]]
+    },
+    "properties": {
+      "label": "JFK-LAX",
+      "stroke-color": "#ff6600",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#ff6600",
+      "icon-size": 18,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 0.6
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-87.6298, 41.8781]]
+    },
+    "properties": {
+      "label": "JFK-ORD",
+      "stroke-color": "#3388ff",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#3388ff",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.5
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-80.1918, 25.7617]]
+    },
+    "properties": {
+      "label": "JFK-MIA",
+      "stroke-color": "#00cc99",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#00cc99",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.2
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-122.4194, 37.7749]]
+    },
+    "properties": {
+      "label": "JFK-SFO",
+      "stroke-color": "#cc0066",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#cc0066",
+      "icon-size": 18,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 0.7
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-104.9903, 39.7392]]
+    },
+    "properties": {
+      "label": "JFK-DEN",
+      "stroke-color": "#9933ff",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#9933ff",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.0
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-95.3698, 29.7604]]
+    },
+    "properties": {
+      "label": "JFK-IAH",
+      "stroke-color": "#ffcc00",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#ffcc00",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 0.9
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-84.4281, 33.6407]]
+    },
+    "properties": {
+      "label": "JFK-ATL",
+      "stroke-color": "#ff3366",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#ff3366",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.3
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-71.0096, 42.3656]]
+    },
+    "properties": {
+      "label": "JFK-BOS",
+      "stroke-color": "#00cccc",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#00cccc",
+      "icon-size": 14,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 2.5
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-122.3321, 47.6062]]
+    },
+    "properties": {
+      "label": "JFK-SEA",
+      "stroke-color": "#66cc00",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#66cc00",
+      "icon-size": 18,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 0.5
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[-74.006, 40.7128], [-115.1398, 36.1699]]
+    },
+    "properties": {
+      "label": "JFK-LAS",
+      "stroke-color": "#ff0099",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#ff0099",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 0.8
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-74.006, 40.7128] },
+    "properties": { "label": "JFK", "fill-color": "#ff0000" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-118.2437, 34.0522] },
+    "properties": { "label": "LAX", "fill-color": "#ff6600" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-87.6298, 41.8781] },
+    "properties": { "label": "ORD", "fill-color": "#3388ff" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-80.1918, 25.7617] },
+    "properties": { "label": "MIA", "fill-color": "#00cc99" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-122.4194, 37.7749] },
+    "properties": { "label": "SFO", "fill-color": "#cc0066" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-104.9903, 39.7392] },
+    "properties": { "label": "DEN", "fill-color": "#9933ff" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-95.3698, 29.7604] },
+    "properties": { "label": "IAH", "fill-color": "#ffcc00" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-84.4281, 33.6407] },
+    "properties": { "label": "ATL", "fill-color": "#ff3366" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-71.0096, 42.3656] },
+    "properties": { "label": "BOS", "fill-color": "#00cccc" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-122.3321, 47.6062] },
+    "properties": { "label": "SEA", "fill-color": "#66cc00" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [-115.1398, 36.1699] },
+    "properties": { "label": "LAS", "fill-color": "#ff0099" }
+  }
+]

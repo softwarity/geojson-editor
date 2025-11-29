@@ -1,0 +1,22 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [-43.1729, -22.9068],
+      [-58.3816, -34.6037]
+    ]
+  },
+  "properties": {
+    "label": "Rio-Buenos Aires",
+    "stroke-color": "#00cc99",
+    "stroke-width": 2,
+    "icon": "airplane",
+    "icon-color": "#00cc99",
+    "icon-size": 18,
+    "icon-rotate": 45,
+    "icon-animation": true,
+    "icon-animation-loop": true,
+    "icon-animation-speed": 1
+  }
+}

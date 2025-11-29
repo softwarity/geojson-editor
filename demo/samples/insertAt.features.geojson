@@ -1,0 +1,127 @@
+[
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[151.2093, -33.8688], [174.7633, -36.8485]]
+    },
+    "properties": {
+      "label": "SYD-AKL",
+      "stroke-color": "#0099ff",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#0099ff",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.2
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[151.2093, -33.8688], [144.9631, -37.8136]]
+    },
+    "properties": {
+      "label": "SYD-MEL",
+      "stroke-color": "#ff9900",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#ff9900",
+      "icon-size": 14,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 2.0
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[151.2093, -33.8688], [153.0251, -27.4698]]
+    },
+    "properties": {
+      "label": "SYD-BNE",
+      "stroke-color": "#cc0066",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#cc0066",
+      "icon-size": 14,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.8
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[151.2093, -33.8688], [115.8605, -31.9505]]
+    },
+    "properties": {
+      "label": "SYD-PER",
+      "stroke-color": "#00cc66",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#00cc66",
+      "icon-size": 16,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 0.7
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [[151.2093, -33.8688], [138.6007, -34.9285]]
+    },
+    "properties": {
+      "label": "SYD-ADL",
+      "stroke-color": "#9933ff",
+      "stroke-width": 2,
+      "icon": "airplane",
+      "icon-color": "#9933ff",
+      "icon-size": 14,
+      "icon-rotate": 45,
+      "icon-animation": true,
+      "icon-animation-loop": true,
+      "icon-animation-speed": 1.5
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [151.2093, -33.8688] },
+    "properties": { "label": "SYD", "fill-color": "#ff0000" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [174.7633, -36.8485] },
+    "properties": { "label": "AKL", "fill-color": "#0099ff" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [144.9631, -37.8136] },
+    "properties": { "label": "MEL", "fill-color": "#ff9900" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [153.0251, -27.4698] },
+    "properties": { "label": "BNE", "fill-color": "#cc0066" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [115.8605, -31.9505] },
+    "properties": { "label": "PER", "fill-color": "#00cc66" }
+  },
+  {
+    "type": "Feature",
+    "geometry": { "type": "Point", "coordinates": [138.6007, -34.9285] },
+    "properties": { "label": "ADL", "fill-color": "#9933ff" }
+  }
+]

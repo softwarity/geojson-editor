@@ -1,0 +1,22 @@
+{
+  "type": "Feature",
+  "geometry": {
+    "type": "LineString",
+    "coordinates": [
+      [103.9915, 1.3644],
+      [113.9213, 22.3193]
+    ]
+  },
+  "properties": {
+    "label": "Singapore-Hong Kong",
+    "stroke-color": "#00cc66",
+    "stroke-width": 2,
+    "icon": "airplane",
+    "icon-color": "#00cc66",
+    "icon-size": 18,
+    "icon-rotate": 45,
+    "icon-animation": true,
+    "icon-animation-loop": true,
+    "icon-animation-speed": 1
+  }
+}

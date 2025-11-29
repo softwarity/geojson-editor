@@ -1,0 +1,202 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [13.4050, 52.5200]]
+      },
+      "properties": {
+        "label": "Paris-Berlin",
+        "stroke-color": "#3388ff",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#3388ff",
+        "icon-size": 18,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 0.8
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [-3.7038, 40.4168]]
+      },
+      "properties": {
+        "label": "Paris-Madrid",
+        "stroke-color": "#ff6600",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#ff6600",
+        "icon-size": 16,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 1.2
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [12.4964, 41.9028]]
+      },
+      "properties": {
+        "label": "Paris-Rome",
+        "stroke-color": "#00cc66",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#00cc66",
+        "icon-size": 16,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 1.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [-0.1276, 51.5074]]
+      },
+      "properties": {
+        "label": "Paris-London",
+        "stroke-color": "#cc0066",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#cc0066",
+        "icon-size": 14,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 1.8
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [4.9041, 52.3676]]
+      },
+      "properties": {
+        "label": "Paris-Amsterdam",
+        "stroke-color": "#9933ff",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#9933ff",
+        "icon-size": 14,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 2.0
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [16.3738, 48.2082]]
+      },
+      "properties": {
+        "label": "Paris-Vienna",
+        "stroke-color": "#ff3366",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#ff3366",
+        "icon-size": 16,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 0.9
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [21.0122, 52.2297]]
+      },
+      "properties": {
+        "label": "Paris-Warsaw",
+        "stroke-color": "#ffcc00",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#ffcc00",
+        "icon-size": 16,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 0.7
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[2.3522, 48.8566], [-9.1393, 38.7223]]
+      },
+      "properties": {
+        "label": "Paris-Lisbon",
+        "stroke-color": "#00cccc",
+        "stroke-width": 2,
+        "icon": "airplane",
+        "icon-color": "#00cccc",
+        "icon-size": 16,
+        "icon-rotate": 45,
+        "icon-animation": true,
+        "icon-animation-loop": true,
+        "icon-animation-speed": 1.1
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [2.3522, 48.8566] },
+      "properties": { "label": "CDG", "fill-color": "#ff0000" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [13.4050, 52.5200] },
+      "properties": { "label": "BER", "fill-color": "#3388ff" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-3.7038, 40.4168] },
+      "properties": { "label": "MAD", "fill-color": "#ff6600" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [12.4964, 41.9028] },
+      "properties": { "label": "FCO", "fill-color": "#00cc66" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-0.1276, 51.5074] },
+      "properties": { "label": "LHR", "fill-color": "#cc0066" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [4.9041, 52.3676] },
+      "properties": { "label": "AMS", "fill-color": "#9933ff" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [16.3738, 48.2082] },
+      "properties": { "label": "VIE", "fill-color": "#ff3366" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [21.0122, 52.2297] },
+      "properties": { "label": "WAW", "fill-color": "#ffcc00" }
+    },
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [-9.1393, 38.7223] },
+      "properties": { "label": "LIS", "fill-color": "#00cccc" }
+    }
+  ]
+}
