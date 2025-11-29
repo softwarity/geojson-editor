@@ -19,7 +19,7 @@ function minifyLiteralsPlugin() {
   return {
     name: 'minify-literals',
     async transform(code, id) {
-      if (id.endsWith('.js') && code.includes('`')) {
+      if ((id.endsWith('.js') || id.endsWith('.ts')) && code.includes('`')) {
         try {
           const result = await minifyHTMLLiterals(code, { fileName: id });
           return result ? { code: result.code, map: result.map } : null;
@@ -40,7 +40,7 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/geojson-editor.js'),
+      entry: resolve(__dirname, 'src/geojson-editor.ts'),
       name: 'GeoJsonEditor',
       fileName: 'geojson-editor',
       formats: ['es']

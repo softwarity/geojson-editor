@@ -1,12 +1,154 @@
 import styles from './geojson-editor.css?inline';
 import { getTemplate } from './geojson-editor.template.js';
+import type { Feature, FeatureCollection } from 'geojson';
+
+// ========== Type Definitions ==========
+
+/** Geometry type names */
+export type GeometryType = 'Point' | 'MultiPoint' | 'LineString' | 'MultiLineString' | 'Polygon' | 'MultiPolygon';
+
+/** Position in the editor (line and column) */
+export interface CursorPosition {
+  line: number;
+  column: number;
+}
+
+/** Options for set/add/insertAt/open methods */
+export interface SetOptions {
+  /**
+   * Attributes to collapse after loading.
+   * - string[]: List of attribute names (e.g., ['coordinates', 'geometry'])
+   * - function: Dynamic function (feature, index) => string[]
+   * - '$root': Special keyword to collapse entire features
+   * - Empty array: No auto-collapse
+   * @default ['coordinates']
+   */
+  collapsed?: string[] | ((feature: Feature, index: number) => string[]);
+}
+
+/** Theme configuration */
+export interface ThemeConfig {
+  bgColor?: string;
+  textColor?: string;
+  caretColor?: string;
+  gutterBg?: string;
+  gutterBorder?: string;
+  gutterText?: string;
+  jsonKey?: string;
+  jsonString?: string;
+  jsonNumber?: string;
+  jsonBoolean?: string;
+  jsonNull?: string;
+  jsonPunct?: string;
+  jsonError?: string;
+  controlColor?: string;
+  controlBg?: string;
+  controlBorder?: string;
+  geojsonKey?: string;
+  geojsonType?: string;
+  geojsonTypeInvalid?: string;
+  jsonKeyInvalid?: string;
+}
+
+/** Theme settings for dark and light modes */
+export interface ThemeSettings {
+  dark?: ThemeConfig;
+  light?: ThemeConfig;
+}
+
+/** Color metadata for a line */
+interface ColorMeta {
+  attributeName: string;
+  color: string;
+}
+
+/** Boolean metadata for a line */
+interface BooleanMeta {
+  attributeName: string;
+  value: boolean;
+}
+
+/** Collapse button metadata */
+interface CollapseButtonMeta {
+  nodeKey: string;
+  nodeId: string;
+  isCollapsed: boolean;
+}
+
+/** Visibility button metadata */
+interface VisibilityButtonMeta {
+  featureKey: string;
+  isHidden: boolean;
+}
+
+/** Line metadata */
+interface LineMeta {
+  colors: ColorMeta[];
+  booleans: BooleanMeta[];
+  collapseButton: CollapseButtonMeta | null;
+  visibilityButton: VisibilityButtonMeta | null;
+  isHidden: boolean;
+  isCollapsed: boolean;
+  featureKey: string | null;
+}
+
+/** Visible line data */
+interface VisibleLine {
+  index: number;
+  content: string;
+  meta: LineMeta | undefined;
+}
+
+/** Feature range in the editor */
+interface FeatureRange {
+  startLine: number;
+  endLine: number;
+  featureIndex: number;
+}
+
+/** Node range info */
+interface NodeRangeInfo {
+  startLine: number;
+  endLine: number;
+  nodeKey?: string;
+  isRootFeature?: boolean;
+}
+
+/** Collapsible range info */
+interface CollapsibleRange extends NodeRangeInfo {
+  nodeId: string;
+  openBracket: string;
+}
+
+/** Editor state snapshot for undo/redo */
+interface EditorSnapshot {
+  lines: string[];
+  cursorLine: number;
+  cursorColumn: number;
+  timestamp: number;
+}
+
+/** Bracket count result */
+interface BracketCount {
+  open: number;
+  close: number;
+}
+
+/** Context stack item */
+interface ContextStackItem {
+  context: string;
+  isArray: boolean;
+}
+
+/** Input types accepted by API methods */
+export type FeatureInput = Feature | Feature[] | FeatureCollection;
 
 // Version injected by Vite build from package.json
 const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
 
 // GeoJSON constants
-const GEOJSON_KEYS = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
-const GEOMETRY_TYPES = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
+const GEOJSON_KEYS: string[] = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
+const GEOMETRY_TYPES: GeometryType[] = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
 
 // Pre-compiled regex patterns for performance (avoid re-creation on each call)
 const RE_CONTEXT_GEOMETRY = /"geometry"\s*:/;
@@ -36,56 +178,66 @@ const RE_WHITESPACE_SPLIT = /(\s+)/;
  * Monaco-like architecture with virtualized line rendering
  */
 class GeoJsonEditor extends HTMLElement {
+  // ========== Model (Source of Truth) ==========
+  lines: string[] = [];
+  collapsedNodes: Set<string> = new Set();
+  hiddenFeatures: Set<string> = new Set();
+
+  // ========== Node ID Management ==========
+  private _nodeIdCounter: number = 0;
+  private _lineToNodeId: Map<number, string> = new Map();
+  private _nodeIdToLines: Map<string, NodeRangeInfo> = new Map();
+
+  // ========== Derived State (computed from model) ==========
+  visibleLines: VisibleLine[] = [];
+  lineMetadata: Map<number, LineMeta> = new Map();
+  featureRanges: Map<string, FeatureRange> = new Map();
+
+  // ========== View State ==========
+  viewportHeight: number = 0;
+  lineHeight: number = 19.5;
+  bufferLines: number = 5;
+
+  // ========== Render Cache ==========
+  private _lastStartIndex: number = -1;
+  private _lastEndIndex: number = -1;
+  private _lastTotalLines: number = -1;
+  private _scrollRaf: number | null = null;
+
+  // ========== Cursor/Selection ==========
+  cursorLine: number = 0;
+  cursorColumn: number = 0;
+  selectionStart: CursorPosition | null = null;
+  selectionEnd: CursorPosition | null = null;
+
+  // ========== Debounce ==========
+  private renderTimer: number | null = null;
+  private inputTimer: number | null = null;
+
+  // ========== Theme ==========
+  themes: ThemeSettings = { dark: {}, light: {} };
+
+  // ========== Undo/Redo History ==========
+  private _undoStack: EditorSnapshot[] = [];
+  private _redoStack: EditorSnapshot[] = [];
+  private _maxHistorySize: number = 100;
+  private _lastActionTime: number = 0;
+  private _lastActionType: string | null = null;
+  private _groupingDelay: number = 500;
+
+  // ========== Internal State ==========
+  private _isSelecting: boolean = false;
+  private _isComposing: boolean = false;
+  private _blockRender: boolean = false;
+  private _charWidth: number | null = null;
+  private _contextMapCache: Map<number, string> | null = null;
+  private _contextMapLinesLength: number = 0;
+  private _contextMapFirstLine: string | undefined = undefined;
+  private _contextMapLastLine: string | undefined = undefined;
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-
-    // ========== Model (Source of Truth) ==========
-    this.lines = [];              // Array of line strings
-    this.collapsedNodes = new Set(); // Set of unique node IDs that are collapsed
-    this.hiddenFeatures = new Set(); // Set of feature keys hidden from events
-    
-    // ========== Node ID Management ==========
-    this._nodeIdCounter = 0;      // Counter for generating unique node IDs
-    this._lineToNodeId = new Map(); // lineIndex -> nodeId (for collapsible lines)
-    this._nodeIdToLines = new Map(); // nodeId -> {startLine, endLine} (range of collapsed content)
-    
-    // ========== Derived State (computed from model) ==========
-    this.visibleLines = [];       // Lines to render (after collapse filter)
-    this.lineMetadata = new Map(); // lineIndex -> {colors, booleans, collapse, visibility, hidden, featureKey}
-    this.featureRanges = new Map(); // featureKey -> {startLine, endLine, featureIndex}
-    
-    // ========== View State ==========
-    this.viewportHeight = 0;
-    this.lineHeight = 19.5;       // CSS: line-height * font-size = 1.5 * 13px
-    this.bufferLines = 5;         // Extra lines to render above/below viewport
-    
-    // ========== Render Cache ==========
-    this._lastStartIndex = -1;
-    this._lastEndIndex = -1;
-    this._lastTotalLines = -1;
-    this._scrollRaf = null;
-    
-    // ========== Cursor/Selection ==========
-    this.cursorLine = 0;
-    this.cursorColumn = 0;
-    this.selectionStart = null;   // {line, column}
-    this.selectionEnd = null;     // {line, column}
-    
-    // ========== Debounce ==========
-    this.renderTimer = null;
-    this.inputTimer = null;
-    
-    // ========== Theme ==========
-    this.themes = { dark: {}, light: {} };
-
-    // ========== Undo/Redo History ==========
-    this._undoStack = [];         // Stack of previous states
-    this._redoStack = [];         // Stack of undone states
-    this._maxHistorySize = 100;   // Maximum history entries
-    this._lastActionTime = 0;     // Timestamp of last action (for grouping)
-    this._lastActionType = null;  // Type of last action (for grouping)
-    this._groupingDelay = 500;    // ms - actions within this delay are grouped
   }
 
   // ========== Render Cache ==========
@@ -435,12 +587,12 @@ class GeoJsonEditor extends HTMLElement {
     this.updatePlaceholderVisibility();
   }
 
-  disconnectedCallback() {
+  disconnectedCallback(): void {
     if (this.renderTimer) clearTimeout(this.renderTimer);
     if (this.inputTimer) clearTimeout(this.inputTimer);
-    
+
     // Cleanup color picker
-    const colorPicker = document.querySelector('.geojson-color-picker-input');
+    const colorPicker = document.querySelector('.geojson-color-picker-input') as HTMLInputElement & { _closeListener?: EventListener };
     if (colorPicker) {
       if (colorPicker._closeListener) {
         document.removeEventListener('click', colorPicker._closeListener, true);
@@ -509,9 +661,10 @@ class GeoJsonEditor extends HTMLElement {
       this.handleEditorClick(e);
     }, true);
 
-    viewport.addEventListener('mousedown', (e) => {
+    viewport.addEventListener('mousedown', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
       // Skip if clicking on visibility pseudo-element (line-level)
-      const lineEl = e.target.closest('.line.has-visibility');
+      const lineEl = target.closest('.line.has-visibility');
       if (lineEl) {
         const rect = lineEl.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
@@ -523,9 +676,9 @@ class GeoJsonEditor extends HTMLElement {
       }
 
       // Skip if clicking on an inline control pseudo-element (positioned with negative left)
-      if (e.target.classList.contains('json-color') ||
-          e.target.classList.contains('json-boolean')) {
-        const rect = e.target.getBoundingClientRect();
+      if (target.classList.contains('json-color') ||
+          target.classList.contains('json-boolean')) {
+        const rect = target.getBoundingClientRect();
         const clickX = e.clientX - rect.left;
         // Pseudo-element is at left: -8px, so clickX will be negative when clicking on it
         if (clickX < 0 && clickX >= -8) {
@@ -670,7 +823,7 @@ class GeoJsonEditor extends HTMLElement {
     });
 
     // Wheel on gutter -> scroll viewport
-    gutter.addEventListener('wheel', (e) => {
+    gutter.addEventListener('wheel', (e: WheelEvent) => {
       e.preventDefault();
       viewport.scrollTop += e.deltaY;
     });
@@ -1018,7 +1171,7 @@ class GeoJsonEditor extends HTMLElement {
       
       const lineEl = document.createElement('div');
       lineEl.className = 'line';
-      lineEl.dataset.lineIndex = lineData.index;
+      lineEl.dataset.lineIndex = String(lineData.index);
       
       // Add visibility button on line (uses ::before pseudo-element)
       if (lineData.meta?.visibilityButton) {
@@ -1153,7 +1306,7 @@ class GeoJsonEditor extends HTMLElement {
       // Line number first
       const lineNum = document.createElement('span');
       lineNum.className = 'line-number';
-      lineNum.textContent = lineData.index + 1;
+      lineNum.textContent = String(lineData.index + 1);
       gutterLine.appendChild(lineNum);
       
       // Collapse column (always present for alignment)
@@ -1163,7 +1316,7 @@ class GeoJsonEditor extends HTMLElement {
         const btn = document.createElement('div');
         btn.className = 'collapse-button' + (meta.collapseButton.isCollapsed ? ' collapsed' : '');
         btn.textContent = meta.collapseButton.isCollapsed ? '›' : '⌄';
-        btn.dataset.line = lineData.index;
+        btn.dataset.line = String(lineData.index);
         btn.dataset.nodeId = meta.collapseButton.nodeId;
         btn.title = meta.collapseButton.isCollapsed ? 'Expand' : 'Collapse';
         collapseCol.appendChild(btn);
@@ -1187,9 +1340,9 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Input Handling ==========
-  
-  handleInput() {
-    const textarea = this.shadowRoot.getElementById('hiddenTextarea');
+
+  handleInput(): void {
+    const textarea = this.shadowRoot!.getElementById('hiddenTextarea') as HTMLTextAreaElement;
     const inputValue = textarea.value;
     
     if (!inputValue) return;
@@ -1275,10 +1428,10 @@ class GeoJsonEditor extends HTMLElement {
       'Enter': () => this._handleEnter(ctx),
       'Backspace': () => this._handleBackspace(ctx),
       'Delete': () => this._handleDelete(ctx),
-      'ArrowUp': () => this._handleArrowKey(-1, 0, e.shiftKey),
-      'ArrowDown': () => this._handleArrowKey(1, 0, e.shiftKey),
-      'ArrowLeft': () => this._handleArrowKey(0, -1, e.shiftKey),
-      'ArrowRight': () => this._handleArrowKey(0, 1, e.shiftKey),
+      'ArrowUp': () => this._handleArrowKey(-1, 0, e.shiftKey, e.ctrlKey || e.metaKey),
+      'ArrowDown': () => this._handleArrowKey(1, 0, e.shiftKey, e.ctrlKey || e.metaKey),
+      'ArrowLeft': () => this._handleArrowKey(0, -1, e.shiftKey, e.ctrlKey || e.metaKey),
+      'ArrowRight': () => this._handleArrowKey(0, 1, e.shiftKey, e.ctrlKey || e.metaKey),
       'Home': () => this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine),
       'End': () => this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine),
       'Tab': () => this._handleTab(e.shiftKey, ctx)
@@ -1633,21 +1786,26 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
-   * Handle arrow key with optional selection
+   * Handle arrow key with optional selection and word jump
    */
-  _handleArrowKey(deltaLine, deltaCol, isShift) {
+  _handleArrowKey(deltaLine, deltaCol, isShift, isCtrl = false) {
     // Start selection if shift is pressed and no selection exists
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
     }
-    
+
     // Move cursor
     if (deltaLine !== 0) {
       this.moveCursorSkipCollapsed(deltaLine);
     } else if (deltaCol !== 0) {
-      this.moveCursorHorizontal(deltaCol);
+      if (isCtrl) {
+        // Word-by-word movement
+        this._moveCursorByWord(deltaCol);
+      } else {
+        this.moveCursorHorizontal(deltaCol);
+      }
     }
-    
+
     // Update selection end if shift is pressed
     if (isShift) {
       this.selectionEnd = { line: this.cursorLine, column: this.cursorColumn };
@@ -1656,6 +1814,73 @@ class GeoJsonEditor extends HTMLElement {
       this.selectionStart = null;
       this.selectionEnd = null;
     }
+  }
+
+  /**
+   * Move cursor by word (Ctrl+Arrow)
+   * Behavior matches VSCode/Monaco:
+   * - Ctrl+Right: move to end of current word, or start of next word
+   * - Ctrl+Left: move to start of current word, or start of previous word
+   */
+  _moveCursorByWord(direction) {
+    const line = this.lines[this.cursorLine] || '';
+    // Word character: alphanumeric, underscore, or hyphen (for kebab-case identifiers)
+    const isWordChar = (ch) => /[\w-]/.test(ch);
+
+    if (direction > 0) {
+      // Move right
+      let pos = this.cursorColumn;
+
+      if (pos >= line.length) {
+        // At end of line, move to start of next line
+        if (this.cursorLine < this.lines.length - 1) {
+          this.cursorLine++;
+          this.cursorColumn = 0;
+        }
+      } else if (isWordChar(line[pos])) {
+        // Inside a word: move to end of word
+        while (pos < line.length && isWordChar(line[pos])) {
+          pos++;
+        }
+        this.cursorColumn = pos;
+      } else {
+        // On non-word char: skip non-word chars only (stop at start of next word)
+        while (pos < line.length && !isWordChar(line[pos])) {
+          pos++;
+        }
+        this.cursorColumn = pos;
+      }
+    } else {
+      // Move left
+      let pos = this.cursorColumn;
+
+      if (pos === 0) {
+        // At start of line, move to end of previous line
+        if (this.cursorLine > 0) {
+          this.cursorLine--;
+          this.cursorColumn = this.lines[this.cursorLine].length;
+        }
+      } else if (pos > 0 && isWordChar(line[pos - 1])) {
+        // Just after a word char: move to start of word
+        while (pos > 0 && isWordChar(line[pos - 1])) {
+          pos--;
+        }
+        this.cursorColumn = pos;
+      } else {
+        // On or after non-word char: skip non-word chars, then skip word
+        while (pos > 0 && !isWordChar(line[pos - 1])) {
+          pos--;
+        }
+        while (pos > 0 && isWordChar(line[pos - 1])) {
+          pos--;
+        }
+        this.cursorColumn = pos;
+      }
+    }
+
+    this._invalidateRenderCache();
+    this._scrollToCursor();
+    this.scheduleRender();
   }
 
   /**
@@ -2139,11 +2364,11 @@ class GeoJsonEditor extends HTMLElement {
     `;
     document.body.appendChild(anchor);
     
-    const colorInput = document.createElement('input');
+    const colorInput = document.createElement('input') as HTMLInputElement & { _closeListener?: EventListener };
     colorInput.type = 'color';
     colorInput.value = currentColor;
     colorInput.className = 'geojson-color-picker-input';
-    
+
     // Position the color input inside the anchor
     colorInput.style.cssText = `
       position: absolute;
@@ -2157,18 +2382,18 @@ class GeoJsonEditor extends HTMLElement {
       cursor: pointer;
     `;
     anchor.appendChild(colorInput);
-    
-    colorInput.addEventListener('input', (e) => {
-      this.updateColorValue(line, e.target.value, attributeName);
+
+    colorInput.addEventListener('input', (e: Event) => {
+      this.updateColorValue(line, (e.target as HTMLInputElement).value, attributeName);
     });
-    
-    const closeOnClickOutside = (e) => {
+
+    const closeOnClickOutside = (e: Event) => {
       if (e.target !== colorInput) {
         document.removeEventListener('click', closeOnClickOutside, true);
         anchor.remove(); // Remove anchor (which contains the input)
       }
     };
-    
+
     colorInput._closeListener = closeOnClickOutside;
     
     setTimeout(() => {
@@ -2266,10 +2491,10 @@ class GeoJsonEditor extends HTMLElement {
   
   updateReadonly() {
     const textarea = this.shadowRoot.getElementById('hiddenTextarea');
-    const clearBtn = this.shadowRoot.getElementById('clearBtn');
-    
+    const clearBtn = this.shadowRoot!.getElementById('clearBtn') as HTMLButtonElement;
+
     // Use readOnly instead of disabled to allow text selection for copying
-    if (textarea) textarea.readOnly = this.readonly;
+    if (textarea) (textarea as HTMLTextAreaElement).readOnly = this.readonly;
     if (clearBtn) clearBtn.hidden = this.readonly;
   }
 
@@ -2355,13 +2580,13 @@ class GeoJsonEditor extends HTMLElement {
     return `:host-context(${selector})`;
   }
 
-  setTheme(theme) {
+  setTheme(theme: ThemeSettings): void {
     if (theme.dark) this.themes.dark = { ...this.themes.dark, ...theme.dark };
     if (theme.light) this.themes.light = { ...this.themes.light, ...theme.light };
     this.updateThemeCSS();
   }
 
-  resetTheme() {
+  resetTheme(): void {
     this.themes = { dark: {}, light: {} };
     this.updateThemeCSS();
   }
@@ -2730,7 +2955,7 @@ class GeoJsonEditor extends HTMLElement {
    *   - Use '$root' to collapse the entire feature
    * @throws {Error} If input is invalid
    */
-  set(input, options = {}) {
+  set(input: FeatureInput, options: SetOptions = {}): void {
     const features = this._normalizeToFeatures(input);
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
     this.setValue(formatted, false); // Don't auto-collapse coordinates
@@ -2745,7 +2970,7 @@ class GeoJsonEditor extends HTMLElement {
    * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
    * @throws {Error} If input is invalid
    */
-  add(input, options = {}) {
+  add(input: FeatureInput, options: SetOptions = {}): void {
     const newFeatures = this._normalizeToFeatures(input);
     const existingFeatures = this._parseFeatures();
     const allFeatures = [...existingFeatures, ...newFeatures];
@@ -2763,7 +2988,7 @@ class GeoJsonEditor extends HTMLElement {
    * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
    * @throws {Error} If input is invalid
    */
-  insertAt(input, index, options = {}) {
+  insertAt(input: FeatureInput, index: number, options: SetOptions = {}): void {
     const newFeatures = this._normalizeToFeatures(input);
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
@@ -2773,7 +2998,7 @@ class GeoJsonEditor extends HTMLElement {
     this._applyCollapsedFromOptions(options, features);
   }
 
-  removeAt(index) {
+  removeAt(index: number): Feature | undefined {
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
     if (idx >= 0 && idx < features.length) {
@@ -2784,7 +3009,7 @@ class GeoJsonEditor extends HTMLElement {
     return undefined;
   }
 
-  removeAll() {
+  removeAll(): Feature[] {
     if (this.lines.length > 0) {
       this._saveToHistory('removeAll');
     }
@@ -2799,26 +3024,24 @@ class GeoJsonEditor extends HTMLElement {
     return removed;
   }
 
-  get(index) {
+  get(index: number): Feature | undefined {
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
     return features[idx];
   }
 
-  getAll() {
+  getAll(): Feature[] {
     return this._parseFeatures();
   }
 
-  emit() {
+  emit(): void {
     this.emitChange();
   }
 
   /**
    * Save GeoJSON to a file (triggers download)
-   * @param {string} filename - Optional filename (default: 'features.geojson')
-   * @returns {boolean} True if save was successful
    */
-  save(filename = 'features.geojson') {
+  save(filename: string = 'features.geojson'): boolean {
     try {
       const features = this._parseFeatures();
       const geojson = {
@@ -2850,15 +3073,15 @@ class GeoJsonEditor extends HTMLElement {
    * @param {string[]|function} options.collapsed - Attributes to collapse (default: ['coordinates'])
    * @returns {Promise<boolean>} Promise that resolves to true if file was loaded successfully
    */
-  open(options = {}) {
+  open(options: SetOptions = {}): Promise<boolean> {
     return new Promise((resolve) => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.geojson,.json,application/geo+json,application/json';
       input.style.display = 'none';
 
-      input.addEventListener('change', (e) => {
-        const file = e.target.files?.[0];
+      input.addEventListener('change', (e: Event) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
         if (!file) {
           document.body.removeChild(input);
           resolve(false);
@@ -2866,9 +3089,9 @@ class GeoJsonEditor extends HTMLElement {
         }
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (event: ProgressEvent<FileReader>) => {
           try {
-            const content = event.target.result;
+            const content = event.target?.result as string;
             const parsed = JSON.parse(content);
 
             // Normalize and validate features

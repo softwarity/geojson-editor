@@ -67,8 +67,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
 - **Color Picker** - Built-in color swatch for hex color properties (`#rrggbb`) displayed inline next to the value; click to open native color picker
 - **Boolean Checkbox** - Inline checkbox for boolean properties displayed next to the value; toggle to switch between `true`/`false` and emit changes (e.g., `marker: true` to show vertices)
-- **Default Properties** - Auto-inject default visualization properties (fill-color, stroke-color, etc.) into features based on configurable rules
-- **Dark/Light Themes** - Automatic theme detection from parent page (Bootstrap, Tailwind, custom)
+- **Dark/Light Color Schemes** - Automatic color scheme detection from parent page (Bootstrap, Tailwind, custom)
 - **Auto-format** - Automatic JSON formatting in real-time (always enabled)
 - **Readonly Mode** - Visual indicator with diagonal stripes when editing is disabled
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
@@ -111,11 +110,35 @@ If you're using a bundler (Vite, Webpack, Rollup, etc.):
 npm install @softwarity/geojson-editor
 ```
 
-Then import in your JavaScript:
+Then import in your JavaScript/TypeScript:
 
 ```javascript
 import '@softwarity/geojson-editor';
 ```
+
+### TypeScript Support
+
+This package includes TypeScript type definitions out of the box. No additional `@types/*` package required.
+
+```typescript
+import '@softwarity/geojson-editor';
+import type { SetOptions, ThemeSettings, CursorPosition, GeometryType } from '@softwarity/geojson-editor';
+
+// Type-safe editor access
+const editor = document.querySelector('geojson-editor') as GeoJsonEditor;
+
+// Full autocompletion and type checking
+editor.set(features, { collapsed: ['coordinates'] });
+editor.setTheme({ dark: { bgColor: '#1a1a1a' } });
+```
+
+**Exported types:**
+- `GeoJsonEditor` - The Web Component class
+- `SetOptions` - Options for `set()`, `add()`, `insertAt()`, `open()`
+- `ThemeConfig` - Theme color configuration
+- `ThemeSettings` - Dark/light color scheme settings
+- `CursorPosition` - Cursor position `{ line, column }`
+- `GeometryType` - GeoJSON geometry types union
 
 ## Usage
 
@@ -166,13 +189,13 @@ editor.addEventListener('error', (e) => {
 | `value` | `string` | `""` | Initial editor content (features array content) |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
-| `dark-selector` | `string` | `".dark"` | CSS selector for dark theme (if matches → dark, else → light) |
+| `dark-selector` | `string` | `".dark"` | CSS selector for dark color scheme detection |
 
 **Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. Use Tab to expand and Shift+Tab to collapse nodes, or click the gutter toggle.
 
 ### Dark Selector Syntax
 
-The `dark-selector` attribute determines when the dark theme is active. If the selector matches, dark theme is applied; otherwise, light theme is used.
+The `dark-selector` attribute determines when the dark color scheme is active. If the selector matches, dark colors are applied; otherwise, light colors are used.
 
 **Examples:**
 
@@ -388,6 +411,10 @@ const success = await editor.open({ collapsed: ['$root'] });
 | `Ctrl+C` / `Cmd+C` | Copy |
 | `Ctrl+X` / `Cmd+X` | Cut |
 | `Ctrl+V` / `Cmd+V` | Paste |
+| `Ctrl+←` / `Cmd+←` | Move cursor to previous word |
+| `Ctrl+→` / `Cmd+→` | Move cursor to next word |
+| `Ctrl+Shift+←` / `Cmd+Shift+←` | Select to previous word |
+| `Ctrl+Shift+→` / `Cmd+Shift+→` | Select to next word |
 | `Tab` | Expand collapsed node at cursor |
 | `Shift+Tab` | Collapse innermost node containing cursor |
 

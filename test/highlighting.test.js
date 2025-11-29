@@ -1,5 +1,5 @@
 import { expect, fixture, html } from '@open-wc/testing';
-import GeoJsonEditor from '../src/geojson-editor.js';
+import GeoJsonEditor from '../src/geojson-editor.ts';
 
 // Helper to wait for component to stabilize
 const waitFor = (ms = 100) => new Promise(r => setTimeout(r, ms));

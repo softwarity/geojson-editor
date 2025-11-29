@@ -38,7 +38,7 @@ This will:
 - Watch for file changes and rebuild automatically
 
 **Development workflow:**
-1. Edit `src/geojson-editor.js`
+1. Edit `src/geojson-editor.ts`
 2. Save the file
 3. Browser refreshes automatically
 4. Test changes in the demo
@@ -52,8 +52,8 @@ npm run build
 ```
 
 This creates:
-- `dist/geojson-editor.js` - Production-ready ES module
-- Minified and optimized for npm distribution
+- `dist/geojson-editor.js` - Production-ready ES module (minified)
+- `types/geojson-editor.d.ts` - TypeScript type definitions
 
 ### 3. Preview Production Build
 
@@ -105,7 +105,7 @@ Tests are split across 7 themed files for better maintainability:
 | `editing.test.js` | Text insertion, deletion, newlines |
 | `highlighting.test.js` | Syntax highlighting, themes, gutter |
 | `api.test.js` | Features API, collapse/expand, visibility, collapsed option |
-| `shortcuts.test.js` | Keyboard shortcuts (Ctrl+Z, Ctrl+S, Ctrl+O, Tab) |
+| `shortcuts.test.js` | Keyboard shortcuts (Ctrl+Z, Ctrl+S, Ctrl+O, Tab, Ctrl+Arrow) |
 
 ### Coverage Report
 
@@ -127,7 +127,7 @@ Tests are located in the `test/` directory. Example test structure:
 
 ```javascript
 import { fixture, html, expect } from '@open-wc/testing';
-import '../src/geojson-editor.js';
+import '../src/geojson-editor.ts';
 
 // Helper for async operations
 const waitFor = (ms = 100) => new Promise(r => setTimeout(r, ms));
@@ -243,9 +243,12 @@ Now changes to the source will be reflected immediately.
 ```
 geojson-editor/
 ├── src/
-│   ├── geojson-editor.js       # Main Web Component (~2500 lines)
-│   ├── geojson-editor.css      # Styles with CSS variables (~450 lines)
-│   └── geojson-editor.template.js # HTML template generator
+│   ├── geojson-editor.ts       # Main Web Component (TypeScript, ~3000 lines)
+│   ├── geojson-editor.css      # Styles with CSS variables (~400 lines)
+│   ├── geojson-editor.template.ts # HTML template generator
+│   └── vite-env.d.ts           # TypeScript declarations for Vite
+├── types/                      # Generated TypeScript declarations
+│   └── geojson-editor.d.ts     # Exported types for consumers
 ├── test/
 │   ├── geojson-editor.test.js  # Original comprehensive tests
 │   ├── rendering.test.js       # Basic rendering, attributes, UI
@@ -253,13 +256,13 @@ geojson-editor/
 │   ├── editing.test.js         # Text insertion, deletion, features API
 │   ├── highlighting.test.js    # Syntax highlighting, themes
 │   ├── api.test.js             # Features API, collapse, visibility, collapsed option
-│   ├── shortcuts.test.js       # Keyboard shortcuts (Ctrl+Z/S/O, Tab)
+│   ├── shortcuts.test.js       # Keyboard shortcuts (Ctrl+Z/S/O, Tab, Ctrl+Arrow)
 │   └── fixtures/
 │       └── geojson-samples.js  # Shared test data
 ├── demo/
 │   └── index.html              # Interactive demo page
 ├── dist/                       # Built output (generated)
-│   └── geojson-editor.js       # Production bundle (~15 KB gzipped)
+│   └── geojson-editor.js       # Production bundle (~13.5 KB gzipped)
 ├── coverage/                   # Coverage reports (generated)
 │   └── lcov-report/            # HTML coverage report
 ├── .github/
@@ -269,6 +272,7 @@ geojson-editor/
 │       ├── tag.yml             # Publish to npm on tag
 │       └── deploy-demo.yml     # Deploy demo to GitHub Pages
 ├── package.json                # Package configuration
+├── tsconfig.json               # TypeScript configuration
 ├── vite.config.js              # Vite build configuration
 ├── web-test-runner.config.js   # Test runner configuration (with CSS middleware)
 ├── README.md                   # User documentation
@@ -318,7 +322,7 @@ editor.setTheme({
 ### 2. Live Reload
 
 Vite provides instant feedback:
-- Edit `src/geojson-editor.js`
+- Edit `src/geojson-editor.ts`
 - Save (Ctrl+S)
 - Browser auto-refreshes
 - No manual reload needed
@@ -339,7 +343,7 @@ Edit `demo/index.html` to test edge cases:
 <!-- Test with placeholder -->
 <geojson-editor placeholder="Enter GeoJSON features..."></geojson-editor>
 
-<!-- Test with dark theme detection (Tailwind style) -->
+<!-- Test with dark color scheme detection (Tailwind style) -->
 <geojson-editor dark-selector="html.dark"></geojson-editor>
 ```
 
@@ -401,18 +405,18 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all 286 unit tests
+- [ ] `npm test` passes all 304 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work:
   - Collapse/expand with Tab/Shift+Tab
   - Inline color picker
   - Boolean checkbox toggle
-  - Themes (dark/light)
+  - Color schemes (dark/light)
 - [ ] `npm run build` completes successfully
 - [ ] `dist/geojson-editor.js` exists and is not empty
 - [ ] No console errors in browser DevTools
-- [ ] Works in both dark and light themes
+- [ ] Works in both dark and light color schemes
 - [ ] FeatureCollection prefix/suffix displays correctly with gutter
 - [ ] Feature visibility toggle works (eye icon)
 - [ ] Clear button works (✕ in suffix area)
@@ -431,7 +435,7 @@ Before submitting changes, verify:
 # 1. Create feature branch
 git checkout -b feature/my-new-feature
 
-# 2. Make changes to src/geojson-editor.js
+# 2. Make changes to src/geojson-editor.ts
 # 3. Test in dev server
 npm run dev
 
@@ -539,7 +543,9 @@ The demo includes:
 # Development
 npm install          # Install dependencies
 npm run dev          # Start dev server (http://localhost:5173)
-npm run build        # Build for production
+npm run build        # Build for production (JS + types)
+npm run build:types  # Generate TypeScript declarations only
+npm run typecheck    # Type-check without emitting
 npm run preview      # Preview production build
 
 # Testing

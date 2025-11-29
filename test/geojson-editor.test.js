@@ -1,5 +1,5 @@
 import { expect, fixture, html, oneEvent } from '@open-wc/testing';
-import GeoJsonEditor from '../src/geojson-editor.js';
+import GeoJsonEditor from '../src/geojson-editor.ts';
 import {
   validPointStr,
   validPolygonStr,

@@ -1,9 +1,7 @@
 /**
  * HTML Template for GeoJSON Editor
- * @param {string} placeholder - Placeholder text
- * @returns {string} HTML template string
  */
-export function getTemplate(placeholder = '', version = '') {
+export function getTemplate(placeholder: string = '', version: string = ''): string {
   return `
     <div class="prefix-wrapper">
       <div class="prefix-gutter"></div>
@@ -46,10 +44,8 @@ export function getTemplate(placeholder = '', version = '') {
 
 /**
  * Escape HTML special characters
- * @param {string} text - Text to escape
- * @returns {string} Escaped text
  */
-function escapeHtml(text) {
+function escapeHtml(text: string): string {
   if (!text) return '';
   return text
     .replace(/&/g, '&amp;')

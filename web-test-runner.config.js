@@ -38,7 +38,7 @@ export default {
   // Plugins to handle Vite-specific imports
   plugins: [
     inlineCssPlugin(),
-    esbuildPlugin({ ts: false }),
+    esbuildPlugin({ ts: true, target: 'es2020' }),
   ],
 
   // Use Playwright for real headless browser testing
@@ -58,7 +58,7 @@ export default {
   coverageConfig: {
     reportDir: 'coverage',
     reporters: ['html', 'lcov', 'text-summary'],
-    include: ['src/**/*.js'],
+    include: ['src/**/*.ts'],
     threshold: {
       statements: 60,
       branches: 50,

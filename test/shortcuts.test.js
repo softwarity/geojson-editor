@@ -1,5 +1,5 @@
 import { expect, fixture, html } from '@open-wc/testing';
-import GeoJsonEditor from '../src/geojson-editor.js';
+import GeoJsonEditor from '../src/geojson-editor.ts';
 import {
   validPoint,
   validPolygon
@@ -393,6 +393,225 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
       // Should be collapsed now
       expect(el.collapsedNodes.has(range.nodeId)).to.be.true;
     }
+  });
+});
+
+describe('GeoJsonEditor - Word Navigation Shortcuts', () => {
+
+  it('should move cursor to next word with Ctrl+ArrowRight', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"hello": "world"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 2; // At 'h' of hello
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should jump past 'hello' to the next boundary
+    expect(el.cursorColumn).to.be.greaterThan(6);
+  });
+
+  it('should move cursor to previous word with Ctrl+ArrowLeft', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"hello": "world"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 12; // At 'w' of world
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should jump back to before 'world'
+    expect(el.cursorColumn).to.be.lessThan(12);
+  });
+
+  it('should select word with Ctrl+Shift+ArrowRight', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"hello": "world"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 2; // At 'h' of hello
+    el.selectionStart = null;
+    el.selectionEnd = null;
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should have a selection
+    expect(el.selectionStart).to.exist;
+    expect(el.selectionEnd).to.exist;
+    expect(el.selectionStart.column).to.equal(2);
+    expect(el.selectionEnd.column).to.be.greaterThan(6);
+  });
+
+  it('should select word with Ctrl+Shift+ArrowLeft', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"hello": "world"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 16; // At end of 'world'
+    el.selectionStart = null;
+    el.selectionEnd = null;
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should have a selection
+    expect(el.selectionStart).to.exist;
+    expect(el.selectionEnd).to.exist;
+    expect(el.selectionStart.column).to.equal(16);
+    expect(el.selectionEnd.column).to.be.lessThan(16);
+  });
+
+  it('should move cursor with Cmd+ArrowRight (macOS)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"hello": "world"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 2;
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      metaKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    expect(el.cursorColumn).to.be.greaterThan(6);
+  });
+
+  it('should select word with Cmd+Shift+ArrowRight (macOS)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"hello": "world"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 2;
+    el.selectionStart = null;
+    el.selectionEnd = null;
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      metaKey: true,
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    expect(el.selectionStart).to.exist;
+    expect(el.selectionEnd).to.exist;
+  });
+
+  it('should move to next line when at end of line with Ctrl+ArrowRight', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}', '{"b": 2}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 8; // End of first line
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should be on second line
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('should move to previous line when at start of line with Ctrl+ArrowLeft', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"a": 1}', '{"b": 2}'];
+    el.cursorLine = 1;
+    el.cursorColumn = 0; // Start of second line
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should be at end of first line
+    expect(el.cursorLine).to.equal(0);
+    expect(el.cursorColumn).to.equal(8);
   });
 });
 

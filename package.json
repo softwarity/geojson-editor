@@ -5,21 +5,26 @@
   "type": "module",
   "main": "./dist/geojson-editor.js",
   "module": "./dist/geojson-editor.js",
+  "types": "./types/geojson-editor.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/geojson-editor.js"
+      "import": "./dist/geojson-editor.js",
+      "types": "./types/geojson-editor.d.ts"
     }
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "types"
   ],
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run build:types",
+    "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir types",
     "preview": "vite preview",
     "test": "web-test-runner",
-    "test:watch": "web-test-runner --watch"
+    "test:watch": "web-test-runner --watch",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",
@@ -42,10 +47,12 @@
   "devDependencies": {
     "@esm-bundle/chai": "^4.3.4-fix.0",
     "@open-wc/testing": "^4.0.0",
+    "@types/geojson": "^7946.0.16",
     "@web/dev-server-esbuild": "^1.0.4",
     "@web/test-runner": "^0.20.2",
     "@web/test-runner-playwright": "^0.11.1",
     "minify-literals": "^1.0.10",
+    "typescript": "^5.9.3",
     "vite": "^7.2.4"
   }
 }
