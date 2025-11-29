@@ -1827,14 +1827,36 @@ class GeoJsonEditor extends HTMLElement {
     // Word character: alphanumeric, underscore, or hyphen (for kebab-case identifiers)
     const isWordChar = (ch) => /[\w-]/.test(ch);
 
+    // Check if we're on a collapsed node's opening line
+    const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
+
     if (direction > 0) {
       // Move right
       let pos = this.cursorColumn;
 
+      // If on collapsed node opening line and cursor is at/after the bracket, jump to closing line
+      if (onCollapsed) {
+        const bracketPos = line.search(/[{\[]/);
+        if (bracketPos >= 0 && pos >= bracketPos) {
+          this.cursorLine = onCollapsed.endLine;
+          this.cursorColumn = (this.lines[this.cursorLine] || '').length;
+          this._invalidateRenderCache();
+          this._scrollToCursor();
+          this.scheduleRender();
+          return;
+        }
+      }
+
       if (pos >= line.length) {
-        // At end of line, move to start of next line
+        // At end of line, move to start of next visible line
         if (this.cursorLine < this.lines.length - 1) {
-          this.cursorLine++;
+          let nextLine = this.cursorLine + 1;
+          // Skip collapsed zones
+          const collapsed = this._getCollapsedRangeForLine(nextLine);
+          if (collapsed) {
+            nextLine = collapsed.endLine;
+          }
+          this.cursorLine = Math.min(nextLine, this.lines.length - 1);
           this.cursorColumn = 0;
         }
       } else if (isWordChar(line[pos])) {
@@ -1854,10 +1876,33 @@ class GeoJsonEditor extends HTMLElement {
       // Move left
       let pos = this.cursorColumn;
 
+      // Check if we're on closing line of a collapsed node
+      const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
+      if (onClosingLine) {
+        const bracketPos = this._getClosingBracketPos(line);
+        if (bracketPos >= 0 && pos <= bracketPos + 1) {
+          // Jump to opening line, after the bracket
+          this.cursorLine = onClosingLine.startLine;
+          const openLine = this.lines[this.cursorLine] || '';
+          const openBracketPos = openLine.search(/[{\[]/);
+          this.cursorColumn = openBracketPos >= 0 ? openBracketPos : 0;
+          this._invalidateRenderCache();
+          this._scrollToCursor();
+          this.scheduleRender();
+          return;
+        }
+      }
+
       if (pos === 0) {
-        // At start of line, move to end of previous line
+        // At start of line, move to end of previous visible line
         if (this.cursorLine > 0) {
-          this.cursorLine--;
+          let prevLine = this.cursorLine - 1;
+          // Skip collapsed zones
+          const collapsed = this._getCollapsedRangeForLine(prevLine);
+          if (collapsed) {
+            prevLine = collapsed.startLine;
+          }
+          this.cursorLine = Math.max(prevLine, 0);
           this.cursorColumn = this.lines[this.cursorLine].length;
         }
       } else if (pos > 0 && isWordChar(line[pos - 1])) {

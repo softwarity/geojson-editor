@@ -613,6 +613,137 @@ describe('GeoJsonEditor - Word Navigation Shortcuts', () => {
     expect(el.cursorLine).to.equal(0);
     expect(el.cursorColumn).to.equal(8);
   });
+
+  it('should skip collapsed node with Ctrl+ArrowRight', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    // Simulate a collapsed coordinates array
+    el.lines = [
+      '{',
+      '  "coordinates": [',
+      '    1,',
+      '    2',
+      '  ]',
+      '}'
+    ];
+    el.updateModel();
+    await waitFor(100);
+
+    // Collapse the coordinates node (line 1)
+    const nodeId = el._lineToNodeId.get(1);
+    if (nodeId) {
+      el.collapsedNodes.add(nodeId);
+    }
+    el.updateView();
+    el.scheduleRender();
+    await waitFor(100);
+
+    // Position cursor at the bracket on line 1
+    el.cursorLine = 1;
+    el.cursorColumn = 17; // At the '['
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should jump to closing line (line 4: "  ]")
+    expect(el.cursorLine).to.equal(4);
+    expect(el.cursorColumn).to.equal(el.lines[4].length);
+  });
+
+  it('should skip collapsed node with Ctrl+ArrowLeft from closing line', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    // Simulate a collapsed coordinates array
+    el.lines = [
+      '{',
+      '  "coordinates": [',
+      '    1,',
+      '    2',
+      '  ]',
+      '}'
+    ];
+    el.updateModel();
+    await waitFor(100);
+
+    // Collapse the coordinates node (line 1)
+    const nodeId = el._lineToNodeId.get(1);
+    if (nodeId) {
+      el.collapsedNodes.add(nodeId);
+    }
+    el.updateView();
+    el.scheduleRender();
+    await waitFor(100);
+
+    // Position cursor at the closing bracket on line 4
+    el.cursorLine = 4;
+    el.cursorColumn = 3; // At the ']'
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should jump to opening line (line 1), at the '['
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(17); // Position of '['
+  });
+
+  it('should skip collapsed zone when moving to next line with Ctrl+ArrowRight', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = [
+      '{',
+      '  "a": [',
+      '    1',
+      '  ],',
+      '  "b": 2',
+      '}'
+    ];
+    el.updateModel();
+    await waitFor(100);
+
+    // Collapse the "a" array (line 1)
+    const nodeId = el._lineToNodeId.get(1);
+    if (nodeId) {
+      el.collapsedNodes.add(nodeId);
+    }
+    el.updateView();
+    el.scheduleRender();
+    await waitFor(100);
+
+    // Position cursor at end of opening line, after the bracket
+    el.cursorLine = 1;
+    el.cursorColumn = 8; // After the '['
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should skip the collapsed content and land on the closing line
+    expect(el.cursorLine).to.equal(3);
+    expect(el.cursorColumn).to.equal(el.lines[3].length);
+  });
 });
 
 describe('GeoJsonEditor - Copy/Paste Shortcuts', () => {
