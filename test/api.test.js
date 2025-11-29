@@ -1488,3 +1488,151 @@ describe('GeoJsonEditor - Collapsed Option', () => {
     expect(el.collapsedNodes.has(propertiesRange.nodeId)).to.be.true;
   });
 });
+
+describe('GeoJsonEditor - Inline Controls', () => {
+
+  it('should update boolean value via updateBooleanValue()', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set a feature with a boolean property
+    const featureWithBool = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { visible: true }
+    };
+    el.set([featureWithBool], { collapsed: [] });
+    await waitFor(200);
+
+    // Find the line with the boolean
+    const boolLineIndex = el.lines.findIndex(line => line.includes('"visible"'));
+    expect(boolLineIndex).to.be.greaterThan(-1);
+
+    // Update boolean value to false
+    el.updateBooleanValue(boolLineIndex, false, 'visible');
+    await waitFor(100);
+
+    // Verify the value was updated
+    expect(el.lines[boolLineIndex]).to.include('false');
+  });
+
+  it('should update color value via updateColorValue()', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set a feature with a color property
+    const featureWithColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { color: '#ff0000' }
+    };
+    el.set([featureWithColor], { collapsed: [] });
+    await waitFor(200);
+
+    // Find the line with the color
+    const colorLineIndex = el.lines.findIndex(line => line.includes('"color"'));
+    expect(colorLineIndex).to.be.greaterThan(-1);
+
+    // Update color value
+    el.updateColorValue(colorLineIndex, '#00ff00', 'color');
+    await waitFor(100);
+
+    // Verify the value was updated
+    expect(el.lines[colorLineIndex]).to.include('#00ff00');
+  });
+
+  it('should emit() manually trigger change event', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint], { collapsed: [] });
+    await waitFor(200);
+
+    let changeEventFired = false;
+    el.addEventListener('change', () => {
+      changeEventFired = true;
+    });
+
+    el.emit();
+    await waitFor(50);
+
+    expect(changeEventFired).to.be.true;
+  });
+});
+
+describe('GeoJsonEditor - Selection Highlight', () => {
+
+  it('should add selection highlight via _addSelectionHighlight()', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint], { collapsed: [] });
+    await waitFor(200);
+
+    // Set up a selection
+    el.selectionStart = { line: 0, column: 0 };
+    el.selectionEnd = { line: 0, column: 5 };
+
+    const lineContent = el.lines[0];
+    const html = '<span>test content</span>';
+
+    const result = el._addSelectionHighlight(html, 0, lineContent);
+
+    // Should contain selection span
+    expect(result).to.include('class="selection"');
+  });
+
+  it('should return unchanged html if line not in selection', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint], { collapsed: [] });
+    await waitFor(200);
+
+    // Set up a selection on line 0 only
+    el.selectionStart = { line: 0, column: 0 };
+    el.selectionEnd = { line: 0, column: 5 };
+
+    const lineContent = el.lines[5] || 'test';
+    const html = '<span>test content</span>';
+
+    // Line 5 is not in selection
+    const result = el._addSelectionHighlight(html, 5, lineContent);
+
+    // Should return unchanged
+    expect(result).to.equal(html);
+  });
+});
+
+describe('GeoJsonEditor - Gutter Click', () => {
+
+  it('should toggle collapse via handleGutterClick on collapse button', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Get a collapsible node
+    const ranges = el._findCollapsibleRanges();
+    const coordinatesRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordinatesRange).to.exist;
+
+    // Initially not collapsed
+    expect(el.collapsedNodes.has(coordinatesRange.nodeId)).to.be.false;
+
+    // Simulate gutter click on collapse button
+    const mockTarget = {
+      classList: { contains: (cls) => cls === 'collapse-button' },
+      dataset: { nodeId: coordinatesRange.nodeId },
+      closest: () => null
+    };
+    const mockEvent = { target: mockTarget };
+
+    el.handleGutterClick(mockEvent);
+    await waitFor(100);
+
+    // Should now be collapsed
+    expect(el.collapsedNodes.has(coordinatesRange.nodeId)).to.be.true;
+  });
+});

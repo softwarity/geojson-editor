@@ -1270,81 +1270,40 @@ class GeoJsonEditor extends HTMLElement {
       onClosingLine: this._getCollapsedClosingLine(this.cursorLine)
     };
 
-    switch (e.key) {
-      case 'Enter':
-        e.preventDefault();
-        this._handleEnter(ctx);
-        break;
-      case 'Backspace':
-        e.preventDefault();
-        this._handleBackspace(ctx);
-        break;
-      case 'Delete':
-        e.preventDefault();
-        this._handleDelete(ctx);
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        this._handleArrowKey(-1, 0, e.shiftKey);
-        break;
-      case 'ArrowDown':
-        e.preventDefault();
-        this._handleArrowKey(1, 0, e.shiftKey);
-        break;
-      case 'ArrowLeft':
-        e.preventDefault();
-        this._handleArrowKey(0, -1, e.shiftKey);
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        this._handleArrowKey(0, 1, e.shiftKey);
-        break;
-      case 'Home':
-        e.preventDefault();
-        this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine);
-        break;
-      case 'End':
-        e.preventDefault();
-        this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine);
-        break;
-      case 'a':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          this._selectAll();
-        }
-        break;
-      case 'z':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          if (e.shiftKey) {
-            this.redo();
-          } else {
-            this.undo();
-          }
-        }
-        break;
-      case 'y':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          this.redo();
-        }
-        break;
-      case 's':
-        if (e.ctrlKey || e.metaKey) {
-          e.preventDefault();
-          this.save();
-        }
-        break;
-      case 'o':
-        if ((e.ctrlKey || e.metaKey) && !this.hasAttribute('readonly')) {
-          e.preventDefault();
-          this.open();
-        }
-        break;
-      case 'Tab':
-        e.preventDefault();
-        this._handleTab(e.shiftKey, ctx);
-        break;
+    // Lookup table for key handlers
+    const keyHandlers = {
+      'Enter': () => this._handleEnter(ctx),
+      'Backspace': () => this._handleBackspace(ctx),
+      'Delete': () => this._handleDelete(ctx),
+      'ArrowUp': () => this._handleArrowKey(-1, 0, e.shiftKey),
+      'ArrowDown': () => this._handleArrowKey(1, 0, e.shiftKey),
+      'ArrowLeft': () => this._handleArrowKey(0, -1, e.shiftKey),
+      'ArrowRight': () => this._handleArrowKey(0, 1, e.shiftKey),
+      'Home': () => this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine),
+      'End': () => this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine),
+      'Tab': () => this._handleTab(e.shiftKey, ctx)
+    };
+
+    // Modifier key handlers (Ctrl/Cmd)
+    const modifierHandlers = {
+      'a': () => this._selectAll(),
+      'z': () => e.shiftKey ? this.redo() : this.undo(),
+      'y': () => this.redo(),
+      's': () => this.save(),
+      'o': () => !this.hasAttribute('readonly') && this.open()
+    };
+
+    // Check for direct key match
+    if (keyHandlers[e.key]) {
+      e.preventDefault();
+      keyHandlers[e.key]();
+      return;
+    }
+
+    // Check for modifier key combinations
+    if ((e.ctrlKey || e.metaKey) && modifierHandlers[e.key]) {
+      e.preventDefault();
+      modifierHandlers[e.key]();
     }
   }
 
@@ -2082,6 +2041,18 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
+   * Helper to apply collapsed option from API methods
+   * @param {object} options - Options object with optional collapsed property
+   * @param {array} features - Features array for function mode
+   */
+  _applyCollapsedFromOptions(options, features) {
+    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
+    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
+      this._applyCollapsedOption(collapsed, features);
+    }
+  }
+
+  /**
    * Apply collapsed option to nodes
    * @param {string[]|function} collapsed - Attributes to collapse or function returning them
    * @param {array} features - Features array for function mode (optional)
@@ -2763,12 +2734,7 @@ class GeoJsonEditor extends HTMLElement {
     const features = this._normalizeToFeatures(input);
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
     this.setValue(formatted, false); // Don't auto-collapse coordinates
-
-    // Apply collapsed option (default: ['coordinates'])
-    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
-    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
-      this._applyCollapsedOption(collapsed, features);
-    }
+    this._applyCollapsedFromOptions(options, features);
   }
 
   /**
@@ -2785,12 +2751,7 @@ class GeoJsonEditor extends HTMLElement {
     const allFeatures = [...existingFeatures, ...newFeatures];
     const formatted = allFeatures.map(f => JSON.stringify(f, null, 2)).join(',\n');
     this.setValue(formatted, false); // Don't auto-collapse coordinates
-
-    // Apply collapsed option (default: ['coordinates'])
-    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
-    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
-      this._applyCollapsedOption(collapsed, allFeatures);
-    }
+    this._applyCollapsedFromOptions(options, allFeatures);
   }
 
   /**
@@ -2809,12 +2770,7 @@ class GeoJsonEditor extends HTMLElement {
     features.splice(Math.max(0, Math.min(idx, features.length)), 0, ...newFeatures);
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
     this.setValue(formatted, false); // Don't auto-collapse coordinates
-
-    // Apply collapsed option (default: ['coordinates'])
-    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
-    if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
-      this._applyCollapsedOption(collapsed, features);
-    }
+    this._applyCollapsedFromOptions(options, features);
   }
 
   removeAt(index) {

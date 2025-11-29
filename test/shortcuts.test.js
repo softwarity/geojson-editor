@@ -441,4 +441,104 @@ describe('GeoJsonEditor - Copy/Paste Shortcuts', () => {
     expect(el.selectionStart.line).to.equal(0);
     expect(el.selectionStart.column).to.equal(0);
   });
+
+  it('should copy selected text via handleCopy', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Select some text
+    el.selectionStart = { line: 0, column: 0 };
+    el.selectionEnd = { line: 0, column: 5 };
+
+    let copiedText = '';
+    const clipboardData = {
+      setData: (type, data) => { copiedText = data; }
+    };
+    const event = { preventDefault: () => {}, clipboardData };
+
+    el.handleCopy(event);
+
+    expect(copiedText.length).to.be.greaterThan(0);
+  });
+
+  it('should copy all content when no selection via handleCopy', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // No selection
+    el.selectionStart = null;
+    el.selectionEnd = null;
+
+    let copiedText = '';
+    const clipboardData = {
+      setData: (type, data) => { copiedText = data; }
+    };
+    const event = { preventDefault: () => {}, clipboardData };
+
+    el.handleCopy(event);
+
+    // Should copy all content
+    expect(copiedText).to.include('"type"');
+    expect(copiedText).to.include('Feature');
+  });
+
+  it('should cut selected text via handleCut', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"test": "value"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    // Select some text
+    el.selectionStart = { line: 0, column: 0 };
+    el.selectionEnd = { line: 0, column: 5 };
+
+    let cutText = '';
+    const clipboardData = {
+      setData: (type, data) => { cutText = data; }
+    };
+    const event = { preventDefault: () => {}, clipboardData };
+
+    el.handleCut(event);
+    await waitFor(100);
+
+    expect(cutText.length).to.be.greaterThan(0);
+    // Selection should be cleared after cut
+    expect(el.selectionStart).to.be.null;
+  });
+
+  it('should cut all content when no selection via handleCut', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    el.lines = ['{"test": "value"}'];
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+    el.selectionStart = null;
+    el.selectionEnd = null;
+
+    let cutText = '';
+    const clipboardData = {
+      setData: (type, data) => { cutText = data; }
+    };
+    const event = { preventDefault: () => {}, clipboardData };
+
+    el.handleCut(event);
+    await waitFor(100);
+
+    expect(cutText).to.include('test');
+    // All content should be removed
+    expect(el.lines.length).to.equal(0);
+  });
 });

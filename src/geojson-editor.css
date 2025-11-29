@@ -11,6 +11,10 @@
 }
 
 :host {
+  --line-height: 19.5px;
+  --gutter-width: 50px;
+  --editor-padding-y: 8px;
+  --editor-padding-x: 12px;
   display: flex;
   flex-direction: column;
   position: relative;
@@ -42,7 +46,7 @@
 
 /* ========== Gutter ========== */
 .gutter {
-  width: 50px;
+  width: var(--gutter-width);
   background: var(--gutter-bg, #f0f0f0);
   border-right: 1px solid var(--gutter-border, #e0e0e0);
   overflow: hidden;
@@ -71,7 +75,7 @@
 }
 
 .gutter-line {
-  height: 19.5px; /* line-height * font-size = 1.5 * 13px */
+  height: var(--line-height);
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -161,7 +165,7 @@
   position: absolute;
   inset: 0;
   overflow: auto;
-  padding: 8px 12px;
+  padding: var(--editor-padding-y) var(--editor-padding-x);
   overscroll-behavior: contain; /* Prevent scroll chaining to parent */
 }
 
@@ -182,7 +186,7 @@
 
 /* Single line */
 .line {
-  height: 19.5px; /* line-height * font-size */
+  height: var(--line-height);
   white-space: pre;
   display: block;
   position: relative;
@@ -214,20 +218,16 @@
   z-index: 0;
 }
 
-.line-hidden > span { 
-  opacity: 0.35; 
-  filter: grayscale(50%); 
-}
-
-.line-collapsed {
-  display: none;
+.line-hidden > span {
+  opacity: 0.35;
+  filter: grayscale(50%);
 }
 
 /* Placeholder */
 .placeholder-layer {
   position: absolute;
-  top: 8px;
-  left: 12px;
+  top: var(--editor-padding-y);
+  left: var(--editor-padding-x);
   color: #6a6a6a;
   pointer-events: none;
   z-index: 0;
@@ -266,7 +266,7 @@
 }
 
 .prefix-gutter, .suffix-gutter {
-  width: 50px;
+  width: var(--gutter-width);
   background: var(--gutter-bg, #f0f0f0);
   border-right: 1px solid var(--gutter-border, #e0e0e0);
   flex-shrink: 0;
