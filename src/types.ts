@@ -142,3 +142,16 @@ export interface ContextStackItem {
   context: string;
   isArray: boolean;
 }
+
+/** Collapsed zone context for keydown handlers */
+export interface CollapsedZoneContext {
+  inCollapsedZone: CollapsedNodeInfo | null;
+  onCollapsedNode: CollapsedNodeInfo | null;
+  onClosingLine: CollapsedNodeInfo | null;
+}
+
+/** Collapsed node info with nodeId */
+export interface CollapsedNodeInfo extends NodeRangeInfo {
+  nodeId: string;
+  isCollapsed?: boolean;
+}

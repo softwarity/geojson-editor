@@ -203,6 +203,18 @@
   animation: cursor-blink 1s step-end infinite;
 }
 
+/* Block cursor for overwrite mode */
+.cursor.cursor-block {
+  width: 0.6em; /* Will be overridden inline with charWidth */
+  opacity: 0.5;
+  animation: cursor-blink-block 1s step-end infinite;
+}
+
+@keyframes cursor-blink-block {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.2; }
+}
+
 @keyframes cursor-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }

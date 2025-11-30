@@ -1,5 +1,5 @@
 import type { Feature } from 'geojson';
-import type { CursorPosition, SetOptions, ThemeSettings, LineMeta, VisibleLine, FeatureRange, FeatureInput } from './types.js';
+import type { CursorPosition, SetOptions, ThemeSettings, LineMeta, VisibleLine, FeatureRange, EditorSnapshot, FeatureInput, CollapsedZoneContext, CollapsedNodeInfo } from './types.js';
 export type { GeometryType, CursorPosition, SetOptions, ThemeConfig, ThemeSettings, FeatureInput } from './types.js';
 /**
  * GeoJSON Editor Web Component
@@ -38,6 +38,7 @@ declare class GeoJsonEditor extends HTMLElement {
     private _isSelecting;
     private _isComposing;
     private _blockRender;
+    private _insertMode;
     private _charWidth;
     private _contextMapCache;
     private _contextMapLinesLength;
@@ -70,9 +71,8 @@ declare class GeoJsonEditor extends HTMLElement {
     };
     /**
      * Restore editor state from snapshot
-     * @param {Object} snapshot - State to restore
      */
-    _restoreSnapshot(snapshot: any): void;
+    _restoreSnapshot(snapshot: EditorSnapshot): void;
     /**
      * Save current state to undo stack before making changes
      * @param {string} actionType - Type of action (insert, delete, paste, etc.)
@@ -105,71 +105,33 @@ declare class GeoJsonEditor extends HTMLElement {
     _generateNodeId(): string;
     /**
      * Check if a line is inside a collapsed node (hidden lines between opening and closing)
-     * @param {number} lineIndex - The line index to check
-     * @returns {Object|null} - The collapsed range info or null
      */
-    _getCollapsedRangeForLine(lineIndex: any): {
-        startLine: number;
-        endLine: number;
-        nodeKey?: string;
-        isRootFeature?: boolean;
-        nodeId: string;
-    };
+    _getCollapsedRangeForLine(lineIndex: number): CollapsedNodeInfo | null;
     /**
      * Check if cursor is on the closing line of a collapsed node
-     * @param {number} lineIndex - The line index to check
-     * @returns {Object|null} - The collapsed range info or null
      */
-    _getCollapsedClosingLine(lineIndex: any): {
-        startLine: number;
-        endLine: number;
-        nodeKey?: string;
-        isRootFeature?: boolean;
-        nodeId: string;
-    };
+    _getCollapsedClosingLine(lineIndex: number): CollapsedNodeInfo | null;
     /**
      * Get the position of the closing bracket on a line
-     * @param {string} line - The line content
-     * @returns {number} - Position of bracket or -1
      */
-    _getClosingBracketPos(line: any): number;
+    _getClosingBracketPos(line: string): number;
     /**
      * Check if cursor is on the opening line of a collapsed node
-     * @param {number} lineIndex - The line index to check
-     * @returns {Object|null} - The collapsed range info or null
      */
-    _getCollapsedNodeAtLine(lineIndex: any): {
-        startLine: number;
-        endLine: number;
-        nodeKey?: string;
-        isRootFeature?: boolean;
-        nodeId: string;
-    };
+    _getCollapsedNodeAtLine(lineIndex: number): CollapsedNodeInfo | null;
     /**
      * Check if cursor is on a line that has a collapsible node (expanded or collapsed)
-     * @param {number} lineIndex - The line index to check
-     * @returns {Object|null} - The node info with isCollapsed flag or null
      */
-    _getCollapsibleNodeAtLine(lineIndex: any): {
-        startLine: number;
-        endLine: number;
-        nodeKey?: string;
-        isRootFeature?: boolean;
-        nodeId: string;
-        isCollapsed: boolean;
-    };
+    _getCollapsibleNodeAtLine(lineIndex: number): CollapsedNodeInfo | null;
     /**
      * Find the innermost expanded node that contains the given line
      * Used for Shift+Tab to collapse the parent node from anywhere inside it
-     * @param {number} lineIndex - The line index to check
-     * @returns {Object|null} - The containing node info or null
      */
-    _getContainingExpandedNode(lineIndex: any): any;
+    _getContainingExpandedNode(lineIndex: number): CollapsedNodeInfo | null;
     /**
      * Delete an entire collapsed node (opening line to closing line)
-     * @param {Object} range - The range info {startLine, endLine}
      */
-    _deleteCollapsedNode(range: any): void;
+    _deleteCollapsedNode(range: CollapsedNodeInfo): void;
     /**
      * Rebuild nodeId mappings after content changes
      * Preserves collapsed state by matching nodeKey + sequential occurrence
@@ -178,7 +140,7 @@ declare class GeoJsonEditor extends HTMLElement {
     static get observedAttributes(): string[];
     connectedCallback(): void;
     disconnectedCallback(): void;
-    attributeChangedCallback(name: any, oldValue: any, newValue: any): void;
+    attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void;
     get readonly(): boolean;
     get value(): string;
     get placeholder(): string;
@@ -190,7 +152,7 @@ declare class GeoJsonEditor extends HTMLElement {
     /**
      * Set the editor content from a string value
      */
-    setValue(value: any, autoCollapse?: boolean): void;
+    setValue(value: string | null, autoCollapse?: boolean): void;
     /**
      * Get full content as string (expanded, no hidden markers)
      */
@@ -222,35 +184,36 @@ declare class GeoJsonEditor extends HTMLElement {
     /**
      * Insert cursor element at the specified column position
      * Uses absolute positioning to avoid affecting text layout
+     * In overwrite mode, cursor is a block covering the next character
      */
-    _insertCursor(column: any): string;
+    _insertCursor(column: number): string;
     /**
      * Add selection highlight to a line
      */
-    _addSelectionHighlight(html: any, lineIndex: any, content: any): any;
+    _addSelectionHighlight(html: string, lineIndex: number, content: string): string;
     /**
      * Get character width for monospace font
      */
     _getCharWidth(): number;
-    renderGutter(startIndex: any, endIndex: any): void;
+    renderGutter(startIndex: number, endIndex: number): void;
     syncGutterScroll(): void;
     handleInput(): void;
-    handleKeydown(e: any): void;
-    _handleEnter(ctx: any): void;
-    _handleBackspace(ctx: any): void;
-    _handleDelete(ctx: any): void;
-    _handleTab(isShiftKey: any, ctx: any): void;
+    handleKeydown(e: KeyboardEvent): void;
+    _handleEnter(ctx: CollapsedZoneContext): void;
+    _handleBackspace(ctx: CollapsedZoneContext): void;
+    _handleDelete(ctx: CollapsedZoneContext): void;
+    _handleTab(isShiftKey: boolean, ctx: CollapsedZoneContext): void;
     insertNewline(): void;
     deleteBackward(): void;
     deleteForward(): void;
     /**
      * Move cursor vertically, skipping hidden collapsed lines only
      */
-    moveCursorSkipCollapsed(deltaLine: any): void;
+    moveCursorSkipCollapsed(deltaLine: number): void;
     /**
      * Move cursor horizontally with smart navigation around collapsed nodes
      */
-    moveCursorHorizontal(delta: any): void;
+    moveCursorHorizontal(delta: number): void;
     _moveCursorRight(): void;
     _moveCursorLeft(): void;
     /**
@@ -260,18 +223,18 @@ declare class GeoJsonEditor extends HTMLElement {
     /**
      * Handle arrow key with optional selection and word jump
      */
-    _handleArrowKey(deltaLine: any, deltaCol: any, isShift: any, isCtrl?: boolean): void;
+    _handleArrowKey(deltaLine: number, deltaCol: number, isShift: boolean, isCtrl?: boolean): void;
     /**
      * Move cursor by word (Ctrl+Arrow)
      * Behavior matches VSCode/Monaco:
      * - Ctrl+Right: move to end of current word, or start of next word
      * - Ctrl+Left: move to start of current word, or start of previous word
      */
-    _moveCursorByWord(direction: any): void;
+    _moveCursorByWord(direction: number): void;
     /**
      * Handle Home/End with optional selection
      */
-    _handleHomeEnd(key: any, isShift: any, onClosingLine: any): void;
+    _handleHomeEnd(key: string, isShift: boolean, onClosingLine: CollapsedNodeInfo | null): void;
     /**
      * Select all content
      */
@@ -299,14 +262,14 @@ declare class GeoJsonEditor extends HTMLElement {
      * Delete selected text
      */
     _deleteSelection(): boolean;
-    insertText(text: any): void;
-    handlePaste(e: any): void;
-    handleCopy(e: any): void;
-    handleCut(e: any): void;
+    insertText(text: string): void;
+    handlePaste(e: ClipboardEvent): void;
+    handleCopy(e: ClipboardEvent): void;
+    handleCut(e: ClipboardEvent): void;
     /**
      * Get line/column position from mouse event
      */
-    _getPositionFromClick(e: any): {
+    _getPositionFromClick(e: MouseEvent): {
         line: number;
         column: number;
     };

@@ -6,7 +6,6 @@ import type { Feature, FeatureCollection } from 'geojson';
 import type {
   CursorPosition,
   SetOptions,
-  ThemeConfig,
   ThemeSettings,
   LineMeta,
   VisibleLine,
@@ -14,7 +13,13 @@ import type {
   NodeRangeInfo,
   CollapsibleRange,
   EditorSnapshot,
-  FeatureInput
+  FeatureInput,
+  CollapsedZoneContext,
+  CollapsedNodeInfo,
+  ColorMeta,
+  BooleanMeta,
+  CollapseButtonMeta,
+  VisibilityButtonMeta
 } from './types.js';
 
 import {
@@ -106,6 +111,7 @@ class GeoJsonEditor extends HTMLElement {
   private _isSelecting: boolean = false;
   private _isComposing: boolean = false;
   private _blockRender: boolean = false;
+  private _insertMode: boolean = true; // true = insert, false = overwrite
   private _charWidth: number | null = null;
   private _contextMapCache: Map<number, string> | null = null;
   private _contextMapLinesLength: number = 0;
@@ -156,9 +162,8 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Restore editor state from snapshot
-   * @param {Object} snapshot - State to restore
    */
-  _restoreSnapshot(snapshot) {
+  _restoreSnapshot(snapshot: EditorSnapshot): void {
     this.lines = [...snapshot.lines];
     this.cursorLine = snapshot.cursorLine;
     this.cursorColumn = snapshot.cursorColumn;
@@ -273,10 +278,8 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Check if a line is inside a collapsed node (hidden lines between opening and closing)
-   * @param {number} lineIndex - The line index to check
-   * @returns {Object|null} - The collapsed range info or null
    */
-  _getCollapsedRangeForLine(lineIndex) {
+  _getCollapsedRangeForLine(lineIndex: number): CollapsedNodeInfo | null {
     for (const [nodeId, info] of this._nodeIdToLines) {
       // Lines strictly between opening and closing are hidden
       if (this.collapsedNodes.has(nodeId) && lineIndex > info.startLine && lineIndex < info.endLine) {
@@ -288,10 +291,8 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Check if cursor is on the closing line of a collapsed node
-   * @param {number} lineIndex - The line index to check
-   * @returns {Object|null} - The collapsed range info or null
    */
-  _getCollapsedClosingLine(lineIndex) {
+  _getCollapsedClosingLine(lineIndex: number): CollapsedNodeInfo | null {
     for (const [nodeId, info] of this._nodeIdToLines) {
       if (this.collapsedNodes.has(nodeId) && lineIndex === info.endLine) {
         return { nodeId, ...info };
@@ -302,10 +303,8 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Get the position of the closing bracket on a line
-   * @param {string} line - The line content
-   * @returns {number} - Position of bracket or -1
    */
-  _getClosingBracketPos(line) {
+  _getClosingBracketPos(line: string): number {
     // Find the last ] or } on the line
     const lastBracket = Math.max(line.lastIndexOf(']'), line.lastIndexOf('}'));
     return lastBracket;
@@ -313,29 +312,27 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Check if cursor is on the opening line of a collapsed node
-   * @param {number} lineIndex - The line index to check  
-   * @returns {Object|null} - The collapsed range info or null
    */
-  _getCollapsedNodeAtLine(lineIndex) {
+  _getCollapsedNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
     const nodeId = this._lineToNodeId.get(lineIndex);
     if (nodeId && this.collapsedNodes.has(nodeId)) {
       const info = this._nodeIdToLines.get(nodeId);
-      return { nodeId, ...info };
+      if (info) return { nodeId, ...info };
     }
     return null;
   }
 
   /**
    * Check if cursor is on a line that has a collapsible node (expanded or collapsed)
-   * @param {number} lineIndex - The line index to check  
-   * @returns {Object|null} - The node info with isCollapsed flag or null
    */
-  _getCollapsibleNodeAtLine(lineIndex) {
+  _getCollapsibleNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
     const nodeId = this._lineToNodeId.get(lineIndex);
     if (nodeId) {
       const info = this._nodeIdToLines.get(nodeId);
-      const isCollapsed = this.collapsedNodes.has(nodeId);
-      return { nodeId, isCollapsed, ...info };
+      if (info) {
+        const isCollapsed = this.collapsedNodes.has(nodeId);
+        return { nodeId, isCollapsed, ...info };
+      }
     }
     return null;
   }
@@ -343,16 +340,14 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Find the innermost expanded node that contains the given line
    * Used for Shift+Tab to collapse the parent node from anywhere inside it
-   * @param {number} lineIndex - The line index to check  
-   * @returns {Object|null} - The containing node info or null
    */
-  _getContainingExpandedNode(lineIndex) {
-    let bestMatch = null;
-    
+  _getContainingExpandedNode(lineIndex: number): CollapsedNodeInfo | null {
+    let bestMatch: CollapsedNodeInfo | null = null;
+
     for (const [nodeId, info] of this._nodeIdToLines) {
       // Skip collapsed nodes
       if (this.collapsedNodes.has(nodeId)) continue;
-      
+
       // Check if line is within this node's range
       if (lineIndex >= info.startLine && lineIndex <= info.endLine) {
         // Prefer the innermost (smallest) containing node
@@ -361,15 +356,14 @@ class GeoJsonEditor extends HTMLElement {
         }
       }
     }
-    
+
     return bestMatch;
   }
 
   /**
    * Delete an entire collapsed node (opening line to closing line)
-   * @param {Object} range - The range info {startLine, endLine}
    */
-  _deleteCollapsedNode(range) {
+  _deleteCollapsedNode(range: CollapsedNodeInfo): void {
     this._saveToHistory('delete');
 
     // Remove all lines from startLine to endLine
@@ -494,7 +488,7 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  attributeChangedCallback(name, oldValue, newValue) {
+  attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (oldValue === newValue) return;
 
     switch (name) {
@@ -752,7 +746,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Set the editor content from a string value
    */
-  setValue(value, autoCollapse = true) {
+  setValue(value: string | null, autoCollapse = true): void {
     // Save to history only if there's existing content
     if (this.lines.length > 0) {
       this._saveToHistory('setValue');
@@ -911,7 +905,7 @@ class GeoJsonEditor extends HTMLElement {
     
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];
-      const meta = {
+      const meta: LineMeta = {
         colors: [],
         booleans: [],
         collapseButton: null,
@@ -1127,18 +1121,24 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Insert cursor element at the specified column position
    * Uses absolute positioning to avoid affecting text layout
+   * In overwrite mode, cursor is a block covering the next character
    */
-  _insertCursor(column) {
-    // Calculate cursor position in pixels using character width
+  _insertCursor(column: number): string {
     const charWidth = this._getCharWidth();
     const left = column * charWidth;
-    return `<span class="cursor" style="left: ${left}px"></span>`;
+    if (this._insertMode) {
+      // Insert mode: thin line cursor
+      return `<span class="cursor" style="left: ${left}px"></span>`;
+    } else {
+      // Overwrite mode: block cursor covering the character
+      return `<span class="cursor cursor-block" style="left: ${left}px; width: ${charWidth}px"></span>`;
+    }
   }
 
   /**
    * Add selection highlight to a line
    */
-  _addSelectionHighlight(html, lineIndex, content) {
+  _addSelectionHighlight(html: string, lineIndex: number, content: string): string {
     const { start, end } = this._normalizeSelection();
     if (!start || !end) return html;
     
@@ -1188,7 +1188,7 @@ class GeoJsonEditor extends HTMLElement {
     return this._charWidth;
   }
 
-  renderGutter(startIndex, endIndex) {
+  renderGutter(startIndex: number, endIndex: number): void {
     const gutterContent = this._gutterContent;
     const gutterScrollContent = this._gutterScrollContent;
     if (!gutterContent) return;
@@ -1289,19 +1289,28 @@ class GeoJsonEditor extends HTMLElement {
       }
     }
 
-    // Insert the input at cursor position
+    // Insert or overwrite the input at cursor position
     if (this.cursorLine < this.lines.length) {
       const line = this.lines[this.cursorLine];
       const before = line.substring(0, this.cursorColumn);
-      const after = line.substring(this.cursorColumn);
-      
+
       // Handle newlines in input
       const inputLines = inputValue.split('\n');
       if (inputLines.length === 1) {
-        this.lines[this.cursorLine] = before + inputValue + after;
+        // Single line input: insert or overwrite mode
+        if (this._insertMode) {
+          // Insert mode: keep text after cursor
+          const after = line.substring(this.cursorColumn);
+          this.lines[this.cursorLine] = before + inputValue + after;
+        } else {
+          // Overwrite mode: replace characters after cursor
+          const after = line.substring(this.cursorColumn + inputValue.length);
+          this.lines[this.cursorLine] = before + inputValue + after;
+        }
         this.cursorColumn += inputValue.length;
       } else {
-        // Multi-line input
+        // Multi-line input: always insert mode
+        const after = line.substring(this.cursorColumn);
         this.lines[this.cursorLine] = before + inputLines[0];
         for (let i = 1; i < inputLines.length - 1; i++) {
           this.lines.splice(this.cursorLine + i, 0, inputLines[i]);
@@ -1329,16 +1338,16 @@ class GeoJsonEditor extends HTMLElement {
     }, 150);
   }
 
-  handleKeydown(e) {
+  handleKeydown(e: KeyboardEvent): void {
     // Build context for collapsed zone detection
-    const ctx = {
+    const ctx: CollapsedZoneContext = {
       inCollapsedZone: this._getCollapsedRangeForLine(this.cursorLine),
       onCollapsedNode: this._getCollapsedNodeAtLine(this.cursorLine),
       onClosingLine: this._getCollapsedClosingLine(this.cursorLine)
     };
 
     // Lookup table for key handlers
-    const keyHandlers = {
+    const keyHandlers: Record<string, () => void> = {
       'Enter': () => this._handleEnter(ctx),
       'Backspace': () => this._handleBackspace(ctx),
       'Delete': () => this._handleDelete(ctx),
@@ -1348,11 +1357,12 @@ class GeoJsonEditor extends HTMLElement {
       'ArrowRight': () => this._handleArrowKey(0, 1, e.shiftKey, e.ctrlKey || e.metaKey),
       'Home': () => this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine),
       'End': () => this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine),
-      'Tab': () => this._handleTab(e.shiftKey, ctx)
+      'Tab': () => this._handleTab(e.shiftKey, ctx),
+      'Insert': () => { this._insertMode = !this._insertMode; this.scheduleRender(); }
     };
 
     // Modifier key handlers (Ctrl/Cmd)
-    const modifierHandlers = {
+    const modifierHandlers: Record<string, () => void | boolean | Promise<boolean>> = {
       'a': () => this._selectAll(),
       'z': () => e.shiftKey ? this.redo() : this.undo(),
       'y': () => this.redo(),
@@ -1374,7 +1384,7 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  _handleEnter(ctx) {
+  _handleEnter(ctx: CollapsedZoneContext): void {
     // Block in collapsed zones
     if (ctx.onCollapsedNode || ctx.inCollapsedZone) return;
     // On closing line, before bracket -> block
@@ -1388,7 +1398,7 @@ class GeoJsonEditor extends HTMLElement {
     this.insertNewline();
   }
 
-  _handleBackspace(ctx) {
+  _handleBackspace(ctx: CollapsedZoneContext): void {
     // Delete selection if any
     if (this._hasSelection()) {
       this._deleteSelection();
@@ -1425,7 +1435,7 @@ class GeoJsonEditor extends HTMLElement {
     this.deleteBackward();
   }
 
-  _handleDelete(ctx) {
+  _handleDelete(ctx: CollapsedZoneContext): void {
     // Delete selection if any
     if (this._hasSelection()) {
       this._deleteSelection();
@@ -1457,7 +1467,7 @@ class GeoJsonEditor extends HTMLElement {
     this.deleteForward();
   }
 
-  _handleTab(isShiftKey, ctx) {
+  _handleTab(isShiftKey: boolean, ctx: CollapsedZoneContext): void {
     // Shift+Tab: collapse the containing expanded node
     if (isShiftKey) {
       const containingNode = this._getContainingExpandedNode(this.cursorLine);
@@ -1543,7 +1553,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Move cursor vertically, skipping hidden collapsed lines only
    */
-  moveCursorSkipCollapsed(deltaLine) {
+  moveCursorSkipCollapsed(deltaLine: number): void {
     let targetLine = this.cursorLine + deltaLine;
     
     // Skip over hidden collapsed zones only (not opening/closing lines)
@@ -1574,7 +1584,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Move cursor horizontally with smart navigation around collapsed nodes
    */
-  moveCursorHorizontal(delta) {
+  moveCursorHorizontal(delta: number): void {
     if (delta > 0) {
       this._moveCursorRight();
     } else {
@@ -1702,7 +1712,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Handle arrow key with optional selection and word jump
    */
-  _handleArrowKey(deltaLine, deltaCol, isShift, isCtrl = false) {
+  _handleArrowKey(deltaLine: number, deltaCol: number, isShift: boolean, isCtrl = false): void {
     // Start selection if shift is pressed and no selection exists
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
@@ -1736,10 +1746,10 @@ class GeoJsonEditor extends HTMLElement {
    * - Ctrl+Right: move to end of current word, or start of next word
    * - Ctrl+Left: move to start of current word, or start of previous word
    */
-  _moveCursorByWord(direction) {
+  _moveCursorByWord(direction: number): void {
     const line = this.lines[this.cursorLine] || '';
     // Word character: alphanumeric, underscore, or hyphen (for kebab-case identifiers)
-    const isWordChar = (ch) => RE_IS_WORD_CHAR.test(ch);
+    const isWordChar = (ch: string) => RE_IS_WORD_CHAR.test(ch);
 
     // Check if we're on a collapsed node's opening line
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
@@ -1845,7 +1855,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Handle Home/End with optional selection
    */
-  _handleHomeEnd(key, isShift, onClosingLine) {
+  _handleHomeEnd(key: string, isShift: boolean, onClosingLine: CollapsedNodeInfo | null): void {
     // Start selection if shift is pressed and no selection exists
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
@@ -1977,7 +1987,7 @@ class GeoJsonEditor extends HTMLElement {
     return true;
   }
 
-  insertText(text) {
+  insertText(text: string): void {
     // Delete selection first if any
     if (this._hasSelection()) {
       this._deleteSelection();
@@ -2020,7 +2030,7 @@ class GeoJsonEditor extends HTMLElement {
     this.formatAndUpdate();
   }
 
-  handlePaste(e) {
+  handlePaste(e: ClipboardEvent): void {
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
     if (!text) return;
@@ -2050,7 +2060,7 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  handleCopy(e) {
+  handleCopy(e: ClipboardEvent): void {
     e.preventDefault();
     // Copy selected text if there's a selection, otherwise copy all
     if (this._hasSelection()) {
@@ -2060,7 +2070,7 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  handleCut(e) {
+  handleCut(e: ClipboardEvent): void {
     e.preventDefault();
     if (this._hasSelection()) {
       e.clipboardData.setData('text/plain', this._getSelectedText());
@@ -2081,7 +2091,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get line/column position from mouse event
    */
-  _getPositionFromClick(e) {
+  _getPositionFromClick(e: MouseEvent): { line: number; column: number } {
     const viewport = this._viewport;
     const linesContainer = this._linesContainer;
     const rect = viewport.getBoundingClientRect();
