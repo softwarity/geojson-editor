@@ -559,7 +559,7 @@ describe('GeoJsonEditor - Theme Support', () => {
 
   it('should apply dark theme via dark-selector', async () => {
     const el = await fixture(html`<geojson-editor dark-selector=".dark-mode"></geojson-editor>`);
-    
+
     const themeStyle = el.shadowRoot.getElementById('theme-styles');
     expect(themeStyle).to.exist;
     expect(themeStyle.textContent).to.include('.dark-mode');
@@ -711,17 +711,16 @@ describe('GeoJsonEditor - Viewport', () => {
 
 describe('GeoJsonEditor - GeoJSON Validation', () => {
 
-  it('should validate GeoJSON structure', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    await waitFor();
+  it('should validate GeoJSON structure via validateGeoJSON function', async () => {
+    // Import the extracted validateGeoJSON function
+    const { validateGeoJSON } = await import('../src/validation.ts');
 
-    // _validateGeoJSON should exist
-    expect(el._validateGeoJSON).to.be.a('function');
+    expect(validateGeoJSON).to.be.a('function');
   });
 
   it('should detect invalid geometry types', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    await waitFor();
+    // Import the extracted validateGeoJSON function
+    const { validateGeoJSON } = await import('../src/validation.ts');
 
     const parsed = {
       features: [{
@@ -731,7 +730,7 @@ describe('GeoJsonEditor - GeoJSON Validation', () => {
       }]
     };
 
-    const errors = el._validateGeoJSON(parsed);
+    const errors = validateGeoJSON(parsed);
     expect(errors.length).to.be.greaterThan(0);
   });
 });

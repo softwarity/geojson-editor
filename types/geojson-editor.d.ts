@@ -1,96 +1,6 @@
-import type { Feature, FeatureCollection } from 'geojson';
-/** Geometry type names */
-export type GeometryType = 'Point' | 'MultiPoint' | 'LineString' | 'MultiLineString' | 'Polygon' | 'MultiPolygon';
-/** Position in the editor (line and column) */
-export interface CursorPosition {
-    line: number;
-    column: number;
-}
-/** Options for set/add/insertAt/open methods */
-export interface SetOptions {
-    /**
-     * Attributes to collapse after loading.
-     * - string[]: List of attribute names (e.g., ['coordinates', 'geometry'])
-     * - function: Dynamic function (feature, index) => string[]
-     * - '$root': Special keyword to collapse entire features
-     * - Empty array: No auto-collapse
-     * @default ['coordinates']
-     */
-    collapsed?: string[] | ((feature: Feature, index: number) => string[]);
-}
-/** Theme configuration */
-export interface ThemeConfig {
-    bgColor?: string;
-    textColor?: string;
-    caretColor?: string;
-    gutterBg?: string;
-    gutterBorder?: string;
-    gutterText?: string;
-    jsonKey?: string;
-    jsonString?: string;
-    jsonNumber?: string;
-    jsonBoolean?: string;
-    jsonNull?: string;
-    jsonPunct?: string;
-    jsonError?: string;
-    controlColor?: string;
-    controlBg?: string;
-    controlBorder?: string;
-    geojsonKey?: string;
-    geojsonType?: string;
-    geojsonTypeInvalid?: string;
-    jsonKeyInvalid?: string;
-}
-/** Theme settings for dark and light modes */
-export interface ThemeSettings {
-    dark?: ThemeConfig;
-    light?: ThemeConfig;
-}
-/** Color metadata for a line */
-interface ColorMeta {
-    attributeName: string;
-    color: string;
-}
-/** Boolean metadata for a line */
-interface BooleanMeta {
-    attributeName: string;
-    value: boolean;
-}
-/** Collapse button metadata */
-interface CollapseButtonMeta {
-    nodeKey: string;
-    nodeId: string;
-    isCollapsed: boolean;
-}
-/** Visibility button metadata */
-interface VisibilityButtonMeta {
-    featureKey: string;
-    isHidden: boolean;
-}
-/** Line metadata */
-interface LineMeta {
-    colors: ColorMeta[];
-    booleans: BooleanMeta[];
-    collapseButton: CollapseButtonMeta | null;
-    visibilityButton: VisibilityButtonMeta | null;
-    isHidden: boolean;
-    isCollapsed: boolean;
-    featureKey: string | null;
-}
-/** Visible line data */
-interface VisibleLine {
-    index: number;
-    content: string;
-    meta: LineMeta | undefined;
-}
-/** Feature range in the editor */
-interface FeatureRange {
-    startLine: number;
-    endLine: number;
-    featureIndex: number;
-}
-/** Input types accepted by API methods */
-export type FeatureInput = Feature | Feature[] | FeatureCollection;
+import type { Feature } from 'geojson';
+import type { CursorPosition, SetOptions, ThemeSettings, LineMeta, VisibleLine, FeatureRange, FeatureInput } from './types.js';
+export type { GeometryType, CursorPosition, SetOptions, ThemeConfig, ThemeSettings, FeatureInput } from './types.js';
 /**
  * GeoJSON Editor Web Component
  * Monaco-like architecture with virtualized line rendering
@@ -133,6 +43,19 @@ declare class GeoJsonEditor extends HTMLElement {
     private _contextMapLinesLength;
     private _contextMapFirstLine;
     private _contextMapLastLine;
+    private _viewport;
+    private _linesContainer;
+    private _scrollContent;
+    private _hiddenTextarea;
+    private _gutterContent;
+    private _gutterScrollContent;
+    private _gutterScroll;
+    private _gutter;
+    private _clearBtn;
+    private _editorWrapper;
+    private _placeholderLayer;
+    private _editorPrefix;
+    private _editorSuffix;
     constructor();
     _invalidateRenderCache(): void;
     /**
@@ -262,6 +185,7 @@ declare class GeoJsonEditor extends HTMLElement {
     get prefix(): string;
     get suffix(): string;
     render(): void;
+    _cacheElements(): void;
     setupEventListeners(): void;
     /**
      * Set the editor content from a string value
@@ -334,9 +258,16 @@ declare class GeoJsonEditor extends HTMLElement {
      */
     _scrollToCursor(): void;
     /**
-     * Handle arrow key with optional selection
+     * Handle arrow key with optional selection and word jump
      */
-    _handleArrowKey(deltaLine: any, deltaCol: any, isShift: any): void;
+    _handleArrowKey(deltaLine: any, deltaCol: any, isShift: any, isCtrl?: boolean): void;
+    /**
+     * Move cursor by word (Ctrl+Arrow)
+     * Behavior matches VSCode/Monaco:
+     * - Ctrl+Right: move to end of current word, or start of next word
+     * - Ctrl+Left: move to start of current word, or start of previous word
+     */
+    _moveCursorByWord(direction: any): void;
     /**
      * Handle Home/End with optional selection
      */
@@ -396,7 +327,7 @@ declare class GeoJsonEditor extends HTMLElement {
      */
     _applyCollapsedOption(collapsed: any, features?: any): void;
     toggleFeatureVisibility(featureKey: any): void;
-    showColorPicker(indicator: any, line: any, currentColor: any, attributeName: any): void;
+    showColorPicker(indicator: HTMLElement, line: number, currentColor: string, attributeName: string): void;
     updateColorValue(line: any, newColor: any, attributeName: any): void;
     updateBooleanValue(line: any, newValue: any, attributeName: any): void;
     formatAndUpdate(): void;
@@ -406,14 +337,8 @@ declare class GeoJsonEditor extends HTMLElement {
     updatePlaceholderContent(): void;
     updatePrefixSuffix(): void;
     updateThemeCSS(): void;
-    _parseSelectorToHostRule(selector: any): string;
     setTheme(theme: ThemeSettings): void;
     resetTheme(): void;
-    _getFeatureKey(feature: any): string;
-    _countBrackets(line: any, openBracket: any): {
-        open: number;
-        close: number;
-    };
     /**
      * Find all collapsible ranges using the mappings built by _rebuildNodeIdMappings
      * This method only READS the existing mappings, it doesn't create new IDs
@@ -421,22 +346,6 @@ declare class GeoJsonEditor extends HTMLElement {
     _findCollapsibleRanges(): any[];
     _findClosingLine(startLine: any, openBracket: any): any;
     _buildContextMap(): Map<any, any>;
-    _highlightSyntax(text: any, context: any, meta: any): any;
-    _validateGeoJSON(parsed: any): any[];
-    /**
-     * Validate a single feature object
-     * @param {object} feature - The feature to validate
-     * @throws {Error} If the feature is invalid
-     */
-    _validateFeature(feature: any): void;
-    /**
-     * Normalize input to an array of features
-     * Accepts: FeatureCollection, Feature[], or single Feature
-     * @param {object|array} input - Input to normalize
-     * @returns {array} Array of features
-     * @throws {Error} If input is invalid
-     */
-    _normalizeToFeatures(input: any): any[];
     /**
      * Replace all features in the editor
      * Accepts: FeatureCollection, Feature[], or single Feature

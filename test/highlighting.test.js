@@ -141,17 +141,12 @@ describe('GeoJsonEditor - Syntax Highlighting', () => {
     expect(geoKeys.length).to.be.greaterThan(0);
   });
 
-  it('should have _highlightSyntax method', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
-    expect(el._highlightSyntax).to.be.a('function');
-  });
+  it('should highlight line content via highlightSyntax function', async () => {
+    // Import the extracted highlightSyntax function
+    const { highlightSyntax } = await import('../src/syntax-highlighter.ts');
 
-  it('should highlight line content', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
-    const result = el._highlightSyntax('"type": "Feature",', 'Feature');
-    
+    const result = highlightSyntax('"type": "Feature",', 'Feature', undefined);
+
     expect(result).to.include('span');
     expect(result).to.include('class=');
   });
@@ -198,6 +193,98 @@ describe('GeoJsonEditor - Color Indicators', () => {
 
     const colorSpans = el.shadowRoot.querySelectorAll('.json-color');
     expect(colorSpans.length).to.be.greaterThanOrEqual(2);
+  });
+
+  it('should normalize 3-digit hex color to 6-digit for color picker', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWith3DigitColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { color: '#abc' }
+    };
+    el.set([featureWith3DigitColor]);
+    await waitFor(200);
+
+    // Find the color span
+    const colorSpan = el.shadowRoot.querySelector('.json-color');
+    expect(colorSpan).to.exist;
+
+    // Mock the color input creation to capture the normalized value
+    let capturedInputValue = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        const originalValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        Object.defineProperty(elem, 'value', {
+          set: function(val) {
+            capturedInputValue = val;
+            originalValueSetter.call(this, val);
+          },
+          get: function() {
+            return originalValueSetter ? this.getAttribute('value') || '' : '';
+          }
+        });
+      }
+      return elem;
+    };
+
+    // Simulate opening the color picker
+    el.showColorPicker(colorSpan, 0, '#abc', 'color');
+    await waitFor(100);
+
+    // Verify the color was normalized from #abc to #aabbcc
+    expect(capturedInputValue).to.equal('#aabbcc');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should keep 6-digit hex color unchanged for color picker', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWith6DigitColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { color: '#ff5733' }
+    };
+    el.set([featureWith6DigitColor]);
+    await waitFor(200);
+
+    // Find the color span
+    const colorSpan = el.shadowRoot.querySelector('.json-color');
+    expect(colorSpan).to.exist;
+
+    // Mock the color input creation to capture the value
+    let capturedInputValue = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        const originalValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        Object.defineProperty(elem, 'value', {
+          set: function(val) {
+            capturedInputValue = val;
+            originalValueSetter.call(this, val);
+          },
+          get: function() {
+            return originalValueSetter ? this.getAttribute('value') || '' : '';
+          }
+        });
+      }
+      return elem;
+    };
+
+    // Simulate opening the color picker
+    el.showColorPicker(colorSpan, 0, '#ff5733', 'color');
+    await waitFor(100);
+
+    // Verify the color stays as #ff5733
+    expect(capturedInputValue).to.equal('#ff5733');
+
+    document.createElement = originalCreateElement;
   });
 });
 
