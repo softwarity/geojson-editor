@@ -1,7 +1,8 @@
-import type { LineMeta } from './types.js';
+import type { LineMeta } from './internal-types.js';
 import {
   GEOJSON_KEYS,
   GEOMETRY_TYPES,
+  RAW_COLORS,
   RE_COLLAPSED_BRACKET,
   RE_COLLAPSED_ROOT,
   RE_ESCAPE_AMP,
@@ -12,6 +13,7 @@ import {
   RE_TYPE_VALUES,
   RE_STRING_VALUES,
   RE_COLOR_HEX,
+  RE_NAMED_COLOR,
   RE_NUMBERS_COLON,
   RE_NUMBERS_ARRAY,
   RE_NUMBERS_START,
@@ -21,6 +23,16 @@ import {
   RE_WHITESPACE_ONLY,
   RE_WHITESPACE_SPLIT
 } from './constants.js';
+
+/**
+ * Convert a named CSS color to hex using RAW_COLORS lookup
+ */
+function namedColorToHex(colorName: string): string | null {
+  const lc = colorName.toLowerCase();
+  const re = new RegExp('(?:^|[\\da-f]{6}|[\\da-f]{3})' + lc + '([\\da-f]{6}|[\\da-f]{3})', 'i');
+  const match = RAW_COLORS.match(re);
+  return match ? '#' + match[1] : null;
+}
 
 /**
  * Apply syntax highlighting to a line of JSON text
@@ -81,8 +93,16 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
   RE_STRING_VALUES.lastIndex = 0;
   result = result.replace(RE_STRING_VALUES, (match, colon, space, val) => {
     if (match.includes('geojson-type') || match.includes('json-string')) return match;
+    // Check for hex color (#fff or #ffffff)
     if (RE_COLOR_HEX.test(val)) {
       return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
+    }
+    // Check for named CSS color (red, blue, etc.)
+    if (RE_NAMED_COLOR.test(val)) {
+      const hex = namedColorToHex(val);
+      if (hex) {
+        return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${hex}">"${val}"</span>`;
+      }
     }
     return `${colon}${space}<span class="json-string">"${val}"</span>`;
   });

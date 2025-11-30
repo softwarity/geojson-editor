@@ -4,23 +4,21 @@ import type { Feature, FeatureCollection } from 'geojson';
 
 // ========== Imports from extracted modules ==========
 import type {
-  CursorPosition,
   SetOptions,
-  ThemeSettings,
+  ThemeSettings
+} from './types.js';
+
+import type {
+  CursorPosition,
+  FeatureInput,
   LineMeta,
   VisibleLine,
   FeatureRange,
   NodeRangeInfo,
-  CollapsibleRange,
   EditorSnapshot,
-  FeatureInput,
   CollapsedZoneContext,
-  CollapsedNodeInfo,
-  ColorMeta,
-  BooleanMeta,
-  CollapseButtonMeta,
-  VisibilityButtonMeta
-} from './types.js';
+  CollapsedNodeInfo
+} from './internal-types.js';
 
 import {
   VERSION,
@@ -28,15 +26,16 @@ import {
   RE_CONTEXT_GEOMETRY,
   RE_CONTEXT_PROPERTIES,
   RE_CONTEXT_FEATURES,
-  RE_ATTR_BOOLEANS,
-  RE_ATTR_COLORS,
+  RE_ATTR_VALUE,
+  RE_ATTR_VALUE_SINGLE,
   RE_NORMALIZE_COLOR,
+  RE_COLOR_HEX,
+  RE_NAMED_COLOR,
   RE_IS_FEATURE,
   RE_KV_MATCH,
   RE_ROOT_MATCH,
   RE_BRACKET_POS,
   RE_IS_WORD_CHAR,
-  RE_ATTR_AND_HEX_COLOR,
   RE_ATTR_AND_BOOL_VALUE,
   RE_TO_KEBAB,
   RE_OPEN_BRACES,
@@ -50,7 +49,7 @@ import { validateGeoJSON, normalizeToFeatures } from './validation.js';
 import { highlightSyntax } from './syntax-highlighter.js';
 
 // Re-export public types
-export type { GeometryType, CursorPosition, SetOptions, ThemeConfig, ThemeSettings, FeatureInput } from './types.js';
+export type { SetOptions, ThemeConfig, ThemeSettings } from './types.js';
 
 // Alias for minification
 const _ce = createElement;
@@ -139,7 +138,7 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Render Cache ==========
-  _invalidateRenderCache() {
+  private _invalidateRenderCache() {
     this._lastStartIndex = -1;
     this._lastEndIndex = -1;
     this._lastTotalLines = -1;
@@ -151,7 +150,7 @@ class GeoJsonEditor extends HTMLElement {
    * Create a snapshot of current editor state
    * @returns {Object} State snapshot
    */
-  _createSnapshot() {
+  private _createSnapshot() {
     return {
       lines: [...this.lines],
       cursorLine: this.cursorLine,
@@ -163,7 +162,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Restore editor state from snapshot
    */
-  _restoreSnapshot(snapshot: EditorSnapshot): void {
+  private _restoreSnapshot(snapshot: EditorSnapshot): void {
     this.lines = [...snapshot.lines];
     this.cursorLine = snapshot.cursorLine;
     this.cursorColumn = snapshot.cursorColumn;
@@ -178,7 +177,7 @@ class GeoJsonEditor extends HTMLElement {
    * Save current state to undo stack before making changes
    * @param {string} actionType - Type of action (insert, delete, paste, etc.)
    */
-  _saveToHistory(actionType = 'edit') {
+  private _saveToHistory(actionType = 'edit') {
     const now = Date.now();
     const shouldGroup = (
       actionType === this._lastActionType &&
@@ -272,14 +271,14 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Unique ID Generation ==========
-  _generateNodeId() {
+  private _generateNodeId() {
     return `node_${++this._nodeIdCounter}`;
   }
 
   /**
    * Check if a line is inside a collapsed node (hidden lines between opening and closing)
    */
-  _getCollapsedRangeForLine(lineIndex: number): CollapsedNodeInfo | null {
+  private _getCollapsedRangeForLine(lineIndex: number): CollapsedNodeInfo | null {
     for (const [nodeId, info] of this._nodeIdToLines) {
       // Lines strictly between opening and closing are hidden
       if (this.collapsedNodes.has(nodeId) && lineIndex > info.startLine && lineIndex < info.endLine) {
@@ -292,7 +291,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Check if cursor is on the closing line of a collapsed node
    */
-  _getCollapsedClosingLine(lineIndex: number): CollapsedNodeInfo | null {
+  private _getCollapsedClosingLine(lineIndex: number): CollapsedNodeInfo | null {
     for (const [nodeId, info] of this._nodeIdToLines) {
       if (this.collapsedNodes.has(nodeId) && lineIndex === info.endLine) {
         return { nodeId, ...info };
@@ -304,7 +303,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get the position of the closing bracket on a line
    */
-  _getClosingBracketPos(line: string): number {
+  private _getClosingBracketPos(line: string): number {
     // Find the last ] or } on the line
     const lastBracket = Math.max(line.lastIndexOf(']'), line.lastIndexOf('}'));
     return lastBracket;
@@ -313,7 +312,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Check if cursor is on the opening line of a collapsed node
    */
-  _getCollapsedNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
+  private _getCollapsedNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
     const nodeId = this._lineToNodeId.get(lineIndex);
     if (nodeId && this.collapsedNodes.has(nodeId)) {
       const info = this._nodeIdToLines.get(nodeId);
@@ -325,7 +324,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Check if cursor is on a line that has a collapsible node (expanded or collapsed)
    */
-  _getCollapsibleNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
+  private _getCollapsibleNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
     const nodeId = this._lineToNodeId.get(lineIndex);
     if (nodeId) {
       const info = this._nodeIdToLines.get(nodeId);
@@ -341,7 +340,7 @@ class GeoJsonEditor extends HTMLElement {
    * Find the innermost expanded node that contains the given line
    * Used for Shift+Tab to collapse the parent node from anywhere inside it
    */
-  _getContainingExpandedNode(lineIndex: number): CollapsedNodeInfo | null {
+  private _getContainingExpandedNode(lineIndex: number): CollapsedNodeInfo | null {
     let bestMatch: CollapsedNodeInfo | null = null;
 
     for (const [nodeId, info] of this._nodeIdToLines) {
@@ -363,7 +362,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Delete an entire collapsed node (opening line to closing line)
    */
-  _deleteCollapsedNode(range: CollapsedNodeInfo): void {
+  private _deleteCollapsedNode(range: CollapsedNodeInfo): void {
     this._saveToHistory('delete');
 
     // Remove all lines from startLine to endLine
@@ -381,7 +380,7 @@ class GeoJsonEditor extends HTMLElement {
    * Rebuild nodeId mappings after content changes
    * Preserves collapsed state by matching nodeKey + sequential occurrence
    */
-  _rebuildNodeIdMappings() {
+  private _rebuildNodeIdMappings() {
     // Save old state to try to preserve collapsed nodes
     const oldCollapsed = new Set(this.collapsedNodes);
     const oldNodeKeyMap = new Map(); // nodeId -> nodeKey
@@ -530,7 +529,7 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== DOM Element Cache ==========
-  _cacheElements() {
+  private _cacheElements() {
     this._viewport = this.shadowRoot.getElementById('viewport');
     this._linesContainer = this.shadowRoot.getElementById('linesContainer');
     this._scrollContent = this.shadowRoot.getElementById('scrollContent');
@@ -915,21 +914,24 @@ class GeoJsonEditor extends HTMLElement {
         featureKey: null
       };
       
-      // Detect colors
-      RE_ATTR_COLORS.lastIndex = 0;
-      let colorMatch: RegExpExecArray | null;
-      while ((colorMatch = RE_ATTR_COLORS.exec(line)) !== null) {
-        const [,attributeName, color] = colorMatch;
-        meta.colors.push({ attributeName, color });
-      }
-
-      // Detect booleans
-      RE_ATTR_BOOLEANS.lastIndex = 0;
-      let boolMatch: RegExpExecArray | null;
-      while ((boolMatch = RE_ATTR_BOOLEANS.exec(line)) !== null) {
-        const [,attributeName, boolValue] = boolMatch;
-        const value = boolValue === 'true';
-        meta.booleans.push({ attributeName, value });
+      // Detect colors and booleans in a single pass
+      RE_ATTR_VALUE.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = RE_ATTR_VALUE.exec(line)) !== null) {
+        const [, attributeName, strValue, boolValue] = match;
+        if (boolValue) {
+          // Boolean value
+          meta.booleans.push({ attributeName, value: boolValue === 'true' });
+        } else if (strValue) {
+          // String value - check if it's a color
+          if (RE_COLOR_HEX.test(strValue)) {
+            // Hex color (#fff or #ffffff)
+            meta.colors.push({ attributeName, color: strValue });
+          } else if (RE_NAMED_COLOR.test(strValue) && RAW_COLORS.includes(strValue.toLowerCase())) {
+            // Named CSS color (red, blue, etc.)
+            meta.colors.push({ attributeName, color: strValue });
+          }
+        }
       }
       
       // Check if line starts a collapsible node
@@ -1123,7 +1125,7 @@ class GeoJsonEditor extends HTMLElement {
    * Uses absolute positioning to avoid affecting text layout
    * In overwrite mode, cursor is a block covering the next character
    */
-  _insertCursor(column: number): string {
+  private _insertCursor(column: number): string {
     const charWidth = this._getCharWidth();
     const left = column * charWidth;
     if (this._insertMode) {
@@ -1138,7 +1140,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Add selection highlight to a line
    */
-  _addSelectionHighlight(html: string, lineIndex: number, content: string): string {
+  private _addSelectionHighlight(html: string, lineIndex: number, content: string): string {
     const { start, end } = this._normalizeSelection();
     if (!start || !end) return html;
     
@@ -1177,7 +1179,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get character width for monospace font
    */
-  _getCharWidth() {
+  private _getCharWidth() {
     if (!this._charWidth) {
       const canvas = _ce('canvas') as HTMLCanvasElement;
       const ctx = canvas.getContext('2d');
@@ -1384,7 +1386,7 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  _handleEnter(ctx: CollapsedZoneContext): void {
+  private _handleEnter(ctx: CollapsedZoneContext): void {
     // Block in collapsed zones
     if (ctx.onCollapsedNode || ctx.inCollapsedZone) return;
     // On closing line, before bracket -> block
@@ -1398,7 +1400,7 @@ class GeoJsonEditor extends HTMLElement {
     this.insertNewline();
   }
 
-  _handleBackspace(ctx: CollapsedZoneContext): void {
+  private _handleBackspace(ctx: CollapsedZoneContext): void {
     // Delete selection if any
     if (this._hasSelection()) {
       this._deleteSelection();
@@ -1435,7 +1437,7 @@ class GeoJsonEditor extends HTMLElement {
     this.deleteBackward();
   }
 
-  _handleDelete(ctx: CollapsedZoneContext): void {
+  private _handleDelete(ctx: CollapsedZoneContext): void {
     // Delete selection if any
     if (this._hasSelection()) {
       this._deleteSelection();
@@ -1467,7 +1469,7 @@ class GeoJsonEditor extends HTMLElement {
     this.deleteForward();
   }
 
-  _handleTab(isShiftKey: boolean, ctx: CollapsedZoneContext): void {
+  private _handleTab(isShiftKey: boolean, ctx: CollapsedZoneContext): void {
     // Shift+Tab: collapse the containing expanded node
     if (isShiftKey) {
       const containingNode = this._getContainingExpandedNode(this.cursorLine);
@@ -1595,7 +1597,7 @@ class GeoJsonEditor extends HTMLElement {
     this.scheduleRender();
   }
 
-  _moveCursorRight() {
+  private _moveCursorRight() {
     const line = this.lines[this.cursorLine];
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
     const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
@@ -1637,7 +1639,7 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  _moveCursorLeft() {
+  private _moveCursorLeft() {
     const line = this.lines[this.cursorLine];
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
     const onClosingLine = this._getCollapsedClosingLine(this.cursorLine);
@@ -1687,7 +1689,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Scroll viewport to ensure cursor is visible
    */
-  _scrollToCursor() {
+  private _scrollToCursor() {
     const viewport = this._viewport;
     if (!viewport) return;
     
@@ -1712,7 +1714,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Handle arrow key with optional selection and word jump
    */
-  _handleArrowKey(deltaLine: number, deltaCol: number, isShift: boolean, isCtrl = false): void {
+  private _handleArrowKey(deltaLine: number, deltaCol: number, isShift: boolean, isCtrl = false): void {
     // Start selection if shift is pressed and no selection exists
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
@@ -1746,7 +1748,7 @@ class GeoJsonEditor extends HTMLElement {
    * - Ctrl+Right: move to end of current word, or start of next word
    * - Ctrl+Left: move to start of current word, or start of previous word
    */
-  _moveCursorByWord(direction: number): void {
+  private _moveCursorByWord(direction: number): void {
     const line = this.lines[this.cursorLine] || '';
     // Word character: alphanumeric, underscore, or hyphen (for kebab-case identifiers)
     const isWordChar = (ch: string) => RE_IS_WORD_CHAR.test(ch);
@@ -1855,7 +1857,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Handle Home/End with optional selection
    */
-  _handleHomeEnd(key: string, isShift: boolean, onClosingLine: CollapsedNodeInfo | null): void {
+  private _handleHomeEnd(key: string, isShift: boolean, onClosingLine: CollapsedNodeInfo | null): void {
     // Start selection if shift is pressed and no selection exists
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
@@ -1888,7 +1890,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Select all content
    */
-  _selectAll() {
+  private _selectAll() {
     this.selectionStart = { line: 0, column: 0 };
     const lastLine = this.lines.length - 1;
     this.selectionEnd = { line: lastLine, column: this.lines[lastLine]?.length || 0 };
@@ -1903,7 +1905,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get selected text
    */
-  _getSelectedText() {
+  private _getSelectedText() {
     if (!this.selectionStart || !this.selectionEnd) return '';
     
     const { start, end } = this._normalizeSelection();
@@ -1925,7 +1927,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Normalize selection so start is before end
    */
-  _normalizeSelection() {
+  private _normalizeSelection() {
     if (!this.selectionStart || !this.selectionEnd) {
       return { start: null, end: null };
     }
@@ -1943,7 +1945,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Check if there is an active selection
    */
-  _hasSelection() {
+  private _hasSelection() {
     if (!this.selectionStart || !this.selectionEnd) return false;
     return this.selectionStart.line !== this.selectionEnd.line ||
            this.selectionStart.column !== this.selectionEnd.column;
@@ -1952,7 +1954,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Clear the current selection
    */
-  _clearSelection() {
+  private _clearSelection() {
     this.selectionStart = null;
     this.selectionEnd = null;
   }
@@ -1960,7 +1962,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Delete selected text
    */
-  _deleteSelection() {
+  private _deleteSelection() {
     if (!this._hasSelection()) return false;
 
     this._saveToHistory('delete');
@@ -2091,7 +2093,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get line/column position from mouse event
    */
-  _getPositionFromClick(e: MouseEvent): { line: number; column: number } {
+  private _getPositionFromClick(e: MouseEvent): { line: number; column: number } {
     const viewport = this._viewport;
     const linesContainer = this._linesContainer;
     const rect = viewport.getBoundingClientRect();
@@ -2183,9 +2185,11 @@ class GeoJsonEditor extends HTMLElement {
         if (targetLineEl) {
           const lineIndex = parseInt(targetLineEl.dataset.lineIndex);
           const line = this.lines[lineIndex];
-          const match = line.match(RE_ATTR_AND_HEX_COLOR);
-          if (match) {
-            this.showColorPicker(e.target, lineIndex, color, match[1]);
+          // Match any string attribute (hex or named color)
+          // RE_ATTR_VALUE_SINGLE captures: [1] attributeName, [2] stringValue
+          const match = line.match(RE_ATTR_VALUE_SINGLE);
+          if (match && match[1]) {
+            this.showColorPicker(e.target as HTMLElement, lineIndex, color, match[1]);
           }
         }
         return;
@@ -2239,7 +2243,7 @@ class GeoJsonEditor extends HTMLElement {
    * @param {object} options - Options object with optional collapsed property
    * @param {array} features - Features array for function mode
    */
-  _applyCollapsedFromOptions(options, features) {
+  private _applyCollapsedFromOptions(options, features) {
     const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
     if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
       this._applyCollapsedOption(collapsed, features);
@@ -2251,7 +2255,7 @@ class GeoJsonEditor extends HTMLElement {
    * @param {string[]|function} collapsed - Attributes to collapse or function returning them
    * @param {array} features - Features array for function mode (optional)
    */
-  _applyCollapsedOption(collapsed, features = null) {
+  private _applyCollapsedOption(collapsed, features = null) {
     const ranges = this._findCollapsibleRanges();
 
     // Group ranges by feature (root nodes)
@@ -2311,13 +2315,24 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Color Picker ==========
   
+  /**
+   * Convert a named CSS color to hex using RAW_COLORS lookup
+   */
+  private _namedColorToHex(colorName: string): string | null {
+    const lc = colorName.toLowerCase();
+    // Pattern: (start OR hex 6 or 3) + colorName + capture hex (6 or 3)
+    const re = new RegExp('(?:^|[\\da-f]{6}|[\\da-f]{3})' + lc + '([\\da-f]{6}|[\\da-f]{3})', 'i');
+    const match = RAW_COLORS.match(re);
+    return match ? '#' + match[1] : null;
+  }
+
   showColorPicker(indicator: HTMLElement, line: number, currentColor: string, attributeName: string) {
     // Remove existing picker and anchor
     const existing = document.querySelector('.geojson-color-picker-anchor');
     if (existing) {
       existing.remove();
     }
-    
+
     // Create an anchor element at the pseudo-element position
     // The browser will position the color picker popup relative to this
     const anchor = _ce('div');
@@ -2332,10 +2347,19 @@ class GeoJsonEditor extends HTMLElement {
       z-index: 9998;
     `;
     document.body.appendChild(anchor);
-    
+
     const colorInput = _ce('input') as HTMLInputElement & { _closeListener?: EventListener };
     colorInput.type = 'color';
-    colorInput.value = currentColor.replace(RE_NORMALIZE_COLOR, '#$1$1$2$2$3$3');
+    // Convert color to hex format for the color picker
+    let hexColor = currentColor;
+    if (!currentColor.startsWith('#')) {
+      // Named color - convert to hex
+      hexColor = this._namedColorToHex(currentColor) || '#000000';
+    } else {
+      // Expand 3-char hex to 6-char (#abc -> #aabbcc)
+      hexColor = currentColor.replace(RE_NORMALIZE_COLOR, '#$1$1$2$2$3$3');
+    }
+    colorInput.value = hexColor;
     colorInput.className = 'geojson-color-picker-input';
 
     // Position the color input inside the anchor
@@ -2373,10 +2397,11 @@ class GeoJsonEditor extends HTMLElement {
     colorInput.click();
   }
 
-  updateColorValue(line, newColor, attributeName) {
-    const regex = new RegExp(`"${attributeName}"\\s*:\\s*"#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})"`);
+  updateColorValue(line: number, newColor: string, attributeName: string) {
+    // Match both hex colors (#xxx, #xxxxxx) and named colors (red, blue, etc.)
+    const regex = new RegExp(`"${attributeName}"\\s*:\\s*"(?:#[0-9a-fA-F]{3,6}|[a-zA-Z]+)"`);
     this.lines[line] = this.lines[line].replace(regex, `"${attributeName}": "${newColor}"`);
-    
+
     // Use updateView to preserve collapsed state (line count didn't change)
     this.updateView();
     this.scheduleRender();
@@ -2549,7 +2574,7 @@ class GeoJsonEditor extends HTMLElement {
    * Find all collapsible ranges using the mappings built by _rebuildNodeIdMappings
    * This method only READS the existing mappings, it doesn't create new IDs
    */
-  _findCollapsibleRanges() {
+  private _findCollapsibleRanges() {
     const ranges = [];
     
     // Simply iterate through the existing mappings
@@ -2585,7 +2610,7 @@ class GeoJsonEditor extends HTMLElement {
     return ranges;
   }
 
-  _findClosingLine(startLine, openBracket) {
+  private _findClosingLine(startLine, openBracket) {
     let depth = 1;
     const line = this.lines[startLine];
     const bracketPos = line.indexOf(openBracket);
@@ -2606,7 +2631,7 @@ class GeoJsonEditor extends HTMLElement {
     return -1;
   }
 
-  _buildContextMap() {
+  private _buildContextMap() {
     // Memoization: return cached result if content hasn't changed
     const linesLength = this.lines.length;
     if (this._contextMapCache &&
@@ -2845,7 +2870,7 @@ class GeoJsonEditor extends HTMLElement {
     });
   }
 
-  _parseFeatures() {
+  private _parseFeatures() {
     try {
       const content = this.lines.join('\n');
       if (!content.trim()) return [];

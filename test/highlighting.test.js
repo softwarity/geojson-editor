@@ -398,3 +398,150 @@ describe('GeoJsonEditor - Gutter Line Numbers', () => {
     expect(collapseButtons.length).to.be.greaterThan(0);
   });
 });
+
+describe('GeoJsonEditor - Named CSS Colors', () => {
+
+  it('should detect named CSS colors (red, blue, etc.)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWithNamedColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { fill: 'red', stroke: 'blue' }
+    };
+    el.set([featureWithNamedColor]);
+    await waitFor(200);
+
+    const colorSpans = el.shadowRoot.querySelectorAll('.json-color');
+    expect(colorSpans.length).to.be.greaterThanOrEqual(2);
+  });
+
+  it('should show correct hex in swatch for named color', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWithNamedColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { color: 'red' }
+    };
+    el.set([featureWithNamedColor]);
+    await waitFor(200);
+
+    const colorSpan = el.shadowRoot.querySelector('.json-color');
+    expect(colorSpan).to.exist;
+    // red = #f00
+    expect(colorSpan.style.getPropertyValue('--swatch-color')).to.equal('#f00');
+  });
+
+  it('should convert named color to hex for color picker', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWithNamedColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { color: 'blue' }
+    };
+    el.set([featureWithNamedColor]);
+    await waitFor(200);
+
+    const colorSpan = el.shadowRoot.querySelector('.json-color');
+    expect(colorSpan).to.exist;
+
+    // Mock the color input creation to capture the normalized value
+    let capturedInputValue = null;
+    const originalCreateElement = document.createElement.bind(document);
+    document.createElement = (tag) => {
+      const elem = originalCreateElement(tag);
+      if (tag === 'input') {
+        const originalValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        Object.defineProperty(elem, 'value', {
+          set: function(val) {
+            capturedInputValue = val;
+            originalValueSetter.call(this, val);
+          },
+          get: function() {
+            return originalValueSetter ? this.getAttribute('value') || '' : '';
+          }
+        });
+      }
+      return elem;
+    };
+
+    // Simulate opening the color picker with named color
+    el.showColorPicker(colorSpan, 0, 'blue', 'color');
+    await waitFor(100);
+
+    // blue = #00f -> should be expanded to #0000ff for color picker
+    expect(capturedInputValue).to.equal('#00f');
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should detect various named colors', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWithColors = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: {
+        primary: 'chartreuse',
+        secondary: 'lightgoldenrodyellow',
+        tertiary: 'navy'
+      }
+    };
+    el.set([featureWithColors]);
+    await waitFor(200);
+
+    const colorSpans = el.shadowRoot.querySelectorAll('.json-color');
+    expect(colorSpans.length).to.be.greaterThanOrEqual(3);
+  });
+
+  it('should not detect non-color strings as colors', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWithNonColors = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: {
+        name: 'hello',
+        description: 'world'
+      }
+    };
+    el.set([featureWithNonColors]);
+    await waitFor(200);
+
+    // Should have no color spans for these non-color values
+    const colorSpans = el.shadowRoot.querySelectorAll('.json-color');
+    expect(colorSpans.length).to.equal(0);
+  });
+
+  it('should update named color value correctly', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const featureWithNamedColor = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [0, 0] },
+      properties: { color: 'red' }
+    };
+    el.set([featureWithNamedColor]);
+    await waitFor(200);
+
+    // Find the line with the color
+    const colorLine = el.lines.findIndex(line => line.includes('"color"'));
+    expect(colorLine).to.be.greaterThan(-1);
+
+    // Update the color
+    el.updateColorValue(colorLine, '#00ff00', 'color');
+    await waitFor(100);
+
+    // Verify the line now contains the new hex color
+    expect(el.lines[colorLine]).to.include('#00ff00');
+    expect(el.lines[colorLine]).to.not.include('red');
+  });
+});

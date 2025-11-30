@@ -1,6 +1,5 @@
 import type { Feature, FeatureCollection } from 'geojson';
-import { GEOMETRY_TYPES } from './constants.js';
-import type { GeometryType } from './types.js';
+import { GEOMETRY_TYPES, type GeometryType } from './constants.js';
 
 /**
  * Validation error for GeoJSON features

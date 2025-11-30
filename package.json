@@ -20,7 +20,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && npm run build:types",
-    "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir types",
+    "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir types && cp src/geojson-editor.d.ts types/ && rm -f types/constants.d.ts types/utils.d.ts types/validation.d.ts types/syntax-highlighter.d.ts types/geojson-editor.template.d.ts types/internal-types.d.ts",
     "preview": "vite preview",
     "test": "web-test-runner",
     "test:watch": "web-test-runner --watch",

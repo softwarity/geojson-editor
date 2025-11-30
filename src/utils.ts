@@ -1,5 +1,5 @@
 import type { Feature } from 'geojson';
-import type { BracketCount } from './types.js';
+import type { BracketCount } from './internal-types.js';
 
 /**
  * Alias for document.createElement - optimized for minification
