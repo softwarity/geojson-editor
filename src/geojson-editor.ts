@@ -150,6 +150,8 @@ const VERSION = typeof __VERSION__ !== 'undefined' ? __VERSION__ : 'dev';
 const GEOJSON_KEYS: string[] = ['type', 'geometry', 'properties', 'coordinates', 'id', 'features'];
 const GEOMETRY_TYPES: GeometryType[] = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon'];
 
+const RAW_COLORS = "alicebluef0f8ffantiquewhitefaebd7aqua0ffaquamarine7ffd4azuref0ffffbeigef5f5dbisqueffe4c4black000blanchedalmondffebcdblue00fblueviolet8a2b2browna52aburlywooddeb887cadetblue5f9ea0chartreuse7ffchocolated2691ecoralff7f50cornflowerblue6495edcornsilkfff8dccrimsondc143ccyand0ffdarkblue00008bdarkcyan008b8bdarkgoldenrodb8860bdarkgraya9a9a9darkgreen006400darkgreya9a9a9darkkhakibdb76bdarkmagenta8b008bdarkolivegreen556b2fdarkorangeff8c00darkorchid9932ccdarkredd8b0000darksalmone9967adarkseagreena8fbc8fdarkslateblue483d8bdarkslategray2f4f4fdarkslategrey2f4f4fdarkturquoise0ced1darkviolet9400d3deeppinkff1493deepskyblue0bfffdimgray696969dimgrey696969dodgerblue1e90fffirebrickb22222floralwhitefffaf0forestgreen228b22fuchsiaf0fgainsborodcdcdcgghostwhitef8f8ffgoldffd700goldenroddaa520gray808080green0800greenyellowadff2fgrey808080honeydewf0fff0hotpinkff69b4indianredcd5c5cindigo4b0082ivoryfffff0khakif0e68clavendere6e6falavenderblushfff0f5lawngreen7cfc00lemonchiffonfffacdlightblueadd8e6lightcoralf08080lightcyane0fffflightgoldenrodyellowfafad2lightgrayd3d3d3lightgreen90ee90lightgreyd3d3d3lightpinkffb6c1lightsalmonffa07alightseagreen20b2aalightskyblue87cefalightslategray778899lightslategrey778899lightsteelblueb0c4delightyellowffffe0lime0f0limegreen32cd32linenfaf0e6magentaf0fmaroon800000mediumaquamarine66cdaamediumblue0000cdmediumorchidba55d3mediumpurple9370dbmediumseagreen3cb371mediumslateblue7b68eemediumspringgreen00fa9amediumturquoise48d1ccmediumvioletredc71585midnightblue191970mintcreamf5fffamistyroseffe4e1moccasinffe4b5navajowhiteffdeadnavy000080oldlacefdf5e6olive808000olivedrab6b8e23orangeffa500orangeredff4500orchidda70d6palegoldenrodeee8aapalegreen98fb98paleturquoiseafeeeepalevioletreddb7093papayawhipffefd5peachpuffffdab9perucd853fpinkffc0cbplumdda0ddpowderblueb0e0e6purple800080rebeccapurple663399redff0000rosybrownbc8f8froyalblue4169esaddlebrown8b4513salmonfa8072sandybrownf4a460seagreen2e8b57seashellfff5eesiennaa0522dsilverc0c0c0skyblue87ceebslateblue6a5acdslategray708090slategrey708090snowsfffafaspringgreen0ff7fsteelblue4682b4tantan0d2b48ctealth008080thistled8bfd8tomatoff6347turquoise40e0d0violetee82eewheatf5deb3whiteffffffwhitesmokef5f5f5yellowffff0yellowgreen9acd32";
+
 // Pre-compiled regex patterns for performance (avoid re-creation on each call)
 const RE_CONTEXT_GEOMETRY = /"geometry"\s*:/;
 const RE_CONTEXT_PROPERTIES = /"properties"\s*:/;
@@ -172,6 +174,22 @@ const RE_NULL = /(<span class="json-punctuation">:<\/span>)(\s*)(null)/g;
 const RE_UNRECOGNIZED = /(<\/span>|^)([^<]+)(<span|$)/g;
 const RE_WHITESPACE_ONLY = /^\s*$/;
 const RE_WHITESPACE_SPLIT = /(\s+)/;
+const RE_ATTR_BOOLEANS = /"([\w-]+)"\s*:\s*(true|false)/g;
+const RE_ATTR_COLORS = /"([\w-]+)"\s*:\s*"(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}))"/g;
+const RE_NORMALIZE_COLOR = /^#?([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/;
+const RE_IS_FEATURE = /"type"\s*:\s*"Feature"/
+const RE_KV_MATCH = /^\s*"([^"]+)"\s*:\s*([{\[])/;
+const RE_ROOT_MATCH = /^\s*([{\[]),?\s*$/;
+const RE_BRACKET_POS = /[{\[]/;
+const RE_IS_WORD_CHAR = /[\w-]/;
+const RE_ATTR_AND_HEX_COLOR = /"([\w-]+)"\s*:\s*"#/;
+const RE_ATTR_AND_BOOL_VALUE = /"([\w-]+)"\s*:\s*(true|false)/;
+const RE_TO_KEBAB = /([A-Z])/g;
+const RE_OPEN_BRACES = /\{/g;
+const RE_CLOSE_BRACES = /\}/g;
+const RE_OPEN_BRACKETS = /\[/g;
+const RE_CLOSE_BRACKET = /\]/g;
+
 
 /**
  * GeoJSON Editor Web Component
@@ -524,9 +542,9 @@ class GeoJsonEditor extends HTMLElement {
       const line = this.lines[i];
       
       // Match "key": { or "key": [
-      const kvMatch = line.match(/^\s*"([^"]+)"\s*:\s*([{\[])/);
+      const kvMatch = line.match(RE_KV_MATCH);
       // Also match standalone { or {, (root Feature objects)
-      const rootMatch = !kvMatch && line.match(/^\s*([{\[]),?\s*$/);
+      const rootMatch = !kvMatch && line.match(RE_ROOT_MATCH);
       
       if (!kvMatch && !rootMatch) continue;
       
@@ -941,7 +959,7 @@ class GeoJsonEditor extends HTMLElement {
       for (let i = 0; i < this.lines.length; i++) {
         const line = this.lines[i];
         
-        if (!inFeature && /"type"\s*:\s*"Feature"/.test(line)) {
+        if (!inFeature && RE_IS_FEATURE.test(line)) {
           // Find opening brace
           let startLine = i;
           for (let j = i; j >= 0; j--) {
@@ -1012,17 +1030,21 @@ class GeoJsonEditor extends HTMLElement {
       };
       
       // Detect colors
-      const colorRegex = /"([\w-]+)"\s*:\s*"(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}))"/g;
-      let colorMatch;
-      while ((colorMatch = colorRegex.exec(line)) !== null) {
-        meta.colors.push({ attributeName: colorMatch[1], color: colorMatch[2] });
+      RE_ATTR_COLORS.lastIndex = 0;
+      let colorMatch: RegExpExecArray | null;
+      while ((colorMatch = RE_ATTR_COLORS.exec(line)) !== null) {
+        const [,attributeName, colorValue] = colorMatch;
+        const color = colorValue.replace(RE_NORMALIZE_COLOR, '$1$1$2$2$3$3');
+        meta.colors.push({ attributeName, color });
       }
-      
+
       // Detect booleans
-      const boolRegex = /"([\w-]+)"\s*:\s*(true|false)/g;
-      let boolMatch;
-      while ((boolMatch = boolRegex.exec(line)) !== null) {
-        meta.booleans.push({ attributeName: boolMatch[1], value: boolMatch[2] === 'true' });
+      RE_ATTR_BOOLEANS.lastIndex = 0;
+      let boolMatch: RegExpExecArray | null;
+      while ((boolMatch = RE_ATTR_BOOLEANS.exec(line)) !== null) {
+        const [,attributeName, boolValue] = boolMatch;
+        const value = boolValue === 'true';
+        meta.booleans.push({ attributeName, value });
       }
       
       // Check if line starts a collapsible node
@@ -1106,7 +1128,6 @@ class GeoJsonEditor extends HTMLElement {
     const viewport = this.shadowRoot.getElementById('viewport');
     const linesContainer = this.shadowRoot.getElementById('linesContainer');
     const scrollContent = this.shadowRoot.getElementById('scrollContent');
-    const gutterContent = this.shadowRoot.getElementById('gutterContent');
 
     if (!viewport || !linesContainer) return;
     
@@ -1368,7 +1389,7 @@ class GeoJsonEditor extends HTMLElement {
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
     if (onCollapsed) {
       const line = this.lines[this.cursorLine];
-      const bracketPos = line.search(/[{\[]/);
+      const bracketPos = line.search(RE_BRACKET_POS);
       if (this.cursorColumn > bracketPos) {
         textarea.value = '';
         return;
@@ -1502,7 +1523,7 @@ class GeoJsonEditor extends HTMLElement {
     // On opening line, allow editing before bracket
     if (ctx.onCollapsedNode) {
       const line = this.lines[this.cursorLine];
-      const bracketPos = line.search(/[{\[]/);
+      const bracketPos = line.search(RE_BRACKET_POS);
       if (this.cursorColumn > bracketPos + 1) {
         this._deleteCollapsedNode(ctx.onCollapsedNode);
         return;
@@ -1532,7 +1553,7 @@ class GeoJsonEditor extends HTMLElement {
     // If on collapsed node opening line
     if (ctx.onCollapsedNode) {
       const line = this.lines[this.cursorLine];
-      const bracketPos = line.search(/[{\[]/);
+      const bracketPos = line.search(RE_BRACKET_POS);
       if (this.cursorColumn > bracketPos) {
         this._deleteCollapsedNode(ctx.onCollapsedNode);
         return;
@@ -1549,7 +1570,7 @@ class GeoJsonEditor extends HTMLElement {
       const containingNode = this._getContainingExpandedNode(this.cursorLine);
       if (containingNode) {
         const startLine = this.lines[containingNode.startLine];
-        const bracketPos = startLine.search(/[{\[]/);
+        const bracketPos = startLine.search(RE_BRACKET_POS);
         this.toggleCollapse(containingNode.nodeId);
         this.cursorLine = containingNode.startLine;
         this.cursorColumn = bracketPos >= 0 ? bracketPos + 1 : startLine.length;
@@ -1689,7 +1710,7 @@ class GeoJsonEditor extends HTMLElement {
         this.cursorColumn++;
       }
     } else if (onCollapsed) {
-      const bracketPos = line.search(/[{\[]/);
+      const bracketPos = line.search(RE_BRACKET_POS);
       if (this.cursorColumn < bracketPos) {
         this.cursorColumn++;
       } else if (this.cursorColumn === bracketPos) {
@@ -1726,10 +1747,10 @@ class GeoJsonEditor extends HTMLElement {
         // Jump to opening line after bracket
         this.cursorLine = onClosingLine.startLine;
         const openLine = this.lines[this.cursorLine];
-        this.cursorColumn = openLine.search(/[{\[]/) + 1;
+        this.cursorColumn = openLine.search(RE_BRACKET_POS) + 1;
       }
     } else if (onCollapsed) {
-      const bracketPos = line.search(/[{\[]/);
+      const bracketPos = line.search(RE_BRACKET_POS);
       if (this.cursorColumn > bracketPos + 1) {
         this.cursorColumn = bracketPos + 1;
       } else if (this.cursorColumn === bracketPos + 1) {
@@ -1752,7 +1773,7 @@ class GeoJsonEditor extends HTMLElement {
         if (collapsed) {
           this.cursorLine = collapsed.startLine;
           const openLine = this.lines[this.cursorLine];
-          this.cursorColumn = openLine.search(/[{\[]/) + 1;
+          this.cursorColumn = openLine.search(RE_BRACKET_POS) + 1;
         } else {
           this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
         }
@@ -1825,7 +1846,7 @@ class GeoJsonEditor extends HTMLElement {
   _moveCursorByWord(direction) {
     const line = this.lines[this.cursorLine] || '';
     // Word character: alphanumeric, underscore, or hyphen (for kebab-case identifiers)
-    const isWordChar = (ch) => /[\w-]/.test(ch);
+    const isWordChar = (ch) => RE_IS_WORD_CHAR.test(ch);
 
     // Check if we're on a collapsed node's opening line
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
@@ -1836,7 +1857,7 @@ class GeoJsonEditor extends HTMLElement {
 
       // If on collapsed node opening line and cursor is at/after the bracket, jump to closing line
       if (onCollapsed) {
-        const bracketPos = line.search(/[{\[]/);
+        const bracketPos = line.search(RE_BRACKET_POS);
         if (bracketPos >= 0 && pos >= bracketPos) {
           this.cursorLine = onCollapsed.endLine;
           this.cursorColumn = (this.lines[this.cursorLine] || '').length;
@@ -1884,7 +1905,7 @@ class GeoJsonEditor extends HTMLElement {
           // Jump to opening line, after the bracket
           this.cursorLine = onClosingLine.startLine;
           const openLine = this.lines[this.cursorLine] || '';
-          const openBracketPos = openLine.search(/[{\[]/);
+          const openBracketPos = openLine.search(RE_BRACKET_POS);
           this.cursorColumn = openBracketPos >= 0 ? openBracketPos : 0;
           this._invalidateRenderCache();
           this._scrollToCursor();
@@ -2084,7 +2105,7 @@ class GeoJsonEditor extends HTMLElement {
     const onCollapsed = this._getCollapsedNodeAtLine(this.cursorLine);
     if (onCollapsed) {
       const line = this.lines[this.cursorLine];
-      const bracketPos = line.search(/[{\[]/);
+      const bracketPos = line.search(RE_BRACKET_POS);
       if (this.cursorColumn > bracketPos) return;
     }
 
@@ -2259,7 +2280,7 @@ class GeoJsonEditor extends HTMLElement {
         if (targetLineEl) {
           const lineIndex = parseInt(targetLineEl.dataset.lineIndex);
           const line = this.lines[lineIndex];
-          const match = line.match(/"([\w-]+)"\s*:\s*"#/);
+          const match = line.match(RE_ATTR_AND_HEX_COLOR);
           if (match) {
             this.showColorPicker(e.target, lineIndex, color, match[1]);
           }
@@ -2280,7 +2301,7 @@ class GeoJsonEditor extends HTMLElement {
         if (targetLineEl) {
           const lineIndex = parseInt(targetLineEl.dataset.lineIndex);
           const line = this.lines[lineIndex];
-          const match = line.match(/"([\w-]+)"\s*:\s*(true|false)/);
+          const match = line.match(RE_ATTR_AND_BOOL_VALUE);
           if (match) {
             const currentValue = match[2] === 'true';
             this.updateBooleanValue(lineIndex, !currentValue, match[1]);
@@ -2602,7 +2623,8 @@ class GeoJsonEditor extends HTMLElement {
       jsonKeyInvalid: '#ff6b68'
     };
     
-    const toKebab = (str) => str.replace(/([A-Z])/g, '-$1').toLowerCase();
+    RE_TO_KEBAB.lastIndex = 0;
+    const toKebab = (str) => str.replace(RE_TO_KEBAB, '-$1').toLowerCase();
     const generateVars = (obj) => Object.entries(obj)
       .map(([k, v]) => `--${toKebab(k)}: ${v};`)
       .join('\n        ');
@@ -2686,9 +2708,9 @@ class GeoJsonEditor extends HTMLElement {
       if (!line) continue;
       
       // Match "key": { or "key": [
-      const kvMatch = line.match(/^\s*"([^"]+)"\s*:\s*([{\[])/);
+      const kvMatch = line.match(RE_KV_MATCH);
       // Also match standalone { or [ (root Feature objects)
-      const rootMatch = !kvMatch && line.match(/^\s*([{\[]),?\s*$/);
+      const rootMatch = !kvMatch && line.match(RE_ROOT_MATCH);
       
       if (!kvMatch && !rootMatch) continue;
       
@@ -2756,10 +2778,14 @@ class GeoJsonEditor extends HTMLElement {
       else if (RE_CONTEXT_FEATURES.test(line)) pendingContext = 'Feature';
 
       // Track brackets
-      const openBraces = (line.match(/\{/g) || []).length;
-      const closeBraces = (line.match(/\}/g) || []).length;
-      const openBrackets = (line.match(/\[/g) || []).length;
-      const closeBrackets = (line.match(/\]/g) || []).length;
+      RE_OPEN_BRACES.lastIndex = 0;
+      RE_CLOSE_BRACES.lastIndex = 0;
+      RE_OPEN_BRACKETS.lastIndex = 0;
+      RE_CLOSE_BRACKET.lastIndex = 0;
+      const openBraces = (line.match(RE_OPEN_BRACES) || []).length;
+      const closeBraces = (line.match(RE_CLOSE_BRACES) || []).length;
+      const openBrackets = (line.match(RE_OPEN_BRACKETS) || []).length;
+      const closeBrackets = (line.match(RE_CLOSE_BRACKET) || []).length;
 
       for (let j = 0; j < openBraces + openBrackets; j++) {
         contextStack.push({ context: pendingContext || currentContext, isArray: j >= openBraces });
