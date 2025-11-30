@@ -322,21 +322,6 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
-   * Check if cursor is on a line that has a collapsible node (expanded or collapsed)
-   */
-  private _getCollapsibleNodeAtLine(lineIndex: number): CollapsedNodeInfo | null {
-    const nodeId = this._lineToNodeId.get(lineIndex);
-    if (nodeId) {
-      const info = this._nodeIdToLines.get(nodeId);
-      if (info) {
-        const isCollapsed = this.collapsedNodes.has(nodeId);
-        return { nodeId, isCollapsed, ...info };
-      }
-    }
-    return null;
-  }
-
-  /**
    * Find the innermost expanded node that contains the given line
    * Used for Shift+Tab to collapse the parent node from anywhere inside it
    */

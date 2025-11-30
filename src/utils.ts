@@ -57,20 +57,3 @@ export function parseSelectorToHostRule(selector: string | null): string {
   }
   return `:host-context(${selector})`;
 }
-
-/**
- * Escape HTML special characters
- */
-export function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
-/**
- * Convert camelCase to kebab-case
- */
-export function toKebabCase(str: string): string {
-  return str.replace(/([A-Z])/g, '-$1').toLowerCase();
-}

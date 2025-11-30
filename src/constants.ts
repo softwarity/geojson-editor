@@ -54,9 +54,7 @@ export const RE_WHITESPACE_SPLIT = /(\s+)/;
 export const RE_ATTR_VALUE = /"([\w-]+)"\s*:\s*(?:"([^"]*)"|(\btrue\b|\bfalse\b))/g;
 // Non-global version for single match with capture groups
 export const RE_ATTR_VALUE_SINGLE = /"([\w-]+)"\s*:\s*(?:"([^"]*)"|(\btrue\b|\bfalse\b))/;
-// Legacy patterns (kept for compatibility)
-export const RE_ATTR_BOOLEANS = /"([\w-]+)"\s*:\s*(true|false)/g;
-export const RE_ATTR_COLORS = /"([\w-]+)"\s*:\s*"(#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}))"/g;
+// Boolean attribute matching (non-global for single match)
 export const RE_ATTR_AND_BOOL_VALUE = /"([\w-]+)"\s*:\s*(true|false)/;
 // Named color detection: only lowercase letters, 3-20 chars (min: red/tan, max: lightgoldenrodyellow)
 export const RE_NAMED_COLOR = /^[a-z]{3,20}$/;
