@@ -166,6 +166,8 @@
   overflow: auto;
   padding: var(--editor-padding-y) var(--editor-padding-x);
   overscroll-behavior: contain; /* Prevent scroll chaining to parent */
+  scrollbar-width: thin;
+  scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8);
 }
 
 /* Scroll content - defines total scrollable height */
@@ -348,7 +350,6 @@
 .viewport::-webkit-scrollbar-track { background: var(--control-bg, #e8e8e8); }
 .viewport::-webkit-scrollbar-thumb { background: var(--control-border, #c0c0c0); border-radius: 5px; }
 .viewport::-webkit-scrollbar-thumb:hover { background: var(--control-color, #000080); }
-.viewport { scrollbar-width: thin; scrollbar-color: var(--control-border, #c0c0c0) var(--control-bg, #e8e8e8); }
 
 /* ========== Inline Controls (using ::before pseudo-elements) ========== */
 

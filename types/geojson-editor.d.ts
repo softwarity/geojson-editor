@@ -144,6 +144,12 @@ declare class GeoJsonEditor extends HTMLElement {
    * Reset theme to defaults
    */
   resetTheme(): void;
+
+  /**
+   * Get current theme settings
+   * @returns Copy of current theme settings
+   */
+  getTheme(): ThemeSettings;
 }
 
 export default GeoJsonEditor;

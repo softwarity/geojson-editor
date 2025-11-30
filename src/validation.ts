@@ -2,14 +2,6 @@ import type { Feature, FeatureCollection } from 'geojson';
 import { GEOMETRY_TYPES, type GeometryType } from './constants.js';
 
 /**
- * Validation error for GeoJSON features
- */
-export interface ValidationError {
-  message: string;
-  featureIndex?: number;
-}
-
-/**
  * Validate a parsed FeatureCollection and return any errors
  */
 export function validateGeoJSON(parsed: FeatureCollection): string[] {
@@ -49,7 +41,7 @@ export function validateFeature(feature: Feature): void {
     throw new Error('Feature must have a properties property');
   }
   if (feature.geometry !== null) {
-    if (!feature.geometry || typeof feature.geometry !== 'object') {
+    if (typeof feature.geometry !== 'object') {
       throw new Error('Feature geometry must be an object or null');
     }
     if (!feature.geometry.type) {

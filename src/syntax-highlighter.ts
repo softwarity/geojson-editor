@@ -27,7 +27,7 @@ import {
 /**
  * Convert a named CSS color to hex using RAW_COLORS lookup
  */
-function namedColorToHex(colorName: string): string | null {
+export function namedColorToHex(colorName: string): string | null {
   const lc = colorName.toLowerCase();
   const re = new RegExp('(?:^|[\\da-f]{6}|[\\da-f]{3})' + lc + '([\\da-f]{6}|[\\da-f]{3})', 'i');
   const match = RAW_COLORS.match(re);

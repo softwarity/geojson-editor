@@ -46,7 +46,7 @@ import {
 
 import { createElement, getFeatureKey, countBrackets, parseSelectorToHostRule } from './utils.js';
 import { validateGeoJSON, normalizeToFeatures } from './validation.js';
-import { highlightSyntax } from './syntax-highlighter.js';
+import { highlightSyntax, namedColorToHex } from './syntax-highlighter.js';
 
 // Re-export public types
 export type { SetOptions, ThemeConfig, ThemeSettings } from './types.js';
@@ -978,8 +978,6 @@ class GeoJsonEditor extends HTMLElement {
     
     // Reset render cache to force re-render
     this._invalidateRenderCache();
-    this._lastEndIndex = -1;
-    this._lastTotalLines = -1;
   }
 
   // ========== Rendering ==========
@@ -1553,8 +1551,9 @@ class GeoJsonEditor extends HTMLElement {
         } else {
           targetLine = collapsed.startLine; // Jump to opening line
         }
+      } else {
+        break; // Not in a collapsed zone, stop
       }
-      break;
     }
     
     this.cursorLine = Math.max(0, Math.min(this.lines.length - 1, targetLine));
@@ -2299,17 +2298,6 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Color Picker ==========
-  
-  /**
-   * Convert a named CSS color to hex using RAW_COLORS lookup
-   */
-  private _namedColorToHex(colorName: string): string | null {
-    const lc = colorName.toLowerCase();
-    // Pattern: (start OR hex 6 or 3) + colorName + capture hex (6 or 3)
-    const re = new RegExp('(?:^|[\\da-f]{6}|[\\da-f]{3})' + lc + '([\\da-f]{6}|[\\da-f]{3})', 'i');
-    const match = RAW_COLORS.match(re);
-    return match ? '#' + match[1] : null;
-  }
 
   showColorPicker(indicator: HTMLElement, line: number, currentColor: string, attributeName: string) {
     // Remove existing picker and anchor
@@ -2339,7 +2327,7 @@ class GeoJsonEditor extends HTMLElement {
     let hexColor = currentColor;
     if (!currentColor.startsWith('#')) {
       // Named color - convert to hex
-      hexColor = this._namedColorToHex(currentColor) || '#000000';
+      hexColor = namedColorToHex(currentColor) || '#000000';
     } else {
       // Expand 3-char hex to 6-char (#abc -> #aabbcc)
       hexColor = currentColor.replace(RE_NORMALIZE_COLOR, '#$1$1$2$2$3$3');
@@ -2555,6 +2543,10 @@ class GeoJsonEditor extends HTMLElement {
     this.updateThemeCSS();
   }
 
+  getTheme(): ThemeSettings {
+    return { ...this.themes };
+  }
+
   /**
    * Find all collapsible ranges using the mappings built by _rebuildNodeIdMappings
    * This method only READS the existing mappings, it doesn't create new IDs
@@ -2684,9 +2676,7 @@ class GeoJsonEditor extends HTMLElement {
    */
   set(input: FeatureInput, options: SetOptions = {}): void {
     const features = normalizeToFeatures(input);
-    const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
-    this.setValue(formatted, false); // Don't auto-collapse coordinates
-    this._applyCollapsedFromOptions(options, features);
+    this._setFeaturesInternal(features, options);
   }
 
   /**
@@ -2699,11 +2689,8 @@ class GeoJsonEditor extends HTMLElement {
    */
   add(input: FeatureInput, options: SetOptions = {}): void {
     const newFeatures = normalizeToFeatures(input);
-    const existingFeatures = this._parseFeatures();
-    const allFeatures = [...existingFeatures, ...newFeatures];
-    const formatted = allFeatures.map(f => JSON.stringify(f, null, 2)).join(',\n');
-    this.setValue(formatted, false); // Don't auto-collapse coordinates
-    this._applyCollapsedFromOptions(options, allFeatures);
+    const allFeatures = [...this._parseFeatures(), ...newFeatures];
+    this._setFeaturesInternal(allFeatures, options);
   }
 
   /**
@@ -2720,8 +2707,15 @@ class GeoJsonEditor extends HTMLElement {
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
     features.splice(Math.max(0, Math.min(idx, features.length)), 0, ...newFeatures);
+    this._setFeaturesInternal(features, options);
+  }
+
+  /**
+   * Internal method to set features with formatting and collapse options
+   */
+  private _setFeaturesInternal(features: Feature[], options: SetOptions): void {
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
-    this.setValue(formatted, false); // Don't auto-collapse coordinates
+    this.setValue(formatted, false);
     this._applyCollapsedFromOptions(options, features);
   }
 
