@@ -14,7 +14,7 @@ export interface SetOptions {
    * - Empty array: No auto-collapse
    * @default ['coordinates']
    */
-  collapsed?: string[] | ((feature: Feature, index: number) => string[]);
+  collapsed?: string[] | ((feature: Feature | null, index: number) => string[]);
 }
 
 /** Theme configuration */

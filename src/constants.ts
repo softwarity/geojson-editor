@@ -52,8 +52,6 @@ export const RE_ATTR_VALUE = /"([\w-]+)"\s*:\s*(?:"([^"]*)"|(\btrue\b|\bfalse\b)
 export const RE_ATTR_VALUE_SINGLE = /"([\w-]+)"\s*:\s*(?:"([^"]*)"|(\btrue\b|\bfalse\b))/;
 // Boolean attribute matching (non-global for single match)
 export const RE_ATTR_AND_BOOL_VALUE = /"([\w-]+)"\s*:\s*(true|false)/;
-// Named color detection: letters only, 3-20 chars (min: red/tan, max: lightgoldenrodyellow)
-export const RE_NAMED_COLOR = /^[a-zA-Z]{3,20}$/;
 
 // Feature detection
 export const RE_IS_FEATURE = /"type"\s*:\s*"Feature"/;

@@ -12,7 +12,6 @@ import {
   RE_TYPE_VALUES,
   RE_STRING_VALUES,
   RE_COLOR_HEX,
-  RE_NAMED_COLOR,
   RE_NUMBERS_COLON,
   RE_NUMBERS_ARRAY,
   RE_NUMBERS_START,
@@ -46,7 +45,6 @@ function getColorTestEl(): HTMLElement {
  * Check if a string is a valid CSS named color
  */
 export function isNamedColor(value: string): boolean {
-  if (!RE_NAMED_COLOR.test(value)) return false;
   return CSS_COLORS.includes(',' + value.toLowerCase() + ',');
 }
 
@@ -112,7 +110,7 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
   // JSON keys - match "key" followed by :
   // In properties context, all keys are treated as regular JSON keys
   RE_JSON_KEYS.lastIndex = 0;
-  result = result.replace(RE_JSON_KEYS, (match, key, colon) => {
+  result = result.replace(RE_JSON_KEYS, (_match, key, colon) => {
     if (context !== 'properties' && GEOJSON_KEYS.includes(key)) {
       return `<span class="geojson-key">"${key}"</span>${colon}`;
     }
@@ -122,7 +120,7 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
   // Type values - "type": "Value" - but NOT inside properties context
   if (context !== 'properties') {
     RE_TYPE_VALUES.lastIndex = 0;
-    result = result.replace(RE_TYPE_VALUES, (match, space, type) => {
+    result = result.replace(RE_TYPE_VALUES, (_match, space, type) => {
       const isValid = type === 'Feature' || type === 'FeatureCollection' || GEOMETRY_TYPES.includes(type);
       const cls = isValid ? 'geojson-type' : 'geojson-type-invalid';
       return `<span class="geojson-key">"type"</span><span class="json-punctuation">:</span>${space}<span class="${cls}">"${type}"</span>`;
@@ -159,7 +157,7 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
 
   // Booleans - use ::before for checkbox via CSS class
   RE_BOOLEANS.lastIndex = 0;
-  result = result.replace(RE_BOOLEANS, (match, colon, space, val) => {
+  result = result.replace(RE_BOOLEANS, (_match, colon, space, val) => {
     const checkedClass = val === 'true' ? ' json-bool-true' : ' json-bool-false';
     return `${colon}${space}<span class="json-boolean${checkedClass}">${val}</span>`;
   });
@@ -183,7 +181,7 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
     if (!text || RE_WHITESPACE_ONLY.test(text)) return match;
     // Check for unrecognized words/tokens (not whitespace, not just spaces/commas)
     // Keep whitespace as-is, wrap any non-whitespace unrecognized token
-    const parts = text.split(RE_WHITESPACE_SPLIT);
+    const parts: string[] = text.split(RE_WHITESPACE_SPLIT);
     let hasError = false;
     const processed = parts.map(part => {
       // If it's whitespace, keep it

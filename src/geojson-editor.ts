@@ -1,6 +1,6 @@
 import styles from './geojson-editor.css?inline';
 import { getTemplate } from './geojson-editor.template.js';
-import type { Feature, FeatureCollection } from 'geojson';
+import type { Feature } from 'geojson';
 
 // ========== Imports from extracted modules ==========
 import type {
@@ -90,8 +90,8 @@ class GeoJsonEditor extends HTMLElement {
   selectionEnd: CursorPosition | null = null;
 
   // ========== Debounce ==========
-  private renderTimer: number | null = null;
-  private inputTimer: number | null = null;
+  private renderTimer: ReturnType<typeof setTimeout> | undefined = undefined;
+  private inputTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
   // ========== Theme ==========
   themes: ThemeSettings = { dark: {}, light: {} };
@@ -134,6 +134,9 @@ class GeoJsonEditor extends HTMLElement {
     super();
     this.attachShadow({ mode: 'open' });
   }
+
+  // Alias for shadowRoot.getElementById (minification)
+  private _id(id: string) { return this.shadowRoot!.getElementById(id); }
 
   // ========== Render Cache ==========
   private _invalidateRenderCache() {
@@ -204,7 +207,7 @@ class GeoJsonEditor extends HTMLElement {
    * Undo last action
    * @returns {boolean} True if undo was performed
    */
-  undo() {
+  undo(): boolean {
     if (this._undoStack.length === 0) return false;
 
     // Save current state to redo stack
@@ -212,7 +215,7 @@ class GeoJsonEditor extends HTMLElement {
 
     // Restore previous state
     const previousState = this._undoStack.pop();
-    this._restoreSnapshot(previousState);
+    if (previousState) this._restoreSnapshot(previousState);
 
     // Reset action tracking
     this._lastActionType = null;
@@ -225,7 +228,7 @@ class GeoJsonEditor extends HTMLElement {
    * Redo previously undone action
    * @returns {boolean} True if redo was performed
    */
-  redo() {
+  redo(): boolean {
     if (this._redoStack.length === 0) return false;
 
     // Save current state to undo stack
@@ -233,7 +236,7 @@ class GeoJsonEditor extends HTMLElement {
 
     // Restore next state
     const nextState = this._redoStack.pop();
-    this._restoreSnapshot(nextState);
+    if (nextState) this._restoreSnapshot(nextState);
 
     // Reset action tracking
     this._lastActionType = null;
@@ -245,7 +248,7 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Clear undo/redo history
    */
-  clearHistory() {
+  clearHistory(): void {
     this._undoStack = [];
     this._redoStack = [];
     this._lastActionType = null;
@@ -256,7 +259,7 @@ class GeoJsonEditor extends HTMLElement {
    * Check if undo is available
    * @returns {boolean}
    */
-  canUndo() {
+  canUndo(): boolean {
     return this._undoStack.length > 0;
   }
 
@@ -264,7 +267,7 @@ class GeoJsonEditor extends HTMLElement {
    * Check if redo is available
    * @returns {boolean}
    */
-  canRedo() {
+  canRedo(): boolean {
     return this._redoStack.length > 0;
   }
 
@@ -397,16 +400,19 @@ class GeoJsonEditor extends HTMLElement {
       const rootMatch = !kvMatch && line.match(RE_ROOT_MATCH);
       
       if (!kvMatch && !rootMatch) continue;
-      
-      let nodeKey, openBracket;
-      
+
+      let nodeKey: string;
+      let openBracket: string;
+
       if (kvMatch) {
         nodeKey = kvMatch[1];
         openBracket = kvMatch[2];
-      } else {
+      } else if (rootMatch) {
         // Root object - use special key based on line number and bracket type
         openBracket = rootMatch[1];
         nodeKey = `__root_${openBracket}_${i}`;
+      } else {
+        continue;
       }
       
       // Check if closes on same line
@@ -498,34 +504,35 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Initial Render ==========
   render() {
+    const shadowRoot = this.shadowRoot!;
     const styleEl = _ce('style');
     styleEl.textContent = styles;
-    
+
     const template = _ce('div');
     template.innerHTML = getTemplate(this.placeholder, VERSION);
-    
-    this.shadowRoot.innerHTML = '';
-    this.shadowRoot.appendChild(styleEl);
+
+    shadowRoot.innerHTML = '';
+    shadowRoot.appendChild(styleEl);
     while (template.firstChild) {
-      this.shadowRoot.appendChild(template.firstChild);
+      shadowRoot.appendChild(template.firstChild);
     }
   }
 
   // ========== DOM Element Cache ==========
   private _cacheElements() {
-    this._viewport = this.shadowRoot.getElementById('viewport');
-    this._linesContainer = this.shadowRoot.getElementById('linesContainer');
-    this._scrollContent = this.shadowRoot.getElementById('scrollContent');
-    this._hiddenTextarea = this.shadowRoot.getElementById('hiddenTextarea') as HTMLTextAreaElement;
-    this._gutterContent = this.shadowRoot.getElementById('gutterContent');
-    this._gutterScrollContent = this.shadowRoot.getElementById('gutterScrollContent');
-    this._gutterScroll = this.shadowRoot.getElementById('gutterScroll');
-    this._gutter = this.shadowRoot.querySelector('.gutter');
-    this._clearBtn = this.shadowRoot.getElementById('clearBtn') as HTMLButtonElement;
-    this._editorWrapper = this.shadowRoot.querySelector('.editor-wrapper');
-    this._placeholderLayer = this.shadowRoot.getElementById('placeholderLayer');
-    this._editorPrefix = this.shadowRoot.getElementById('editorPrefix');
-    this._editorSuffix = this.shadowRoot.getElementById('editorSuffix');
+    this._viewport = this._id('viewport');
+    this._linesContainer = this._id('linesContainer');
+    this._scrollContent = this._id('scrollContent');
+    this._hiddenTextarea = this._id('hiddenTextarea') as HTMLTextAreaElement;
+    this._gutterContent = this._id('gutterContent');
+    this._gutterScrollContent = this._id('gutterScrollContent');
+    this._gutterScroll = this._id('gutterScroll');
+    this._gutter = this.shadowRoot!.querySelector('.gutter');
+    this._clearBtn = this._id('clearBtn') as HTMLButtonElement;
+    this._editorWrapper = this.shadowRoot!.querySelector('.editor-wrapper');
+    this._placeholderLayer = this._id('placeholderLayer');
+    this._editorPrefix = this._id('editorPrefix');
+    this._editorSuffix = this._id('editorSuffix');
   }
 
   // ========== Event Listeners ==========
@@ -537,6 +544,9 @@ class GeoJsonEditor extends HTMLElement {
     const clearBtn = this._clearBtn;
     const editorWrapper = this._editorWrapper;
 
+    // Guard: all elements must exist
+    if (!hiddenTextarea || !viewport || !gutterContent || !gutter || !clearBtn || !editorWrapper) return;
+
     // Mouse selection state
     this._isSelecting = false;
 
@@ -544,16 +554,17 @@ class GeoJsonEditor extends HTMLElement {
     // Editor inline control clicks (color swatches, checkboxes, visibility icons)
     // Use capture phase to intercept before mousedown
     viewport.addEventListener('click', (e) => {
-      this.handleEditorClick(e);
+      this.handleEditorClick(e as MouseEvent);
     }, true);
 
-    viewport.addEventListener('mousedown', (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
+    viewport.addEventListener('mousedown', (e) => {
+      const ev = e as MouseEvent;
+      const target = ev.target as HTMLElement;
       // Skip if clicking on visibility pseudo-element (line-level)
       const lineEl = target.closest('.line.has-visibility');
       if (lineEl) {
         const rect = lineEl.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
+        const clickX = ev.clientX - rect.left;
         if (clickX < 14) {
           // Block render until click is processed to prevent DOM destruction
           this._blockRender = true;
@@ -565,7 +576,7 @@ class GeoJsonEditor extends HTMLElement {
       if (target.classList.contains('json-color') ||
           target.classList.contains('json-boolean')) {
         const rect = target.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
+        const clickX = ev.clientX - rect.left;
         // Pseudo-element is at left: -8px, so clickX will be negative when clicking on it
         if (clickX < 0 && clickX >= -8) {
           // Block render until click is processed to prevent DOM destruction
@@ -573,14 +584,14 @@ class GeoJsonEditor extends HTMLElement {
           return;
         }
       }
-      
+
       // Prevent default to avoid losing focus after click
-      e.preventDefault();
-      
+      ev.preventDefault();
+
       // Calculate click position
-      const pos = this._getPositionFromClick(e);
-      
-      if (e.shiftKey && this.selectionStart) {
+      const pos = this._getPositionFromClick(ev);
+
+      if (ev.shiftKey && this.selectionStart) {
         // Shift+click: extend selection
         this.selectionEnd = pos;
         this.cursorLine = pos.line;
@@ -593,7 +604,7 @@ class GeoJsonEditor extends HTMLElement {
         this.selectionEnd = null;
         this._isSelecting = true;
       }
-      
+
       // Focus textarea
       hiddenTextarea.focus();
       this._invalidateRenderCache();
@@ -603,25 +614,25 @@ class GeoJsonEditor extends HTMLElement {
     // Mouse move for drag selection
     viewport.addEventListener('mousemove', (e) => {
       if (!this._isSelecting) return;
-      
-      const pos = this._getPositionFromClick(e);
+      const ev = e as MouseEvent;
+      const pos = this._getPositionFromClick(ev);
       this.selectionEnd = pos;
       this.cursorLine = pos.line;
       this.cursorColumn = pos.column;
-      
+
       // Auto-scroll when near edges
       const rect = viewport.getBoundingClientRect();
       const scrollMargin = 30; // pixels from edge to start scrolling
       const scrollSpeed = 20; // pixels to scroll per frame
-      
-      if (e.clientY < rect.top + scrollMargin) {
+
+      if (ev.clientY < rect.top + scrollMargin) {
         // Near top edge, scroll up
         viewport.scrollTop -= scrollSpeed;
-      } else if (e.clientY > rect.bottom - scrollMargin) {
+      } else if (ev.clientY > rect.bottom - scrollMargin) {
         // Near bottom edge, scroll down
         viewport.scrollTop += scrollSpeed;
       }
-      
+
       this._invalidateRenderCache();
       this.scheduleRender();
     });
@@ -649,7 +660,7 @@ class GeoJsonEditor extends HTMLElement {
     viewport.addEventListener('scroll', () => {
       if (isRendering) return;
       this.syncGutterScroll();
-      
+
       // Use requestAnimationFrame to batch scroll updates
       if (!this._scrollRaf) {
         this._scrollRaf = requestAnimationFrame(() => {
@@ -680,38 +691,38 @@ class GeoJsonEditor extends HTMLElement {
     });
 
     hiddenTextarea.addEventListener('keydown', (e) => {
-      this.handleKeydown(e);
+      this.handleKeydown(e as KeyboardEvent);
     });
 
     // Paste handling
     hiddenTextarea.addEventListener('paste', (e) => {
-      this.handlePaste(e);
+      this.handlePaste(e as ClipboardEvent);
     });
 
     // Copy handling
     hiddenTextarea.addEventListener('copy', (e) => {
-      this.handleCopy(e);
+      this.handleCopy(e as ClipboardEvent);
     });
 
     // Cut handling
     hiddenTextarea.addEventListener('cut', (e) => {
-      this.handleCut(e);
+      this.handleCut(e as ClipboardEvent);
     });
 
     // Gutter interactions
     gutterContent.addEventListener('click', (e) => {
-      this.handleGutterClick(e);
+      this.handleGutterClick(e as MouseEvent);
     });
-    
+
     // Prevent gutter from stealing focus
     gutter.addEventListener('mousedown', (e) => {
       e.preventDefault();
     });
 
     // Wheel on gutter -> scroll viewport
-    gutter.addEventListener('wheel', (e: WheelEvent) => {
+    gutter.addEventListener('wheel', (e) => {
       e.preventDefault();
-      viewport.scrollTop += e.deltaY;
+      viewport.scrollTop += (e as WheelEvent).deltaY;
     });
 
     // Clear button
@@ -983,7 +994,7 @@ class GeoJsonEditor extends HTMLElement {
   scheduleRender() {
     if (this.renderTimer) return;
     this.renderTimer = requestAnimationFrame(() => {
-      this.renderTimer = null;
+      this.renderTimer = undefined;
       this.renderViewport();
     });
   }
@@ -1076,7 +1087,7 @@ class GeoJsonEditor extends HTMLElement {
       }
       
       // Highlight syntax and add cursor if this is the cursor line and editor is focused
-      const context = contextMap.get(lineData.index);
+      const context = contextMap.get(lineData.index) || 'Feature';
       let html = highlightSyntax(lineData.content, context, lineData.meta);
       
       // Add selection highlight if line is in selection
@@ -1122,8 +1133,9 @@ class GeoJsonEditor extends HTMLElement {
    * Add selection highlight to a line
    */
   private _addSelectionHighlight(html: string, lineIndex: number, content: string): string {
-    const { start, end } = this._normalizeSelection();
-    if (!start || !end) return html;
+    const sel = this._normalizeSelection();
+    if (!sel) return html;
+    const { start, end } = sel;
     
     // Check if this line is in the selection
     if (lineIndex < start.line || lineIndex > end.line) return html;
@@ -1160,13 +1172,18 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get character width for monospace font
    */
-  private _getCharWidth() {
+  private _getCharWidth(): number {
     if (!this._charWidth) {
       const canvas = _ce('canvas') as HTMLCanvasElement;
       const ctx = canvas.getContext('2d');
-      // Use exact same font as CSS: 'Courier New', Courier, monospace at 13px
-      ctx.font = "13px 'Courier New', Courier, monospace";
-      this._charWidth = ctx.measureText('M').width;
+      if (ctx) {
+        // Use exact same font as CSS: 'Courier New', Courier, monospace at 13px
+        ctx.font = "13px 'Courier New', Courier, monospace";
+        this._charWidth = ctx.measureText('M').width;
+      } else {
+        // Fallback to approximate monospace character width
+        this._charWidth = 7.8;
+      }
     }
     return this._charWidth;
   }
@@ -1887,11 +1904,10 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get selected text
    */
-  private _getSelectedText() {
-    if (!this.selectionStart || !this.selectionEnd) return '';
-    
-    const { start, end } = this._normalizeSelection();
-    if (!start || !end) return '';
+  private _getSelectedText(): string {
+    const sel = this._normalizeSelection();
+    if (!sel) return '';
+    const { start, end } = sel;
     
     if (start.line === end.line) {
       return this.lines[start.line].substring(start.column, end.column);
@@ -1909,14 +1925,14 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Normalize selection so start is before end
    */
-  private _normalizeSelection() {
+  private _normalizeSelection(): { start: CursorPosition; end: CursorPosition } | null {
     if (!this.selectionStart || !this.selectionEnd) {
-      return { start: null, end: null };
+      return null;
     }
-    
+
     const s = this.selectionStart;
     const e = this.selectionEnd;
-    
+
     if (s.line < e.line || (s.line === e.line && s.column <= e.column)) {
       return { start: s, end: e };
     } else {
@@ -1944,12 +1960,12 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Delete selected text
    */
-  private _deleteSelection() {
-    if (!this._hasSelection()) return false;
+  private _deleteSelection(): boolean {
+    const sel = this._normalizeSelection();
+    if (!sel) return false;
+    const { start, end } = sel;
 
     this._saveToHistory('delete');
-
-    const { start, end } = this._normalizeSelection();
 
     if (start.line === end.line) {
       // Single line selection
@@ -2016,7 +2032,7 @@ class GeoJsonEditor extends HTMLElement {
 
   handlePaste(e: ClipboardEvent): void {
     e.preventDefault();
-    const text = e.clipboardData.getData('text/plain');
+    const text = e.clipboardData?.getData('text/plain');
     if (!text) return;
 
     const wasEmpty = this.lines.length === 0;
@@ -2038,7 +2054,7 @@ class GeoJsonEditor extends HTMLElement {
       // Cancel pending render, collapse first, then render once
       if (this.renderTimer) {
         cancelAnimationFrame(this.renderTimer);
-        this.renderTimer = null;
+        this.renderTimer = undefined;
       }
       this.autoCollapseCoordinates();
     }
@@ -2046,6 +2062,7 @@ class GeoJsonEditor extends HTMLElement {
 
   handleCopy(e: ClipboardEvent): void {
     e.preventDefault();
+    if (!e.clipboardData) return;
     // Copy selected text if there's a selection, otherwise copy all
     if (this._hasSelection()) {
       e.clipboardData.setData('text/plain', this._getSelectedText());
@@ -2056,6 +2073,7 @@ class GeoJsonEditor extends HTMLElement {
 
   handleCut(e: ClipboardEvent): void {
     e.preventDefault();
+    if (!e.clipboardData) return;
     if (this._hasSelection()) {
       e.clipboardData.setData('text/plain', this._getSelectedText());
       this._saveToHistory('cut');
@@ -2078,6 +2096,7 @@ class GeoJsonEditor extends HTMLElement {
   private _getPositionFromClick(e: MouseEvent): { line: number; column: number } {
     const viewport = this._viewport;
     const linesContainer = this._linesContainer;
+    if (!viewport) return { line: 0, column: 0 };
     const rect = viewport.getBoundingClientRect();
 
     const paddingTop = 8;
@@ -2118,28 +2137,34 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Gutter Interactions ==========
   
-  handleGutterClick(e) {
+  handleGutterClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    if (!target) return;
+
     // Visibility button in gutter
-    const visBtn = e.target.closest('.visibility-button');
+    const visBtn = target.closest('.visibility-button') as HTMLElement | null;
     if (visBtn) {
       this.toggleFeatureVisibility(visBtn.dataset.featureKey);
       return;
     }
-    
+
     // Collapse button in gutter
-    if (e.target.classList.contains('collapse-button')) {
-      const nodeId = e.target.dataset.nodeId;
-      this.toggleCollapse(nodeId);
+    if (target.classList.contains('collapse-button')) {
+      const nodeId = target.dataset.nodeId;
+      if (nodeId) this.toggleCollapse(nodeId);
       return;
     }
   }
   
-  handleEditorClick(e) {
+  handleEditorClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    if (!target) return;
+
     // Unblock render now that click is being processed
     this._blockRender = false;
 
     // Line-level visibility button (pseudo-element ::before on .line.has-visibility)
-    const lineEl = e.target.closest('.line.has-visibility');
+    const lineEl = target.closest('.line.has-visibility') as HTMLElement | null;
     if (lineEl) {
       const rect = lineEl.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -2153,42 +2178,42 @@ class GeoJsonEditor extends HTMLElement {
         return;
       }
     }
-    
+
     // Inline color swatch (pseudo-element positioned with left: -8px)
-    if (e.target.classList.contains('json-color')) {
-      const rect = e.target.getBoundingClientRect();
+    if (target.classList.contains('json-color')) {
+      const rect = target.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       // Pseudo-element is at left: -8px, so clickX will be negative when clicking on it
       if (clickX < 0 && clickX >= -8) {
         e.preventDefault();
         e.stopPropagation();
-        const color = e.target.dataset.color;
-        const targetLineEl = e.target.closest('.line');
+        const color = target.dataset.color;
+        const targetLineEl = target.closest('.line') as HTMLElement | null;
         if (targetLineEl) {
-          const lineIndex = parseInt(targetLineEl.dataset.lineIndex);
+          const lineIndex = parseInt(targetLineEl.dataset.lineIndex || '0');
           const line = this.lines[lineIndex];
           // Match any string attribute (hex or named color)
           // RE_ATTR_VALUE_SINGLE captures: [1] attributeName, [2] stringValue
           const match = line.match(RE_ATTR_VALUE_SINGLE);
-          if (match && match[1]) {
-            this.showColorPicker(e.target as HTMLElement, lineIndex, color, match[1]);
+          if (match && match[1] && color) {
+            this.showColorPicker(target, lineIndex, color, match[1]);
           }
         }
         return;
       }
     }
-    
+
     // Inline boolean checkbox (pseudo-element positioned with left: -8px)
-    if (e.target.classList.contains('json-boolean')) {
-      const rect = e.target.getBoundingClientRect();
+    if (target.classList.contains('json-boolean')) {
+      const rect = target.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       // Pseudo-element is at left: -8px, so clickX will be negative when clicking on it
       if (clickX < 0 && clickX >= -8) {
         e.preventDefault();
         e.stopPropagation();
-        const targetLineEl = e.target.closest('.line');
+        const targetLineEl = target.closest('.line') as HTMLElement | null;
         if (targetLineEl) {
-          const lineIndex = parseInt(targetLineEl.dataset.lineIndex);
+          const lineIndex = parseInt(targetLineEl.dataset.lineIndex || '0');
           const line = this.lines[lineIndex];
           const match = line.match(RE_ATTR_AND_BOOL_VALUE);
           if (match) {
@@ -2203,7 +2228,7 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Collapse/Expand ==========
   
-  toggleCollapse(nodeId) {
+  toggleCollapse(nodeId: string): void {
     if (this.collapsedNodes.has(nodeId)) {
       this.collapsedNodes.delete(nodeId);
     } else {
@@ -2222,10 +2247,8 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Helper to apply collapsed option from API methods
-   * @param {object} options - Options object with optional collapsed property
-   * @param {array} features - Features array for function mode
    */
-  private _applyCollapsedFromOptions(options, features) {
+  private _applyCollapsedFromOptions(options: SetOptions, features: Feature[]): void {
     const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
     if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
       this._applyCollapsedOption(collapsed, features);
@@ -2234,10 +2257,8 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Apply collapsed option to nodes
-   * @param {string[]|function} collapsed - Attributes to collapse or function returning them
-   * @param {array} features - Features array for function mode (optional)
    */
-  private _applyCollapsedOption(collapsed, features = null) {
+  private _applyCollapsedOption(collapsed: string[] | ((feature: Feature | null, index: number) => string[]), features: Feature[] | null = null): void {
     const ranges = this._findCollapsibleRanges();
 
     // Group ranges by feature (root nodes)
@@ -2282,7 +2303,8 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Feature Visibility ==========
 
-  toggleFeatureVisibility(featureKey) {
+  toggleFeatureVisibility(featureKey: string | undefined): void {
+    if (!featureKey) return;
     if (this.hiddenFeatures.has(featureKey)) {
       this.hiddenFeatures.delete(featureKey);
     } else {
@@ -2347,7 +2369,7 @@ class GeoJsonEditor extends HTMLElement {
     `;
     anchor.appendChild(colorInput);
 
-    colorInput.addEventListener('input', (e: Event) => {
+    colorInput.addEventListener('input', (e) => {
       this.updateColorValue(line, (e.target as HTMLInputElement).value, attributeName);
     });
 
@@ -2359,7 +2381,7 @@ class GeoJsonEditor extends HTMLElement {
     };
 
     colorInput._closeListener = closeOnClickOutside;
-    
+
     setTimeout(() => {
       document.addEventListener('click', closeOnClickOutside, true);
     }, 100);
@@ -2379,7 +2401,7 @@ class GeoJsonEditor extends HTMLElement {
     this.emitChange();
   }
 
-  updateBooleanValue(line, newValue, attributeName) {
+  updateBooleanValue(line: number, newValue: boolean, attributeName: string): void {
     const regex = new RegExp(`"${attributeName}"\\s*:\\s*(true|false)`);
     this.lines[line] = this.lines[line].replace(regex, `"${attributeName}": ${newValue}`);
     
@@ -2421,9 +2443,9 @@ class GeoJsonEditor extends HTMLElement {
       
       // Filter hidden features
       if (this.hiddenFeatures.size > 0) {
-        parsed.features = parsed.features.filter((feature) => {
+        parsed.features = parsed.features.filter((feature: Feature) => {
           const key = getFeatureKey(feature);
-          return !this.hiddenFeatures.has(key);
+          return key ? !this.hiddenFeatures.has(key) : true;
         });
       }
       
@@ -2445,7 +2467,7 @@ class GeoJsonEditor extends HTMLElement {
       }
     } catch (e) {
       this.dispatchEvent(new CustomEvent('error', {
-        detail: { error: e.message, content },
+        detail: { error: e instanceof Error ? e.message : 'Unknown error', content },
         bubbles: true,
         composed: true
       }));
@@ -2484,17 +2506,17 @@ class GeoJsonEditor extends HTMLElement {
     const darkSelector = this.getAttribute('dark-selector') || '.dark';
     const darkRule = parseSelectorToHostRule(darkSelector);
 
-    let themeStyle = this.shadowRoot.getElementById('theme-styles') as HTMLStyleElement;
+    let themeStyle = this._id('theme-styles') as HTMLStyleElement;
     if (!themeStyle) {
       themeStyle = _ce('style') as HTMLStyleElement;
       themeStyle.id = 'theme-styles';
-      this.shadowRoot.insertBefore(themeStyle, this.shadowRoot.firstChild);
+      this.shadowRoot!.insertBefore(themeStyle, this.shadowRoot!.firstChild);
     }
     
     const darkDefaults = {
       bgColor: '#2b2b2b',
       textColor: '#a9b7c6',
-      caretColor: '#bbbbbb',
+      caretColor: '#bbb',
       gutterBg: '#313335',
       gutterBorder: '#3c3f41',
       gutterText: '#606366',
@@ -2515,14 +2537,15 @@ class GeoJsonEditor extends HTMLElement {
     };
     
     RE_TO_KEBAB.lastIndex = 0;
-    const toKebab = (str) => str.replace(RE_TO_KEBAB, '-$1').toLowerCase();
-    const generateVars = (obj) => Object.entries(obj)
+    const toKebab = (str: string) => str.replace(RE_TO_KEBAB, '-$1').toLowerCase();
+    const generateVars = (obj: Record<string, string | undefined>) => Object.entries(obj)
+      .filter((entry): entry is [string, string] => entry[1] !== undefined)
       .map(([k, v]) => `--${toKebab(k)}: ${v};`)
       .join('\n        ');
     
-    const lightVars = generateVars(this.themes.light || {});
+    const lightVars = generateVars(this.themes.light as Record<string, string | undefined> || {});
     const darkTheme = { ...darkDefaults, ...this.themes.dark };
-    const darkVars = generateVars(darkTheme);
+    const darkVars = generateVars(darkTheme as Record<string, string | undefined>);
     
     let css = lightVars ? `:host {\n        ${lightVars}\n      }\n` : '';
     css += `${darkRule} {\n        ${darkVars}\n      }`;
@@ -2566,8 +2589,8 @@ class GeoJsonEditor extends HTMLElement {
       const rootMatch = !kvMatch && line.match(RE_ROOT_MATCH);
       
       if (!kvMatch && !rootMatch) continue;
-      
-      const openBracket = kvMatch ? kvMatch[2] : rootMatch[1];
+
+      const openBracket = kvMatch ? kvMatch[2] : (rootMatch ? rootMatch[1] : '{');
       
       ranges.push({
         startLine: rangeInfo.startLine,
@@ -2585,7 +2608,7 @@ class GeoJsonEditor extends HTMLElement {
     return ranges;
   }
 
-  private _findClosingLine(startLine, openBracket) {
+  private _findClosingLine(startLine: number, openBracket: string): number {
     let depth = 1;
     const line = this.lines[startLine];
     const bracketPos = line.indexOf(openBracket);
@@ -2616,9 +2639,9 @@ class GeoJsonEditor extends HTMLElement {
       return this._contextMapCache;
     }
 
-    const contextMap = new Map();
-    const contextStack = [];
-    let pendingContext = null;
+    const contextMap = new Map<number, string>();
+    const contextStack: { context: string; isArray: boolean }[] = [];
+    let pendingContext: string | null = null;
 
     for (let i = 0; i < linesLength; i++) {
       const line = this.lines[i];
@@ -2799,7 +2822,7 @@ class GeoJsonEditor extends HTMLElement {
       input.accept = '.geojson,.json,application/geo+json,application/json';
       input.style.display = 'none';
 
-      input.addEventListener('change', (e: Event) => {
+      input.addEventListener('change', (e) => {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (!file) {
           document.body.removeChild(input);
