@@ -700,11 +700,12 @@ describe('GeoJsonEditor - Internal Keyboard Handlers', () => {
     el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
 
     el.lines = ['{"a": 1}'];
+    el.visibleLines = [{ index: 0, content: el.lines[0], meta: undefined }];
     el.cursorLine = 0;
     el.cursorColumn = 4;
 
     const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
-    el._handleEnter(event);
+    el.handleKeydown(event);
     await waitFor(50);
 
     expect(el.lines.length).to.equal(2);
@@ -788,51 +789,47 @@ describe('GeoJsonEditor - Internal Keyboard Handlers', () => {
     expect(el.lines[0]).to.equal('{"a": 1');
   });
 
-  it('_handleTab should expand collapsed node', async () => {
+  it('_handleTab should navigate to next attribute', async () => {
     const el = await createSizedFixture();
     await waitFor();
 
-    el.set([validPolygon]);
-    await waitFor(200);
+    // Stub formatAndUpdate to prevent formatting
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
 
-    // Collapse a node
-    const nodeId = Array.from(el._nodeIdToLines.keys())[0];
-    if (nodeId) {
-      el.collapsedNodes.add(nodeId);
-      el.updateView();
-      await waitFor(50);
-
-      // Position cursor on collapsed node
-      const nodeInfo = el._nodeIdToLines.get(nodeId);
-      if (nodeInfo?.start !== undefined) {
-        el.cursorLine = nodeInfo.start;
-        el.cursorColumn = 0;
-
-        const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
-        el._handleTab(event);
-
-        expect(el.collapsedNodes.has(nodeId)).to.be.false;
-      }
-    }
-  });
-
-  it('_handleTab with shiftKey should collapse containing node', async () => {
-    const el = await createSizedFixture();
-    await waitFor();
-
-    el.set([validPolygon]);
-    await waitFor(200);
-
-    // Position cursor inside content
-    el.cursorLine = 3;
+    el.lines = ['{"hello": "world", "foo": 123}'];
+    el.visibleLines = [{ index: 0, content: el.lines[0], meta: undefined }];
+    el.cursorLine = 0;
     el.cursorColumn = 0;
 
-    const initialSize = el.collapsedNodes.size;
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    el.handleKeydown(event);
+    await waitFor(50);
+
+    // Should have moved to first attribute
+    expect(el.cursorColumn).to.be.greaterThan(0);
+    expect(el.selectionStart).to.not.be.null;
+    expect(el.selectionEnd).to.not.be.null;
+  });
+
+  it('_handleTab with shiftKey should navigate to previous attribute', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Stub formatAndUpdate to prevent formatting
+    el.formatAndUpdate = () => { el.updateView(); el.scheduleRender(); };
+
+    el.lines = ['{"hello": "world", "foo": 123}'];
+    el.visibleLines = [{ index: 0, content: el.lines[0], meta: undefined }];
+    el.cursorLine = 0;
+    el.cursorColumn = 25; // At end
 
     const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true });
-    el._handleTab(event);
+    el.handleKeydown(event);
+    await waitFor(50);
 
-    expect(el.collapsedNodes.size).to.be.greaterThan(initialSize);
+    // Should have selected an attribute
+    expect(el.selectionStart).to.not.be.null;
+    expect(el.selectionEnd).to.not.be.null;
   });
 });
 

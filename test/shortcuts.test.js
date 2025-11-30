@@ -332,7 +332,7 @@ describe('GeoJsonEditor - Open Shortcuts', () => {
 
 describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
 
-  it('should expand collapsed node with Tab', async () => {
+  it('should expand collapsed node with Enter', async () => {
     const el = await createSizedFixture();
     await waitFor();
 
@@ -354,7 +354,7 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
         el.cursorColumn = 0;
 
         const event = new KeyboardEvent('keydown', {
-          key: 'Tab',
+          key: 'Enter',
           bubbles: true
         });
         el.handleKeydown(event);
@@ -366,7 +366,7 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
     }
   });
 
-  it('should collapse node with Shift+Tab', async () => {
+  it('should collapse node with Shift+Enter', async () => {
     const el = await createSizedFixture();
     await waitFor();
 
@@ -383,7 +383,7 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
       el.cursorColumn = 0;
 
       const event = new KeyboardEvent('keydown', {
-        key: 'Tab',
+        key: 'Enter',
         shiftKey: true,
         bubbles: true
       });
@@ -393,6 +393,53 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
       // Should be collapsed now
       expect(el.collapsedNodes.has(range.nodeId)).to.be.true;
     }
+  });
+
+  it('should navigate to next attribute with Tab', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Position at start
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should have selection on an attribute
+    expect(el.selectionStart).to.not.be.null;
+    expect(el.selectionEnd).to.not.be.null;
+  });
+
+  it('should navigate to previous attribute with Shift+Tab', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Position at end of first line
+    el.cursorLine = 0;
+    el.cursorColumn = el.lines[0]?.length || 0;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should have selection on an attribute
+    expect(el.selectionStart).to.not.be.null;
+    expect(el.selectionEnd).to.not.be.null;
   });
 });
 

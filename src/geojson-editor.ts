@@ -557,14 +557,13 @@ class GeoJsonEditor extends HTMLElement {
       this.handleEditorClick(e as MouseEvent);
     }, true);
 
-    viewport.addEventListener('mousedown', (e) => {
-      const ev = e as MouseEvent;
-      const target = ev.target as HTMLElement;
+    viewport.addEventListener('mousedown', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
       // Skip if clicking on visibility pseudo-element (line-level)
       const lineEl = target.closest('.line.has-visibility');
       if (lineEl) {
         const rect = lineEl.getBoundingClientRect();
-        const clickX = ev.clientX - rect.left;
+        const clickX = e.clientX - rect.left;
         if (clickX < 14) {
           // Block render until click is processed to prevent DOM destruction
           this._blockRender = true;
@@ -576,7 +575,7 @@ class GeoJsonEditor extends HTMLElement {
       if (target.classList.contains('json-color') ||
           target.classList.contains('json-boolean')) {
         const rect = target.getBoundingClientRect();
-        const clickX = ev.clientX - rect.left;
+        const clickX = e.clientX - rect.left;
         // Pseudo-element is at left: -8px, so clickX will be negative when clicking on it
         if (clickX < 0 && clickX >= -8) {
           // Block render until click is processed to prevent DOM destruction
@@ -586,12 +585,12 @@ class GeoJsonEditor extends HTMLElement {
       }
 
       // Prevent default to avoid losing focus after click
-      ev.preventDefault();
+      e.preventDefault();
 
       // Calculate click position
-      const pos = this._getPositionFromClick(ev);
+      const pos = this._getPositionFromClick(e);
 
-      if (ev.shiftKey && this.selectionStart) {
+      if (e.shiftKey && this.selectionStart) {
         // Shift+click: extend selection
         this.selectionEnd = pos;
         this.cursorLine = pos.line;
@@ -612,10 +611,9 @@ class GeoJsonEditor extends HTMLElement {
     });
     
     // Mouse move for drag selection
-    viewport.addEventListener('mousemove', (e) => {
+    viewport.addEventListener('mousemove', (e: MouseEvent) => {
       if (!this._isSelecting) return;
-      const ev = e as MouseEvent;
-      const pos = this._getPositionFromClick(ev);
+      const pos = this._getPositionFromClick(e);
       this.selectionEnd = pos;
       this.cursorLine = pos.line;
       this.cursorColumn = pos.column;
@@ -625,10 +623,10 @@ class GeoJsonEditor extends HTMLElement {
       const scrollMargin = 30; // pixels from edge to start scrolling
       const scrollSpeed = 20; // pixels to scroll per frame
 
-      if (ev.clientY < rect.top + scrollMargin) {
+      if (e.clientY < rect.top + scrollMargin) {
         // Near top edge, scroll up
         viewport.scrollTop -= scrollSpeed;
-      } else if (ev.clientY > rect.bottom - scrollMargin) {
+      } else if (e.clientY > rect.bottom - scrollMargin) {
         // Near bottom edge, scroll down
         viewport.scrollTop += scrollSpeed;
       }
@@ -1348,7 +1346,7 @@ class GeoJsonEditor extends HTMLElement {
 
     // Lookup table for key handlers
     const keyHandlers: Record<string, () => void> = {
-      'Enter': () => this._handleEnter(ctx),
+      'Enter': () => this._handleEnter(e.shiftKey, ctx),
       'Backspace': () => this._handleBackspace(ctx),
       'Delete': () => this._handleDelete(ctx),
       'ArrowUp': () => this._handleArrowKey(-1, 0, e.shiftKey, e.ctrlKey || e.metaKey),
@@ -1384,17 +1382,43 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
-  private _handleEnter(ctx: CollapsedZoneContext): void {
-    // Block in collapsed zones
-    if (ctx.onCollapsedNode || ctx.inCollapsedZone) return;
-    // On closing line, before bracket -> block
+  private _handleEnter(isShiftKey: boolean, ctx: CollapsedZoneContext): void {
+    // Shift+Enter: collapse the containing expanded node
+    if (isShiftKey) {
+      const containingNode = this._getContainingExpandedNode(this.cursorLine);
+      if (containingNode) {
+        const startLine = this.lines[containingNode.startLine];
+        const bracketPos = startLine.search(RE_BRACKET_POS);
+        this.toggleCollapse(containingNode.nodeId);
+        this.cursorLine = containingNode.startLine;
+        this.cursorColumn = bracketPos >= 0 ? bracketPos + 1 : startLine.length;
+        this._clearSelection();
+        this._scrollToCursor();
+      }
+      return;
+    }
+
+    // Enter on collapsed node: expand it
+    if (ctx.onCollapsedNode) {
+      this.toggleCollapse(ctx.onCollapsedNode.nodeId);
+      return;
+    }
+
+    // Enter on closing line of collapsed node: expand it
     if (ctx.onClosingLine) {
       const line = this.lines[this.cursorLine];
       const bracketPos = this._getClosingBracketPos(line);
+      // If cursor is before or on bracket, expand
       if (bracketPos >= 0 && this.cursorColumn <= bracketPos) {
+        this.toggleCollapse(ctx.onClosingLine.nodeId);
         return;
       }
     }
+
+    // Block in collapsed zones
+    if (ctx.inCollapsedZone) return;
+
+    // Normal Enter: insert newline
     this.insertNewline();
   }
 
@@ -1467,29 +1491,208 @@ class GeoJsonEditor extends HTMLElement {
     this.deleteForward();
   }
 
-  private _handleTab(isShiftKey: boolean, ctx: CollapsedZoneContext): void {
-    // Shift+Tab: collapse the containing expanded node
+  private _handleTab(isShiftKey: boolean, _ctx: CollapsedZoneContext): void {
+    // Tab/Shift+Tab: navigate between attributes (key and value)
     if (isShiftKey) {
-      const containingNode = this._getContainingExpandedNode(this.cursorLine);
-      if (containingNode) {
-        const startLine = this.lines[containingNode.startLine];
-        const bracketPos = startLine.search(RE_BRACKET_POS);
-        this.toggleCollapse(containingNode.nodeId);
-        this.cursorLine = containingNode.startLine;
-        this.cursorColumn = bracketPos >= 0 ? bracketPos + 1 : startLine.length;
-        this._clearSelection();
+      this._navigateToPrevAttribute();
+    } else {
+      this._navigateToNextAttribute();
+    }
+  }
+
+  /**
+   * Navigate to the next attribute (key or value) in the JSON
+   */
+  private _navigateToNextAttribute(): void {
+    const totalLines = this.visibleLines.length;
+    let currentVisibleIdx = this.visibleLines.findIndex(vl => vl.index === this.cursorLine);
+    if (currentVisibleIdx < 0) currentVisibleIdx = 0;
+
+    // Search from current position forward
+    for (let i = currentVisibleIdx; i < totalLines; i++) {
+      const vl = this.visibleLines[i];
+      const line = this.lines[vl.index];
+      const startCol = (i === currentVisibleIdx) ? this.cursorColumn : 0;
+
+      const pos = this._findNextAttributeInLine(line, startCol);
+      if (pos !== null) {
+        this.cursorLine = vl.index;
+        this.cursorColumn = pos.start;
+        // Select the attribute key or value
+        this.selectionStart = { line: vl.index, column: pos.start };
+        this.selectionEnd = { line: vl.index, column: pos.end };
         this._scrollToCursor();
+        this._invalidateRenderCache();
+        this.scheduleRender();
+        return;
       }
-      return;
     }
-    // Tab: expand collapsed node if on one
-    if (ctx.onCollapsedNode) {
-      this.toggleCollapse(ctx.onCollapsedNode.nodeId);
-      return;
+
+    // Wrap to beginning
+    for (let i = 0; i < currentVisibleIdx; i++) {
+      const vl = this.visibleLines[i];
+      const line = this.lines[vl.index];
+      const pos = this._findNextAttributeInLine(line, 0);
+      if (pos !== null) {
+        this.cursorLine = vl.index;
+        this.cursorColumn = pos.start;
+        this.selectionStart = { line: vl.index, column: pos.start };
+        this.selectionEnd = { line: vl.index, column: pos.end };
+        this._scrollToCursor();
+        this._invalidateRenderCache();
+        this.scheduleRender();
+        return;
+      }
     }
-    if (ctx.onClosingLine) {
-      this.toggleCollapse(ctx.onClosingLine.nodeId);
+  }
+
+  /**
+   * Navigate to the previous attribute (key or value) in the JSON
+   */
+  private _navigateToPrevAttribute(): void {
+    const totalLines = this.visibleLines.length;
+    let currentVisibleIdx = this.visibleLines.findIndex(vl => vl.index === this.cursorLine);
+    if (currentVisibleIdx < 0) currentVisibleIdx = totalLines - 1;
+
+    // Search from current position backward
+    for (let i = currentVisibleIdx; i >= 0; i--) {
+      const vl = this.visibleLines[i];
+      const line = this.lines[vl.index];
+      const endCol = (i === currentVisibleIdx) ? this.cursorColumn : line.length;
+
+      const pos = this._findPrevAttributeInLine(line, endCol);
+      if (pos !== null) {
+        this.cursorLine = vl.index;
+        this.cursorColumn = pos.start;
+        this.selectionStart = { line: vl.index, column: pos.start };
+        this.selectionEnd = { line: vl.index, column: pos.end };
+        this._scrollToCursor();
+        this._invalidateRenderCache();
+        this.scheduleRender();
+        return;
+      }
     }
+
+    // Wrap to end
+    for (let i = totalLines - 1; i > currentVisibleIdx; i--) {
+      const vl = this.visibleLines[i];
+      const line = this.lines[vl.index];
+      const pos = this._findPrevAttributeInLine(line, line.length);
+      if (pos !== null) {
+        this.cursorLine = vl.index;
+        this.cursorColumn = pos.start;
+        this.selectionStart = { line: vl.index, column: pos.start };
+        this.selectionEnd = { line: vl.index, column: pos.end };
+        this._scrollToCursor();
+        this._invalidateRenderCache();
+        this.scheduleRender();
+        return;
+      }
+    }
+  }
+
+  /**
+   * Find next attribute position in a line after startCol
+   * Returns {start, end} for the key or value, or null if none found
+   */
+  private _findNextAttributeInLine(line: string, startCol: number): { start: number; end: number } | null {
+    // Pattern: "key": value where value can be "string", number, true, false, null
+    const re = /"([^"]+)"(?:\s*:\s*(?:"([^"]*)"|(-?\d+\.?\d*(?:e[+-]?\d+)?)|true|false|null))?/gi;
+    let match;
+
+    while ((match = re.exec(line)) !== null) {
+      const keyStart = match.index + 1; // Skip opening quote
+      const keyEnd = keyStart + match[1].length;
+
+      // If key is after startCol, return key position
+      if (keyStart > startCol) {
+        return { start: keyStart, end: keyEnd };
+      }
+
+      // Check if there's a value (string, number, boolean, null)
+      if (match[2] !== undefined) {
+        // String value - find its position
+        const valueMatch = line.substring(match.index).match(/:\s*"([^"]*)"/);
+        if (valueMatch) {
+          const valueStart = match.index + (valueMatch.index || 0) + valueMatch[0].indexOf('"') + 1;
+          const valueEnd = valueStart + match[2].length;
+          if (valueStart > startCol) {
+            return { start: valueStart, end: valueEnd };
+          }
+        }
+      } else if (match[3] !== undefined) {
+        // Number value
+        const numMatch = line.substring(match.index).match(/:\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/i);
+        if (numMatch) {
+          const valueStart = match.index + (numMatch.index || 0) + numMatch[0].indexOf(numMatch[1]);
+          const valueEnd = valueStart + numMatch[1].length;
+          if (valueStart > startCol) {
+            return { start: valueStart, end: valueEnd };
+          }
+        }
+      } else {
+        // Boolean or null - check after the colon
+        const boolMatch = line.substring(match.index).match(/:\s*(true|false|null)/);
+        if (boolMatch) {
+          const valueStart = match.index + (boolMatch.index || 0) + boolMatch[0].indexOf(boolMatch[1]);
+          const valueEnd = valueStart + boolMatch[1].length;
+          if (valueStart > startCol) {
+            return { start: valueStart, end: valueEnd };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Find previous attribute position in a line before endCol
+   */
+  private _findPrevAttributeInLine(line: string, endCol: number): { start: number; end: number } | null {
+    // Collect all attributes in the line
+    const attrs: { start: number; end: number }[] = [];
+    const re = /"([^"]+)"(?:\s*:\s*(?:"([^"]*)"|(-?\d+\.?\d*(?:e[+-]?\d+)?)|true|false|null))?/gi;
+    let match;
+
+    while ((match = re.exec(line)) !== null) {
+      const keyStart = match.index + 1;
+      const keyEnd = keyStart + match[1].length;
+      attrs.push({ start: keyStart, end: keyEnd });
+
+      // Check for value
+      if (match[2] !== undefined) {
+        const valueMatch = line.substring(match.index).match(/:\s*"([^"]*)"/);
+        if (valueMatch) {
+          const valueStart = match.index + (valueMatch.index || 0) + valueMatch[0].indexOf('"') + 1;
+          const valueEnd = valueStart + match[2].length;
+          attrs.push({ start: valueStart, end: valueEnd });
+        }
+      } else if (match[3] !== undefined) {
+        const numMatch = line.substring(match.index).match(/:\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/i);
+        if (numMatch) {
+          const valueStart = match.index + (numMatch.index || 0) + numMatch[0].indexOf(numMatch[1]);
+          const valueEnd = valueStart + numMatch[1].length;
+          attrs.push({ start: valueStart, end: valueEnd });
+        }
+      } else {
+        const boolMatch = line.substring(match.index).match(/:\s*(true|false|null)/);
+        if (boolMatch) {
+          const valueStart = match.index + (boolMatch.index || 0) + boolMatch[0].indexOf(boolMatch[1]);
+          const valueEnd = valueStart + boolMatch[1].length;
+          attrs.push({ start: valueStart, end: valueEnd });
+        }
+      }
+    }
+
+    // Find the last attribute that ends before endCol
+    for (let i = attrs.length - 1; i >= 0; i--) {
+      if (attrs[i].end < endCol) {
+        return attrs[i];
+      }
+    }
+
+    return null;
   }
 
   insertNewline() {
