@@ -2,7 +2,6 @@ import type { LineMeta } from './internal-types.js';
 import {
   GEOJSON_KEYS,
   GEOMETRY_TYPES,
-  RAW_COLORS,
   RE_COLLAPSED_BRACKET,
   RE_COLLAPSED_ROOT,
   RE_ESCAPE_AMP,
@@ -24,14 +23,55 @@ import {
   RE_WHITESPACE_SPLIT
 } from './constants.js';
 
+// CSS named colors (147 colors, ~1.2KB) - format: ,color1,color2,...,
+// Using string with indexOf for O(n) lookup, simpler than Set
+const CSS_COLORS = ',aliceblue,antiquewhite,aqua,aquamarine,azure,beige,bisque,black,blanchedalmond,blue,blueviolet,brown,burlywood,cadetblue,chartreuse,chocolate,coral,cornflowerblue,cornsilk,crimson,cyan,darkblue,darkcyan,darkgoldenrod,darkgray,darkgreen,darkgrey,darkkhaki,darkmagenta,darkolivegreen,darkorange,darkorchid,darkred,darksalmon,darkseagreen,darkslateblue,darkslategray,darkslategrey,darkturquoise,darkviolet,deeppink,deepskyblue,dimgray,dimgrey,dodgerblue,firebrick,floralwhite,forestgreen,fuchsia,gainsboro,ghostwhite,gold,goldenrod,gray,green,greenyellow,grey,honeydew,hotpink,indianred,indigo,ivory,khaki,lavender,lavenderblush,lawngreen,lemonchiffon,lightblue,lightcoral,lightcyan,lightgoldenrodyellow,lightgray,lightgreen,lightgrey,lightpink,lightsalmon,lightseagreen,lightskyblue,lightslategray,lightslategrey,lightsteelblue,lightyellow,lime,limegreen,linen,magenta,maroon,mediumaquamarine,mediumblue,mediumorchid,mediumpurple,mediumseagreen,mediumslateblue,mediumspringgreen,mediumturquoise,mediumvioletred,midnightblue,mintcream,mistyrose,moccasin,navajowhite,navy,oldlace,olive,olivedrab,orange,orangered,orchid,palegoldenrod,palegreen,paleturquoise,palevioletred,papayawhip,peachpuff,peru,pink,plum,powderblue,purple,rebeccapurple,red,rosybrown,royalblue,saddlebrown,salmon,sandybrown,seagreen,seashell,sienna,silver,skyblue,slateblue,slategray,slategrey,snow,springgreen,steelblue,tan,teal,thistle,tomato,turquoise,violet,wheat,white,whitesmoke,yellow,yellowgreen,';
+
+// Reusable DOM element for color conversion (getComputedStyle)
+let _colorTestEl: HTMLElement | null = null;
+
 /**
- * Convert a named CSS color to hex using RAW_COLORS lookup
+ * Get or create the color test element (lazy initialization)
+ */
+function getColorTestEl(): HTMLElement {
+  if (!_colorTestEl) {
+    _colorTestEl = document.createElement('div');
+    _colorTestEl.style.display = 'none';
+    document.body.appendChild(_colorTestEl);
+  }
+  return _colorTestEl;
+}
+
+/**
+ * Check if a string is a valid CSS named color
+ */
+export function isNamedColor(value: string): boolean {
+  if (!RE_NAMED_COLOR.test(value)) return false;
+  return CSS_COLORS.includes(',' + value.toLowerCase() + ',');
+}
+
+/**
+ * Convert a named CSS color to hex using browser's getComputedStyle
  */
 export function namedColorToHex(colorName: string): string | null {
-  const lc = colorName.toLowerCase();
-  const re = new RegExp('(?:^|[\\da-f]{6}|[\\da-f]{3})' + lc + '([\\da-f]{6}|[\\da-f]{3})', 'i');
-  const match = RAW_COLORS.match(re);
-  return match ? '#' + match[1] : null;
+  const el = getColorTestEl();
+  el.style.color = colorName;
+
+  // Get computed color (browser returns rgb(r, g, b) or rgba(r, g, b, a))
+  const computed = getComputedStyle(el).color;
+  if (!computed) return null;
+
+  // Parse rgb(r, g, b) or rgba(r, g, b, a)
+  const match = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!match) return null;
+  const [ ,rd, gd, bd ] = match;
+
+  // Convert to hex
+  const r = parseInt(rd, 10).toString(16).padStart(2, '0');
+  const g = parseInt(gd, 10).toString(16).padStart(2, '0');
+  const b = parseInt(bd, 10).toString(16).padStart(2, '0');
+
+  return '#' + r + g + b;
 }
 
 /**
@@ -97,12 +137,10 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
     if (RE_COLOR_HEX.test(val)) {
       return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
     }
-    // Check for named CSS color (red, blue, etc.)
-    if (RE_NAMED_COLOR.test(val)) {
-      const hex = namedColorToHex(val);
-      if (hex) {
-        return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${hex}">"${val}"</span>`;
-      }
+    // Check for named CSS color (red, blue, etc.) - uses cached browser validation
+    if (isNamedColor(val)) {
+      // Use the named color directly for swatch, browser handles it
+      return `${colon}${space}<span class="json-string json-color" data-color="${val}" style="--swatch-color: ${val}">"${val}"</span>`;
     }
     return `${colon}${space}<span class="json-string">"${val}"</span>`;
   });

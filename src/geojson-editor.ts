@@ -22,7 +22,6 @@ import type {
 
 import {
   VERSION,
-  RAW_COLORS,
   RE_CONTEXT_GEOMETRY,
   RE_CONTEXT_PROPERTIES,
   RE_CONTEXT_FEATURES,
@@ -30,7 +29,6 @@ import {
   RE_ATTR_VALUE_SINGLE,
   RE_NORMALIZE_COLOR,
   RE_COLOR_HEX,
-  RE_NAMED_COLOR,
   RE_IS_FEATURE,
   RE_KV_MATCH,
   RE_ROOT_MATCH,
@@ -46,7 +44,7 @@ import {
 
 import { createElement, getFeatureKey, countBrackets, parseSelectorToHostRule } from './utils.js';
 import { validateGeoJSON, normalizeToFeatures } from './validation.js';
-import { highlightSyntax, namedColorToHex } from './syntax-highlighter.js';
+import { highlightSyntax, namedColorToHex, isNamedColor } from './syntax-highlighter.js';
 
 // Re-export public types
 export type { SetOptions, ThemeConfig, ThemeSettings } from './types.js';
@@ -912,8 +910,8 @@ class GeoJsonEditor extends HTMLElement {
           if (RE_COLOR_HEX.test(strValue)) {
             // Hex color (#fff or #ffffff)
             meta.colors.push({ attributeName, color: strValue });
-          } else if (RE_NAMED_COLOR.test(strValue) && RAW_COLORS.includes(strValue.toLowerCase())) {
-            // Named CSS color (red, blue, etc.)
+          } else if (isNamedColor(strValue)) {
+            // Named CSS color (red, blue, etc.) - validated via browser
             meta.colors.push({ attributeName, color: strValue });
           }
         }

@@ -431,8 +431,8 @@ describe('GeoJsonEditor - Named CSS Colors', () => {
 
     const colorSpan = el.shadowRoot.querySelector('.json-color');
     expect(colorSpan).to.exist;
-    // red = #f00
-    expect(colorSpan.style.getPropertyValue('--swatch-color')).to.equal('#f00');
+    // Named colors are now used directly (browser handles CSS color names natively)
+    expect(colorSpan.style.getPropertyValue('--swatch-color')).to.equal('red');
   });
 
   it('should convert named color to hex for color picker', async () => {
@@ -474,8 +474,8 @@ describe('GeoJsonEditor - Named CSS Colors', () => {
     el.showColorPicker(colorSpan, 0, 'blue', 'color');
     await waitFor(100);
 
-    // blue = #00f -> should be expanded to #0000ff for color picker
-    expect(capturedInputValue).to.equal('#00f');
+    // blue -> converted to hex via getComputedStyle (always 6 chars)
+    expect(capturedInputValue).to.equal('#0000ff');
 
     document.createElement = originalCreateElement;
   });
