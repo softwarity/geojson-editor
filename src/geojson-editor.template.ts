@@ -37,6 +37,11 @@ export function getTemplate(placeholder: string = '', version: string = ''): str
     <div class="suffix-wrapper">
       <div class="suffix-gutter"></div>
       <div class="editor-suffix" id="editorSuffix"></div>
+      <div class="error-nav" id="errorNav">
+        <button class="error-nav-btn" id="prevErrorBtn" title="Previous error">◀</button>
+        <span class="error-count" id="errorCount"></span>
+        <button class="error-nav-btn" id="nextErrorBtn" title="Next error">▶</button>
+      </div>
       <button class="clear-btn" id="clearBtn" title="Clear editor">✕</button>
     </div>
   `;

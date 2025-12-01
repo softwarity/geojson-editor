@@ -114,6 +114,7 @@ class GeoJsonEditor extends HTMLElement {
   private _contextMapLinesLength: number = 0;
   private _contextMapFirstLine: string | undefined = undefined;
   private _contextMapLastLine: string | undefined = undefined;
+  private _errorLinesCache: Set<number> | null = null;
 
   // ========== Cached DOM Elements ==========
   private _viewport: HTMLElement | null = null;
@@ -129,6 +130,10 @@ class GeoJsonEditor extends HTMLElement {
   private _placeholderLayer: HTMLElement | null = null;
   private _editorPrefix: HTMLElement | null = null;
   private _editorSuffix: HTMLElement | null = null;
+  private _errorNav: HTMLElement | null = null;
+  private _errorCount: HTMLElement | null = null;
+  private _prevErrorBtn: HTMLButtonElement | null = null;
+  private _nextErrorBtn: HTMLButtonElement | null = null;
 
   constructor() {
     super();
@@ -533,6 +538,10 @@ class GeoJsonEditor extends HTMLElement {
     this._placeholderLayer = this._id('placeholderLayer');
     this._editorPrefix = this._id('editorPrefix');
     this._editorSuffix = this._id('editorSuffix');
+    this._errorNav = this._id('errorNav');
+    this._errorCount = this._id('errorCount');
+    this._prevErrorBtn = this._id('prevErrorBtn') as HTMLButtonElement;
+    this._nextErrorBtn = this._id('nextErrorBtn') as HTMLButtonElement;
   }
 
   // ========== Event Listeners ==========
@@ -728,6 +737,14 @@ class GeoJsonEditor extends HTMLElement {
       this.removeAll();
     });
 
+    // Error navigation buttons
+    this._prevErrorBtn?.addEventListener('click', () => {
+      this.goToPrevError();
+    });
+    this._nextErrorBtn?.addEventListener('click', () => {
+      this.goToNextError();
+    });
+
     // Initial readonly state
     this.updateReadonly();
   }
@@ -794,8 +811,9 @@ class GeoJsonEditor extends HTMLElement {
    * Rebuilds line-to-nodeId mapping while preserving collapsed state
    */
   updateModel() {
-    // Invalidate context map cache since content changed
+    // Invalidate caches since content changed
     this._contextMapCache = null;
+    this._errorLinesCache = null;
 
     // Rebuild lineToNodeId mapping (may shift due to edits)
     this._rebuildNodeIdMappings();
@@ -891,9 +909,12 @@ class GeoJsonEditor extends HTMLElement {
    */
   computeLineMetadata() {
     this.lineMetadata.clear();
-    
+
     const collapsibleRanges = this._findCollapsibleRanges();
-    
+
+    // Compute error lines once (cached)
+    const errorLines = this._computeErrorLines();
+
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];
       const meta: LineMeta = {
@@ -903,9 +924,10 @@ class GeoJsonEditor extends HTMLElement {
         visibilityButton: null,
         isHidden: false,
         isCollapsed: false,
-        featureKey: null
+        featureKey: null,
+        hasError: errorLines.has(i)
       };
-      
+
       // Detect colors and booleans in a single pass
       RE_ATTR_VALUE.lastIndex = 0;
       let match: RegExpExecArray | null;
@@ -925,7 +947,7 @@ class GeoJsonEditor extends HTMLElement {
           }
         }
       }
-      
+
       // Check if line starts a collapsible node
       const collapsible = collapsibleRanges.find(r => r.startLine === i);
       if (collapsible) {
@@ -935,15 +957,15 @@ class GeoJsonEditor extends HTMLElement {
           isCollapsed: this.collapsedNodes.has(collapsible.nodeId)
         };
       }
-      
+
       // Check if line is inside a collapsed node (exclude closing bracket line)
-      const insideCollapsed = collapsibleRanges.find(r => 
+      const insideCollapsed = collapsibleRanges.find(r =>
         this.collapsedNodes.has(r.nodeId) && i > r.startLine && i < r.endLine
       );
       if (insideCollapsed) {
         meta.isCollapsed = true;
       }
-      
+
       // Check if line belongs to a hidden feature
       for (const [featureKey, range] of this.featureRanges) {
         if (i >= range.startLine && i <= range.endLine) {
@@ -961,8 +983,141 @@ class GeoJsonEditor extends HTMLElement {
           break;
         }
       }
-      
+
       this.lineMetadata.set(i, meta);
+    }
+  }
+
+  /**
+   * Compute error lines (syntax highlighting + structural errors)
+   * Called once per model update, result is used by computeLineMetadata
+   */
+  private _computeErrorLines(): Set<number> {
+    if (this._errorLinesCache !== null) {
+      return this._errorLinesCache;
+    }
+
+    const errorLines = new Set<number>();
+
+    // Check syntax highlighting errors for each line
+    for (let i = 0; i < this.lines.length; i++) {
+      const highlighted = highlightSyntax(this.lines[i], '', undefined);
+      if (highlighted.includes('json-error')) {
+        errorLines.add(i);
+      }
+    }
+
+    // Check structural error from JSON.parse
+    try {
+      const content = this.lines.join('\n');
+      const wrapped = '[' + content + ']';
+      JSON.parse(wrapped);
+    } catch (e) {
+      if (e instanceof Error) {
+        // Try to extract line number from error message
+        // Chrome/Node: "... at line X column Y"
+        const lineMatch = e.message.match(/line (\d+)/);
+        if (lineMatch) {
+          // Subtract 1 because we wrapped with '[' on first line
+          const errorLine = Math.max(0, parseInt(lineMatch[1], 10) - 1);
+          errorLines.add(errorLine);
+        }
+      }
+    }
+
+    this._errorLinesCache = errorLines;
+    return errorLines;
+  }
+
+  /**
+   * Get all lines that have errors (for navigation and counting)
+   * Returns array of line indices sorted by line number
+   */
+  private _getErrorLines(): number[] {
+    const errorLines: number[] = [];
+    for (const [lineIndex, meta] of this.lineMetadata) {
+      if (meta.hasError) {
+        errorLines.push(lineIndex);
+      }
+    }
+    return errorLines.sort((a, b) => a - b);
+  }
+
+  /**
+   * Navigate to the next error line
+   */
+  goToNextError(): boolean {
+    const errorLines = this._getErrorLines();
+    if (errorLines.length === 0) return false;
+
+    // Find next error after current cursor position
+    const nextError = errorLines.find(line => line > this.cursorLine);
+    const targetLine = nextError !== undefined ? nextError : errorLines[0]; // Wrap to first
+
+    return this._goToErrorLine(targetLine);
+  }
+
+  /**
+   * Navigate to the previous error line
+   */
+  goToPrevError(): boolean {
+    const errorLines = this._getErrorLines();
+    if (errorLines.length === 0) return false;
+
+    // Find previous error before current cursor position
+    const prevErrors = errorLines.filter(line => line < this.cursorLine);
+    const targetLine = prevErrors.length > 0 ? prevErrors[prevErrors.length - 1] : errorLines[errorLines.length - 1]; // Wrap to last
+
+    return this._goToErrorLine(targetLine);
+  }
+
+  /**
+   * Navigate to a specific error line
+   */
+  private _goToErrorLine(lineIndex: number): boolean {
+    // Expand all collapsed nodes containing this line (from outermost to innermost)
+    let expanded = false;
+    for (const [nodeId, nodeInfo] of this._nodeIdToLines) {
+      if (this.collapsedNodes.has(nodeId) && lineIndex > nodeInfo.startLine && lineIndex <= nodeInfo.endLine) {
+        this.collapsedNodes.delete(nodeId);
+        expanded = true;
+      }
+    }
+    if (expanded) {
+      this.updateView();
+    }
+
+    this.cursorLine = lineIndex;
+    this.cursorColumn = 0;
+    this._invalidateRenderCache();
+    this._scrollToCursor(true); // Center the error line
+    this.renderViewport();
+    this._updateErrorDisplay();
+
+    // Focus the editor
+    this._hiddenTextarea?.focus();
+    return true;
+  }
+
+  /**
+   * Expand all collapsed nodes that contain error lines
+   */
+  private _expandErrorNodes(): void {
+    const errorLines = this._getErrorLines();
+    if (errorLines.length === 0) return;
+
+    let expanded = false;
+    for (const errorLine of errorLines) {
+      for (const [nodeId, nodeInfo] of this._nodeIdToLines) {
+        if (this.collapsedNodes.has(nodeId) && errorLine > nodeInfo.startLine && errorLine <= nodeInfo.endLine) {
+          this.collapsedNodes.delete(nodeId);
+          expanded = true;
+        }
+      }
+    }
+
+    if (expanded) {
+      this.updateView();
     }
   }
 
@@ -1211,18 +1366,23 @@ class GeoJsonEditor extends HTMLElement {
     for (let i = startIndex; i < endIndex; i++) {
       const lineData = this.visibleLines[i];
       if (!lineData) continue;
-      
+
       const gutterLine = _ce('div');
       gutterLine.className = 'gutter-line';
-      
+
       const meta = lineData.meta;
-      
+
+      // Add error indicator class
+      if (meta?.hasError) {
+        gutterLine.classList.add('has-error');
+      }
+
       // Line number first
       const lineNum = _ce('span');
       lineNum.className = 'line-number';
       lineNum.textContent = String(lineData.index + 1);
       gutterLine.appendChild(lineNum);
-      
+
       // Collapse column (always present for alignment)
       const collapseCol = _ce('div');
       collapseCol.className = 'collapse-column';
@@ -1236,7 +1396,7 @@ class GeoJsonEditor extends HTMLElement {
         collapseCol.appendChild(btn);
       }
       gutterLine.appendChild(collapseCol);
-      
+
       fragment.appendChild(gutterLine);
     }
     
@@ -1360,6 +1520,8 @@ class GeoJsonEditor extends HTMLElement {
       'ArrowRight': () => this._handleArrowKey(0, 1, e.shiftKey, e.ctrlKey || e.metaKey),
       'Home': () => this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine),
       'End': () => this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine),
+      'PageUp': () => this._handlePageUpDown('up', e.shiftKey),
+      'PageDown': () => this._handlePageUpDown('down', e.shiftKey),
       'Tab': () => this._handleTab(e.shiftKey, ctx),
       'Insert': () => { this._insertMode = !this._insertMode; this.scheduleRender(); }
     };
@@ -2014,26 +2176,34 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Scroll viewport to ensure cursor is visible
+   * @param center - if true, center the cursor line in the viewport
    */
-  private _scrollToCursor() {
+  private _scrollToCursor(center = false) {
     const viewport = this._viewport;
     if (!viewport) return;
-    
+
     // Find the visible line index for the cursor
     const visibleIndex = this.visibleLines.findIndex(vl => vl.index === this.cursorLine);
     if (visibleIndex === -1) return;
-    
+
     const cursorY = visibleIndex * this.lineHeight;
-    const viewportTop = viewport.scrollTop;
-    const viewportBottom = viewportTop + viewport.clientHeight;
-    
-    // Scroll up if cursor is above viewport
-    if (cursorY < viewportTop) {
-      viewport.scrollTop = cursorY;
-    }
-    // Scroll down if cursor is below viewport
-    else if (cursorY + this.lineHeight > viewportBottom) {
-      viewport.scrollTop = cursorY + this.lineHeight - viewport.clientHeight;
+    const viewportHeight = viewport.clientHeight;
+
+    if (center) {
+      // Center the cursor line in the viewport
+      viewport.scrollTop = Math.max(0, cursorY - viewportHeight / 2 + this.lineHeight / 2);
+    } else {
+      const viewportTop = viewport.scrollTop;
+      const viewportBottom = viewportTop + viewportHeight;
+
+      // Scroll up if cursor is above viewport
+      if (cursorY < viewportTop) {
+        viewport.scrollTop = cursorY;
+      }
+      // Scroll down if cursor is below viewport
+      else if (cursorY + this.lineHeight > viewportBottom) {
+        viewport.scrollTop = cursorY + this.lineHeight - viewportHeight;
+      }
     }
   }
 
@@ -2188,18 +2358,32 @@ class GeoJsonEditor extends HTMLElement {
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
     }
-    
+
     if (key === 'home') {
       if (onClosingLine) {
+        // On closing line of collapsed node: go to start line
         this.cursorLine = onClosingLine.startLine;
+        this.cursorColumn = 0;
+      } else if (this.cursorColumn === 0) {
+        // Already at start of line: go to start of document
+        this.cursorLine = 0;
+        this.cursorColumn = 0;
+      } else {
+        // Go to start of line
+        this.cursorColumn = 0;
       }
-      this.cursorColumn = 0;
     } else {
-      if (this.cursorLine < this.lines.length) {
-        this.cursorColumn = this.lines[this.cursorLine].length;
+      const lineLength = this.lines[this.cursorLine]?.length || 0;
+      if (this.cursorColumn === lineLength) {
+        // Already at end of line: go to end of document
+        this.cursorLine = this.lines.length - 1;
+        this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
+      } else {
+        // Go to end of line
+        this.cursorColumn = lineLength;
       }
     }
-    
+
     // Update selection end if shift is pressed
     if (isShift) {
       this.selectionEnd = { line: this.cursorLine, column: this.cursorColumn };
@@ -2207,7 +2391,50 @@ class GeoJsonEditor extends HTMLElement {
       this.selectionStart = null;
       this.selectionEnd = null;
     }
-    
+
+    this._invalidateRenderCache();
+    this._scrollToCursor();
+    this.scheduleRender();
+  }
+
+  /**
+   * Handle PageUp/PageDown
+   */
+  private _handlePageUpDown(direction: 'up' | 'down', isShift: boolean): void {
+    // Start selection if shift is pressed and no selection exists
+    if (isShift && !this.selectionStart) {
+      this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
+    }
+
+    const viewport = this._viewport;
+    if (!viewport) return;
+
+    // Calculate how many lines fit in the viewport
+    const linesPerPage = Math.floor(viewport.clientHeight / this.lineHeight);
+
+    if (direction === 'up') {
+      // Find current visible index and move up by page
+      const currentVisibleIdx = this.visibleLines.findIndex(vl => vl.index === this.cursorLine);
+      const newVisibleIdx = Math.max(0, currentVisibleIdx - linesPerPage);
+      this.cursorLine = this.visibleLines[newVisibleIdx]?.index || 0;
+    } else {
+      // Find current visible index and move down by page
+      const currentVisibleIdx = this.visibleLines.findIndex(vl => vl.index === this.cursorLine);
+      const newVisibleIdx = Math.min(this.visibleLines.length - 1, currentVisibleIdx + linesPerPage);
+      this.cursorLine = this.visibleLines[newVisibleIdx]?.index || this.lines.length - 1;
+    }
+
+    // Clamp cursor column to line length
+    this.cursorColumn = Math.min(this.cursorColumn, this.lines[this.cursorLine]?.length || 0);
+
+    // Update selection end if shift is pressed
+    if (isShift) {
+      this.selectionEnd = { line: this.cursorLine, column: this.cursorColumn };
+    } else {
+      this.selectionStart = null;
+      this.selectionEnd = null;
+    }
+
     this._invalidateRenderCache();
     this._scrollToCursor();
     this.scheduleRender();
@@ -2386,6 +2613,9 @@ class GeoJsonEditor extends HTMLElement {
     if (wasEmpty && this.lines.length > 0) {
       this.autoCollapseCoordinates();
     }
+
+    // Expand any collapsed nodes that contain errors
+    this._expandErrorNodes();
 
     // Force immediate render (not via RAF) to ensure content displays instantly
     this.renderViewport();
@@ -2856,9 +3086,13 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   formatAndUpdate() {
+    // Save cursor position
+    const oldCursorLine = this.cursorLine;
+    const oldCursorColumn = this.cursorColumn;
+    const oldContent = this.lines.join('\n');
+
     try {
-      const content = this.lines.join('\n');
-      const wrapped = '[' + content + ']';
+      const wrapped = '[' + oldContent + ']';
       const parsed = JSON.parse(wrapped);
 
       const formatted = JSON.stringify(parsed, null, 2);
@@ -2866,15 +3100,51 @@ class GeoJsonEditor extends HTMLElement {
       this.lines = lines.slice(1, -1); // Remove wrapper brackets
     } catch {
       // Invalid JSON - apply best-effort formatting
-      const content = this.lines.join('\n');
-      if (content.trim()) {
-        this.lines = this._bestEffortFormat(content);
+      if (oldContent.trim()) {
+        this.lines = this._bestEffortFormat(oldContent);
       }
     }
+
+    const newContent = this.lines.join('\n');
+
+    // If content didn't change, keep cursor exactly where it was
+    if (newContent === oldContent) {
+      this.cursorLine = oldCursorLine;
+      this.cursorColumn = oldCursorColumn;
+    } else {
+      // Content changed due to reformatting
+      // The cursor position (this.cursorLine, this.cursorColumn) was set by the calling
+      // operation (insertText, insertNewline, etc.) BEFORE formatAndUpdate was called.
+      // We need to adjust for indentation changes while keeping the logical position.
+
+      // If cursor is at column 0 (e.g., after newline), keep it there
+      // This preserves expected behavior for newline insertion
+      if (this.cursorColumn === 0) {
+        // Just keep line, column 0 - indentation will be handled by auto-indent
+      } else {
+        // For other cases, try to maintain position relative to content (not indentation)
+        const oldLines = oldContent.split('\n');
+        const oldLineContent = oldLines[oldCursorLine] || '';
+        const oldLeadingSpaces = oldLineContent.length - oldLineContent.trimStart().length;
+        const oldColumnInContent = Math.max(0, oldCursorColumn - oldLeadingSpaces);
+
+        // Apply same offset to new line's indentation
+        if (this.cursorLine < this.lines.length) {
+          const newLineContent = this.lines[this.cursorLine];
+          const newLeadingSpaces = newLineContent.length - newLineContent.trimStart().length;
+          this.cursorColumn = newLeadingSpaces + oldColumnInContent;
+        }
+      }
+    }
+
+    // Clamp cursor to valid range
+    this.cursorLine = Math.min(this.cursorLine, Math.max(0, this.lines.length - 1));
+    this.cursorColumn = Math.min(this.cursorColumn, this.lines[this.cursorLine]?.length || 0);
 
     this.updateModel();
     this.scheduleRender();
     this.updatePlaceholderVisibility();
+    this._updateErrorDisplay();
     this.emitChange();
   }
 
@@ -2931,6 +3201,21 @@ class GeoJsonEditor extends HTMLElement {
   updatePlaceholderVisibility() {
     if (this._placeholderLayer) {
       this._placeholderLayer.style.display = this.lines.length > 0 ? 'none' : 'block';
+    }
+  }
+
+  /**
+   * Update error display (counter and navigation visibility)
+   */
+  private _updateErrorDisplay() {
+    const errorLines = this._getErrorLines();
+    const count = errorLines.length;
+
+    if (this._errorNav) {
+      this._errorNav.classList.toggle('visible', count > 0);
+    }
+    if (this._errorCount) {
+      this._errorCount.textContent = count > 0 ? String(count) : '';
     }
   }
 

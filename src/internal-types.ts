@@ -47,6 +47,13 @@ export interface LineMeta {
   isHidden: boolean;
   isCollapsed: boolean;
   featureKey: string | null;
+  hasError: boolean;
+}
+
+/** Error info for navigation */
+export interface ErrorInfo {
+  line: number;
+  type: 'syntax' | 'structural';
 }
 
 /** Visible line data */

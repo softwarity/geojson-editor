@@ -80,6 +80,17 @@
   align-items: center;
   justify-content: flex-end;
   padding-right: 4px;
+  position: relative;
+}
+
+.gutter-line.has-error::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--error-color, #dc3545);
 }
 
 .line-number {
@@ -344,6 +355,41 @@
 }
 .clear-btn:hover { opacity: 0.7; background: rgba(255,255,255,0.1); }
 .clear-btn[hidden] { display: none; }
+
+/* ========== Error Navigation ========== */
+.error-nav {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin-right: 24px; /* Space for clear button */
+}
+.error-nav.visible {
+  display: flex;
+}
+.error-nav-btn {
+  background: transparent;
+  border: none;
+  color: var(--error-color, #dc3545);
+  cursor: pointer;
+  font-size: 8px;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.error-nav-btn:hover {
+  opacity: 1;
+}
+.error-count {
+  color: var(--error-color, #dc3545);
+  font-size: 11px;
+  min-width: 20px;
+  text-align: center;
+}
 
 /* ========== Scrollbar ========== */
 .viewport::-webkit-scrollbar { width: 10px; height: 10px; }
