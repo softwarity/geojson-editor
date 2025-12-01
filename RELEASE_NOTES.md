@@ -1,5 +1,34 @@
 # Release Notes - @softwarity/geojson-editor
 
+## v1.0.19
+
+### New Features
+
+- **Error Navigation** - Visual error indicators in gutter with navigation buttons (◀ ▶) to jump between errors; error count displayed in suffix area
+- **Home/End Enhancement** - Double-tap Home/End to go to document start/end (single tap for line start/end)
+- **PageUp/PageDown** - Page navigation with cursor movement
+- **Shift Selection** - Home, End, PageUp, PageDown all support Shift for extending selection
+- **goToNextError()/goToPrevError() API** - Programmatic error navigation
+
+### Improvements
+
+- Cursor position preserved when correcting errors (smart position restoration during reformatting)
+- Collapsed nodes containing errors auto-expand after paste
+- Refactored error expansion logic to reduce code duplication
+
+### Bug Fixes
+
+- Fixed cursor jumping when adding/removing characters that cause JSON validation state changes
+- Fixed paste not rendering content until focus lost
+
+### Code Quality
+
+- Removed unused types (ErrorInfo, CollapsibleRange, ContextStackItem)
+- 330 unit tests (13 new tests)
+- Coverage: 84% statements, 80% branches, 91% functions
+
+---
+
 ## v1.0.18
 
 ### New Features

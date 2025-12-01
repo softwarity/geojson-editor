@@ -50,6 +50,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 | **Clear button** | ✅ | ❌ | ❌ | ❌ |
 | **Save to file (Ctrl+S)** | ✅ | ❌ | ❌ | ❌ |
 | **Open from file (Ctrl+O)** | ✅ | ❌ | ❌ | ❌ |
+| **Error navigation** | ✅ | ✅ | ✅ | ❌ |
 | **Dark mode detection** | ✅ Auto | ⚠️ Manual | ⚠️ Manual | ⚠️ Manual |
 | **Dependencies** | 0 | Many | Few | 0 |
 | **Setup complexity** | 1 line | Complex | Moderate | Simple |
@@ -80,6 +81,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Undo/Redo** - Full undo/redo support with Ctrl+Z / Ctrl+Y / Ctrl+Shift+Z; rapid keystrokes grouped as single undo step
 - **Save to File** - Ctrl+S to download GeoJSON as `.geojson` file; programmatic `save(filename)` method available
 - **Open from File** - Ctrl+O to open a `.geojson` or `.json` file from the client filesystem; programmatic `open()` method available
+- **Error Navigation** - Visual error indicators in gutter with navigation buttons (◀ ▶) to jump between errors; error count displayed in suffix area
 
 ## Installation
 
@@ -401,6 +403,23 @@ if (success) {
 const success = await editor.open({ collapsed: ['$root'] });
 ```
 
+### Error Navigation API
+
+Navigate between syntax and structural errors:
+
+| Method | Description |
+|--------|-------------|
+| `goToNextError()` | Navigate to next error, returns `true` if found |
+| `goToPrevError()` | Navigate to previous error, returns `true` if found |
+
+Error lines are indicated with a red bar in the gutter. The error count is displayed in the suffix area between navigation buttons (◀ ▶).
+
+```javascript
+// Navigate to errors programmatically
+editor.goToNextError();
+editor.goToPrevError();
+```
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -422,6 +441,11 @@ const success = await editor.open({ collapsed: ['$root'] });
 | `Shift+Enter` | Collapse innermost node containing cursor |
 | `Tab` | Navigate to next attribute (key or value) |
 | `Shift+Tab` | Navigate to previous attribute |
+| `Home` | Go to start of line; if already there, go to start of document |
+| `End` | Go to end of line; if already there, go to end of document |
+| `PageUp` | Scroll up one page |
+| `PageDown` | Scroll down one page |
+| `Shift+Home/End/PageUp/PageDown` | Extend selection while navigating |
 
 ## Events
 

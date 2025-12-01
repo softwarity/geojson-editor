@@ -494,6 +494,143 @@ describe('GeoJsonEditor - Collapse/Expand', () => {
       expect(collapsedButtons.length).to.be.greaterThan(0);
     }
   });
+
+  it('should keep opened node open after editing (not re-collapse)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set content with auto-collapsed coordinates
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Find the coordinates node (should be collapsed by default)
+    let coordinatesNodeId = null;
+    for (const [nodeId, info] of el._nodeIdToLines) {
+      if (info.nodeKey === 'coordinates') {
+        coordinatesNodeId = nodeId;
+        break;
+      }
+    }
+    expect(coordinatesNodeId).to.not.be.null;
+    expect(el.collapsedNodes.has(coordinatesNodeId)).to.be.true;
+
+    // Open the node manually
+    el.toggleCollapse(coordinatesNodeId);
+    await waitFor(50);
+
+    // Node should be open now
+    expect(el.collapsedNodes.has(coordinatesNodeId)).to.be.false;
+
+    // Simulate editing by calling formatAndUpdate (which triggers _rebuildNodeIdMappings)
+    el.formatAndUpdate();
+    await waitFor(50);
+
+    // Find the new nodeId for coordinates (IDs change after rebuild)
+    let newCoordinatesNodeId = null;
+    for (const [nodeId, info] of el._nodeIdToLines) {
+      if (info.nodeKey === 'coordinates') {
+        newCoordinatesNodeId = nodeId;
+        break;
+      }
+    }
+
+    // Node should still be open (not re-collapsed)
+    expect(el.collapsedNodes.has(newCoordinatesNodeId)).to.be.false;
+  });
+
+  it('should re-collapse node after user closes it manually', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Find coordinates node
+    let coordinatesNodeId = null;
+    for (const [nodeId, info] of el._nodeIdToLines) {
+      if (info.nodeKey === 'coordinates') {
+        coordinatesNodeId = nodeId;
+        break;
+      }
+    }
+
+    // Open it
+    el.toggleCollapse(coordinatesNodeId);
+    await waitFor(50);
+    expect(el.collapsedNodes.has(coordinatesNodeId)).to.be.false;
+
+    // Close it manually
+    el.toggleCollapse(coordinatesNodeId);
+    await waitFor(50);
+    expect(el.collapsedNodes.has(coordinatesNodeId)).to.be.true;
+
+    // Simulate editing
+    el.formatAndUpdate();
+    await waitFor(50);
+
+    // Find new nodeId
+    let newCoordinatesNodeId = null;
+    for (const [nodeId, info] of el._nodeIdToLines) {
+      if (info.nodeKey === 'coordinates') {
+        newCoordinatesNodeId = nodeId;
+        break;
+      }
+    }
+
+    // Should remain collapsed (user closed it)
+    expect(el.collapsedNodes.has(newCoordinatesNodeId)).to.be.true;
+  });
+
+  it('should only keep opened node open in multi-feature scenario', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set multiple features - all with collapsed coordinates
+    el.set([validPolygon, validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Find all coordinates nodes
+    const coordinatesNodes = [];
+    for (const [nodeId, info] of el._nodeIdToLines) {
+      if (info.nodeKey === 'coordinates') {
+        coordinatesNodes.push({ nodeId, uniqueKey: info.uniqueKey });
+      }
+    }
+    expect(coordinatesNodes.length).to.be.greaterThan(1);
+
+    // All should be collapsed initially
+    for (const node of coordinatesNodes) {
+      expect(el.collapsedNodes.has(node.nodeId)).to.be.true;
+    }
+
+    // Open only the first coordinates node
+    el.toggleCollapse(coordinatesNodes[0].nodeId);
+    await waitFor(50);
+
+    // First should be open, others still collapsed
+    expect(el.collapsedNodes.has(coordinatesNodes[0].nodeId)).to.be.false;
+    for (let i = 1; i < coordinatesNodes.length; i++) {
+      expect(el.collapsedNodes.has(coordinatesNodes[i].nodeId)).to.be.true;
+    }
+
+    // Simulate editing
+    el.formatAndUpdate();
+    await waitFor(50);
+
+    // Find new nodeIds after rebuild
+    const newCoordinatesNodes = [];
+    for (const [nodeId, info] of el._nodeIdToLines) {
+      if (info.nodeKey === 'coordinates') {
+        newCoordinatesNodes.push({ nodeId, uniqueKey: info.uniqueKey });
+      }
+    }
+
+    // First should still be open, others still collapsed
+    expect(el.collapsedNodes.has(newCoordinatesNodes[0].nodeId)).to.be.false;
+    for (let i = 1; i < newCoordinatesNodes.length; i++) {
+      expect(el.collapsedNodes.has(newCoordinatesNodes[i].nodeId)).to.be.true;
+    }
+  });
 });
 
 describe('GeoJsonEditor - Feature Visibility', () => {

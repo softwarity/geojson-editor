@@ -66,6 +66,7 @@ class GeoJsonEditor extends HTMLElement {
   private _nodeIdCounter: number = 0;
   private _lineToNodeId: Map<number, string> = new Map();
   private _nodeIdToLines: Map<string, NodeRangeInfo> = new Map();
+  private _openedNodeKeys: Set<string> = new Set(); // UniqueKeys (nodeKey:occurrence) that user opened
 
   // ========== Derived State (computed from model) ==========
   visibleLines: VisibleLine[] = [];
@@ -372,38 +373,31 @@ class GeoJsonEditor extends HTMLElement {
    * Preserves collapsed state by matching nodeKey + sequential occurrence
    */
   private _rebuildNodeIdMappings() {
-    // Save old state to try to preserve collapsed nodes
-    const oldCollapsed = new Set(this.collapsedNodes);
-    const oldNodeKeyMap = new Map(); // nodeId -> nodeKey
-    for (const [nodeId, info] of this._nodeIdToLines) {
-      if (info.nodeKey) oldNodeKeyMap.set(nodeId, info.nodeKey);
+    // Save collapsed uniqueKeys from old state
+    const collapsedUniqueKeys = new Set<string>();
+    for (const nodeId of this.collapsedNodes) {
+      const info = this._nodeIdToLines.get(nodeId);
+      if (info?.uniqueKey) collapsedUniqueKeys.add(info.uniqueKey);
     }
-    
-    // Build list of collapsed nodeKeys for matching
-    const collapsedNodeKeys = [];
-    for (const nodeId of oldCollapsed) {
-      const nodeKey = oldNodeKeyMap.get(nodeId);
-      if (nodeKey) collapsedNodeKeys.push(nodeKey);
-    }
-    
+
     // Reset mappings
     this._nodeIdCounter = 0;
     this._lineToNodeId.clear();
     this._nodeIdToLines.clear();
     this.collapsedNodes.clear();
-    
-    // Track occurrences of each nodeKey for matching
-    const nodeKeyOccurrences = new Map();
-    
+
+    // Track occurrences of each nodeKey
+    const nodeKeyOccurrences = new Map<string, number>();
+
     // Assign fresh IDs to all collapsible nodes
     for (let i = 0; i < this.lines.length; i++) {
       const line = this.lines[i];
-      
+
       // Match "key": { or "key": [
       const kvMatch = line.match(RE_KV_MATCH);
       // Also match standalone { or {, (root Feature objects)
       const rootMatch = !kvMatch && line.match(RE_ROOT_MATCH);
-      
+
       if (!kvMatch && !rootMatch) continue;
 
       let nodeKey: string;
@@ -419,30 +413,26 @@ class GeoJsonEditor extends HTMLElement {
       } else {
         continue;
       }
-      
+
       // Check if closes on same line
       const rest = line.substring(line.indexOf(openBracket) + 1);
       const counts = countBrackets(rest, openBracket);
       if (counts.close > counts.open) continue;
-      
+
       const endLine = this._findClosingLine(i, openBracket);
       if (endLine === -1 || endLine === i) continue;
-      
-      // Generate unique ID for this node
+
+      // Generate unique ID and unique key for this node
       const nodeId = this._generateNodeId();
-      
-      this._lineToNodeId.set(i, nodeId);
-      this._nodeIdToLines.set(nodeId, { startLine: i, endLine, nodeKey, isRootFeature: !!rootMatch });
-      
-      // Track occurrence of this nodeKey
       const occurrence = nodeKeyOccurrences.get(nodeKey) || 0;
       nodeKeyOccurrences.set(nodeKey, occurrence + 1);
-      
-      // Check if this nodeKey was previously collapsed
-      const keyIndex = collapsedNodeKeys.indexOf(nodeKey);
-      if (keyIndex !== -1) {
-        // Remove from list so we don't match it again
-        collapsedNodeKeys.splice(keyIndex, 1);
+      const uniqueKey = `${nodeKey}:${occurrence}`;
+
+      this._lineToNodeId.set(i, nodeId);
+      this._nodeIdToLines.set(nodeId, { startLine: i, endLine, nodeKey, uniqueKey, isRootFeature: !!rootMatch });
+
+      // Restore collapsed state if was collapsed and not explicitly opened
+      if (collapsedUniqueKeys.has(uniqueKey) && !this._openedNodeKeys.has(uniqueKey)) {
         this.collapsedNodes.add(nodeId);
       }
     }
@@ -780,6 +770,7 @@ class GeoJsonEditor extends HTMLElement {
     // Clear state for new content
     this.collapsedNodes.clear();
     this.hiddenFeatures.clear();
+    this._openedNodeKeys.clear();
     this._lineToNodeId.clear();
     this._nodeIdToLines.clear();
     this.cursorLine = 0;
@@ -1072,18 +1063,29 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
-   * Navigate to a specific error line
+   * Expand all collapsed nodes containing a specific line
+   * Returns true if any nodes were expanded
    */
-  private _goToErrorLine(lineIndex: number): boolean {
-    // Expand all collapsed nodes containing this line (from outermost to innermost)
+  private _expandNodesContainingLine(lineIndex: number): boolean {
     let expanded = false;
     for (const [nodeId, nodeInfo] of this._nodeIdToLines) {
       if (this.collapsedNodes.has(nodeId) && lineIndex > nodeInfo.startLine && lineIndex <= nodeInfo.endLine) {
         this.collapsedNodes.delete(nodeId);
+        // Track that this node was opened - don't re-collapse during edits
+        if (nodeInfo.uniqueKey) {
+          this._openedNodeKeys.add(nodeInfo.uniqueKey);
+        }
         expanded = true;
       }
     }
-    if (expanded) {
+    return expanded;
+  }
+
+  /**
+   * Navigate to a specific error line
+   */
+  private _goToErrorLine(lineIndex: number): boolean {
+    if (this._expandNodesContainingLine(lineIndex)) {
       this.updateView();
     }
 
@@ -1108,11 +1110,8 @@ class GeoJsonEditor extends HTMLElement {
 
     let expanded = false;
     for (const errorLine of errorLines) {
-      for (const [nodeId, nodeInfo] of this._nodeIdToLines) {
-        if (this.collapsedNodes.has(nodeId) && errorLine > nodeInfo.startLine && errorLine <= nodeInfo.endLine) {
-          this.collapsedNodes.delete(nodeId);
-          expanded = true;
-        }
+      if (this._expandNodesContainingLine(errorLine)) {
+        expanded = true;
       }
     }
 
@@ -2788,14 +2787,23 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Collapse/Expand ==========
-  
+
   toggleCollapse(nodeId: string): void {
+    const nodeInfo = this._nodeIdToLines.get(nodeId);
     if (this.collapsedNodes.has(nodeId)) {
       this.collapsedNodes.delete(nodeId);
+      // Track that user opened this node - don't re-collapse during edits
+      if (nodeInfo?.uniqueKey) {
+        this._openedNodeKeys.add(nodeInfo.uniqueKey);
+      }
     } else {
       this.collapsedNodes.add(nodeId);
+      // User closed it - allow re-collapse
+      if (nodeInfo?.uniqueKey) {
+        this._openedNodeKeys.delete(nodeInfo.uniqueKey);
+      }
     }
-    
+
     // Use updateView - don't rebuild nodeId mappings since content didn't change
     this.updateView();
     this._invalidateRenderCache(); // Force re-render
@@ -3142,6 +3150,10 @@ class GeoJsonEditor extends HTMLElement {
     this.cursorColumn = Math.min(this.cursorColumn, this.lines[this.cursorLine]?.length || 0);
 
     this.updateModel();
+
+    // Expand any nodes that contain errors (prevents closing edited nodes with typos)
+    this._expandErrorNodes();
+
     this.scheduleRender();
     this.updatePlaceholderVisibility();
     this._updateErrorDisplay();

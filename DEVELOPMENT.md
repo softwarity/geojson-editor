@@ -89,8 +89,8 @@ test/api.test.js:
   ✓ GeoJsonEditor - Features API > should set features via set()
   ...
 
-Chromium: 317 passed, 0 failed
-Finished running tests in 23s, all tests passed! 🎉
+Chromium: 330 passed, 0 failed
+Finished running tests in 27s, all tests passed! 🎉
 ```
 
 ### Test Organization
@@ -406,7 +406,7 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all 317 unit tests
+- [ ] `npm test` passes all 330 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work:
@@ -424,6 +424,7 @@ Before submitting changes, verify:
 - [ ] Clear button works (✕ in suffix area)
 - [ ] Features API works (set, add, insertAt, removeAt, removeAll, get, getAll, emit)
 - [ ] Features API options work (collapsed option with $root, coordinates, etc.)
+- [ ] Error navigation works (◀ ▶ buttons, red gutter indicator)
 - [ ] Readonly mode works (clear button hidden)
 - [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
 - [ ] `error` events fire with invalid JSON/GeoJSON

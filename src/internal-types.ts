@@ -50,12 +50,6 @@ export interface LineMeta {
   hasError: boolean;
 }
 
-/** Error info for navigation */
-export interface ErrorInfo {
-  line: number;
-  type: 'syntax' | 'structural';
-}
-
 /** Visible line data */
 export interface VisibleLine {
   index: number;
@@ -75,13 +69,8 @@ export interface NodeRangeInfo {
   startLine: number;
   endLine: number;
   nodeKey?: string;
+  uniqueKey?: string; // nodeKey:occurrence - stable identifier across rebuilds
   isRootFeature?: boolean;
-}
-
-/** Collapsible range info */
-export interface CollapsibleRange extends NodeRangeInfo {
-  nodeId: string;
-  openBracket: string;
 }
 
 /** Editor state snapshot for undo/redo */
@@ -96,12 +85,6 @@ export interface EditorSnapshot {
 export interface BracketCount {
   open: number;
   close: number;
-}
-
-/** Context stack item */
-export interface ContextStackItem {
-  context: string;
-  isArray: boolean;
 }
 
 /** Collapsed zone context for keydown handlers */
