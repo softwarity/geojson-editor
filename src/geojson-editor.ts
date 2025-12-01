@@ -3019,11 +3019,79 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Best-effort formatting for invalid JSON
    * Splits on structural characters and indents as much as possible
+   * @param content The content to format
+   * @param skipLineIndex Optional line index to skip (keep as-is)
    */
-  private _bestEffortFormat(content: string): string[] {
+  private _bestEffortFormat(content: string, skipLineIndex?: number): string[] {
+    const sourceLines = content.split('\n');
+
+    // If we have a line to skip, handle it specially
+    if (skipLineIndex !== undefined && skipLineIndex >= 0 && skipLineIndex < sourceLines.length) {
+      const skippedLine = sourceLines[skipLineIndex];
+
+      // Format content before the skipped line
+      const beforeContent = sourceLines.slice(0, skipLineIndex).join('\n');
+      const beforeLines = beforeContent.trim() ? this._formatChunk(beforeContent) : [];
+
+      // Keep skipped line exactly as-is (don't re-indent, user is typing on it)
+      const depthBefore = this._computeDepthAtEnd(beforeLines);
+
+      // Compute depth after the skipped line (including its brackets)
+      const depthAfterSkipped = depthBefore + this._computeBracketDelta(skippedLine);
+
+      // Format content after the skipped line, starting at correct depth
+      const afterContent = sourceLines.slice(skipLineIndex + 1).join('\n');
+      const afterLines = afterContent.trim() ? this._formatChunk(afterContent, depthAfterSkipped) : [];
+
+      return [...beforeLines, skippedLine, ...afterLines];
+    }
+
+    // No line to skip - format everything
+    return this._formatChunk(content);
+  }
+
+  /**
+   * Compute the net bracket delta for a line (opens - closes)
+   */
+  private _computeBracketDelta(line: string): number {
+    let delta = 0;
+    let inString = false;
+    let escaped = false;
+    for (const char of line) {
+      if (escaped) { escaped = false; continue; }
+      if (char === '\\' && inString) { escaped = true; continue; }
+      if (char === '"') { inString = !inString; continue; }
+      if (inString) continue;
+      if (char === '{' || char === '[') delta++;
+      else if (char === '}' || char === ']') delta--;
+    }
+    return delta;
+  }
+
+  /**
+   * Compute the bracket depth at the end of formatted lines
+   * Starts at 1 to account for FeatureCollection wrapper
+   */
+  private _computeDepthAtEnd(lines: string[]): number {
+    let depth = 1; // Start at 1 for FeatureCollection wrapper
+    for (const line of lines) {
+      for (const char of line) {
+        if (char === '{' || char === '[') depth++;
+        else if (char === '}' || char === ']') depth = Math.max(0, depth - 1);
+      }
+    }
+    return depth;
+  }
+
+  /**
+   * Format a chunk of JSON content
+   * @param content The content to format
+   * @param initialDepth Starting indentation depth (default 1 for FeatureCollection wrapper)
+   */
+  private _formatChunk(content: string, initialDepth: number = 1): string[] {
     const result: string[] = [];
     let currentLine = '';
-    let depth = 0;
+    let depth = initialDepth;
     let inString = false;
     let escaped = false;
 
@@ -3109,7 +3177,14 @@ class GeoJsonEditor extends HTMLElement {
     } catch {
       // Invalid JSON - apply best-effort formatting
       if (oldContent.trim()) {
-        this.lines = this._bestEffortFormat(oldContent);
+        // Skip the cursor line only for small content (typing, not paste)
+        // This avoids text jumping while user is typing
+        // For paste/large insertions, format everything for proper structure
+        const cursorLineContent = this.lines[oldCursorLine] || '';
+        // If cursor line is short, likely typing. Long lines = paste
+        const isSmallEdit = cursorLineContent.length < 80;
+        const skipLine = isSmallEdit ? oldCursorLine : undefined;
+        this.lines = this._bestEffortFormat(oldContent, skipLine);
       }
     }
 
