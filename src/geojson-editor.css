@@ -264,7 +264,6 @@
 .json-number { color: var(--json-number, #00f); }
 .json-boolean, .json-null { color: var(--json-boolean, #000080); }
 .json-punctuation { color: var(--json-punct, #000); }
-.json-key-invalid { color: var(--json-key-invalid, #f00); }
 .json-error { color: var(--json-error, #f00); }
 
 .geojson-key { color: var(--geojson-key, #660e7a); font-weight: 600; }

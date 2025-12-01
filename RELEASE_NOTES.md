@@ -20,12 +20,15 @@
 
 - Fixed cursor jumping when adding/removing characters that cause JSON validation state changes
 - Fixed paste not rendering content until focus lost
+- Fixed node collapse state: manually opened nodes (or auto-expanded due to errors) now stay open during editing
+- Fixed multi-feature collapse isolation: opening one coordinates node no longer opens all coordinates nodes across features
 
 ### Code Quality
 
-- Removed unused types (ErrorInfo, CollapsibleRange, ContextStackItem)
-- 330 unit tests (13 new tests)
-- Coverage: 84% statements, 80% branches, 91% functions
+- Removed unused CSS rule (`.json-key-invalid`)
+- Added `uniqueKey` to NodeRangeInfo for stable node identification across edits
+- 333 unit tests (16 new tests for v1.0.19)
+- Coverage: 85% statements, 80% branches, 91% functions
 
 ---
 
