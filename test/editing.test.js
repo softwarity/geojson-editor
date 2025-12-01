@@ -256,6 +256,37 @@ describe('GeoJsonEditor - Copy/Cut/Paste', () => {
     expect(features[0].geometry.type).to.equal('Point');
   });
 
+  it('should format and auto-collapse coordinates after paste into empty editor', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Paste a Polygon Feature (which has coordinates to collapse)
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => JSON.stringify(validPolygon)
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    // Check that content was formatted (multiple lines, not single line)
+    expect(el.lines.length).to.be.greaterThan(1);
+
+    // Check that JSON is properly formatted with indentation
+    const content = el.getContent();
+    expect(content).to.include('  "type"'); // Should have indented properties
+
+    // Check that coordinates were auto-collapsed (collapsedNodes should not be empty)
+    expect(el.collapsedNodes.size).to.be.greaterThan(0);
+
+    // Verify the feature data is correct
+    const features = el.getAll();
+    expect(features.length).to.equal(1);
+    expect(features[0].geometry.type).to.equal('Polygon');
+  });
+
   it('should paste array of Features', async () => {
     const el = await createSizedFixture();
     await waitFor();
