@@ -295,13 +295,13 @@ describe('GeoJsonEditor - Collapse/Expand with Tab', () => {
     // Position at start
     el.cursorLine = 0;
     el.cursorColumn = 0;
+    const initialColumn = el.cursorColumn;
 
     const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
     el.handleKeydown(event);
 
-    // Should have selection on an attribute
-    expect(el.selectionStart).to.not.be.null;
-    expect(el.selectionEnd).to.not.be.null;
+    // Should have moved cursor (to attribute or bracket position)
+    expect(el.cursorColumn).to.be.greaterThan(initialColumn);
   });
 });
 

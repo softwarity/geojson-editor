@@ -405,6 +405,7 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
     // Position at start
     el.cursorLine = 0;
     el.cursorColumn = 0;
+    const initialColumn = el.cursorColumn;
 
     const event = new KeyboardEvent('keydown', {
       key: 'Tab',
@@ -413,9 +414,8 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
     el.handleKeydown(event);
     await waitFor(100);
 
-    // Should have selection on an attribute
-    expect(el.selectionStart).to.not.be.null;
-    expect(el.selectionEnd).to.not.be.null;
+    // Should have moved cursor (to attribute or bracket position)
+    expect(el.cursorColumn).to.be.greaterThan(initialColumn);
   });
 
   it('should navigate to previous attribute with Shift+Tab', async () => {
@@ -425,9 +425,15 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
     el.set([validPolygon], { collapsed: [] });
     await waitFor(200);
 
-    // Position at end of first line
-    el.cursorLine = 0;
-    el.cursorColumn = el.lines[0]?.length || 0;
+    // Position on a line with attributes (line 1 should have "type": "Feature")
+    // Find a line with content
+    let startLine = 1;
+    while (startLine < el.lines.length && el.lines[startLine].trim().length < 5) {
+      startLine++;
+    }
+    el.cursorLine = startLine;
+    const initialColumn = el.lines[startLine]?.length || 0;
+    el.cursorColumn = initialColumn;
 
     const event = new KeyboardEvent('keydown', {
       key: 'Tab',
@@ -437,10 +443,170 @@ describe('GeoJsonEditor - Collapse/Expand Shortcuts', () => {
     el.handleKeydown(event);
     await waitFor(100);
 
-    // Should have selection on an attribute
-    expect(el.selectionStart).to.not.be.null;
-    expect(el.selectionEnd).to.not.be.null;
+    // Should have moved cursor backward (to attribute or bracket position)
+    expect(el.cursorColumn).to.be.lessThan(initialColumn);
   });
+
+  it('should navigate Tab to standalone numbers in arrays', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Use a LineString which has standalone coordinate numbers
+    const lineString = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [[2.55, 49.01], [105.8, 21.2]]
+      },
+      properties: {}
+    };
+    el.set([lineString], { collapsed: [] });
+    await waitFor(200);
+
+    // Find line with first coordinate number
+    const numLineIdx = el.lines.findIndex(line => line.includes('2.55'));
+    expect(numLineIdx).to.be.greaterThan(-1);
+
+    // Position before the number
+    el.cursorLine = numLineIdx;
+    el.cursorColumn = 0;
+
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should have moved to the number position
+    const line = el.lines[el.cursorLine];
+    const numPos = line.indexOf('2.55');
+    expect(el.cursorColumn).to.equal(numPos);
+  });
+
+  it('should navigate Shift+Tab backward through standalone numbers', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const lineString = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [[2.55, 49.01], [105.8, 21.2]]
+      },
+      properties: {}
+    };
+    el.set([lineString], { collapsed: [] });
+    await waitFor(200);
+
+    // Find properties line and start from there
+    const propsLineIdx = el.lines.findIndex(line => line.includes('"properties"'));
+    expect(propsLineIdx).to.be.greaterThan(-1);
+
+    el.cursorLine = propsLineIdx;
+    el.cursorColumn = el.lines[propsLineIdx].length;
+
+    // Navigate backward multiple times - should pass through numbers
+    let foundNumber = false;
+    for (let i = 0; i < 20; i++) {
+      const event = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true });
+      el.handleKeydown(event);
+      await waitFor(50);
+
+      const currentLine = el.lines[el.cursorLine];
+      // Check if we landed on a number
+      if (/^\s*-?\d+\.?\d*/.test(currentLine)) {
+        foundNumber = true;
+        break;
+      }
+    }
+
+    expect(foundNumber).to.be.true;
+  });
+
+  it('should stop Tab on opening brackets of expanded nodes', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Find geometry line with opening bracket
+    const geometryLineIdx = el.lines.findIndex(line => line.includes('"geometry"'));
+    expect(geometryLineIdx).to.be.greaterThan(-1);
+
+    // Position before geometry
+    el.cursorLine = geometryLineIdx;
+    el.cursorColumn = 0;
+
+    // Tab should first go to "geometry" key, then to the bracket
+    const event1 = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    el.handleKeydown(event1);
+    await waitFor(50);
+
+    const event2 = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    el.handleKeydown(event2);
+    await waitFor(50);
+
+    // Should be positioned after the bracket
+    const line = el.lines[el.cursorLine];
+    const bracketPos = line.indexOf('{');
+    if (bracketPos >= 0) {
+      expect(el.cursorColumn).to.equal(bracketPos + 1);
+    }
+  });
+
+  it('should do nothing when Enter on expanded node', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Find geometry line (expanded node)
+    const geometryLineIdx = el.lines.findIndex(line => line.includes('"geometry"'));
+    const geometryLine = el.lines[geometryLineIdx];
+    const bracketPos = geometryLine.indexOf('{');
+
+    el.cursorLine = geometryLineIdx;
+    el.cursorColumn = bracketPos + 1; // After the bracket
+
+    const initialLines = el.lines.length;
+    const initialCursorLine = el.cursorLine;
+    const initialCursorColumn = el.cursorColumn;
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Nothing should have changed
+    expect(el.lines.length).to.equal(initialLines);
+    expect(el.cursorLine).to.equal(initialCursorLine);
+    expect(el.cursorColumn).to.equal(initialCursorColumn);
+  });
+
+  it('should collapse node with Shift+Enter from deep inside', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Find coordinates line (deep inside geometry)
+    const coordsLineIdx = el.lines.findIndex(line => line.includes('"coordinates"'));
+    expect(coordsLineIdx).to.be.greaterThan(-1);
+
+    // Position cursor on coordinates line
+    el.cursorLine = coordsLineIdx;
+    el.cursorColumn = 5;
+
+    const initialCollapsed = el.collapsedNodes.size;
+
+    const event = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true });
+    el.handleKeydown(event);
+    await waitFor(100);
+
+    // Should have collapsed something (the innermost containing node)
+    expect(el.collapsedNodes.size).to.be.greaterThan(initialCollapsed);
+  });
+
 });
 
 describe('GeoJsonEditor - Word Navigation Shortcuts', () => {

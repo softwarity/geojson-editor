@@ -1487,6 +1487,174 @@ describe('GeoJsonEditor - Collapsed Option', () => {
     expect(el.collapsedNodes.has(coordinatesRange.nodeId)).to.be.true;
     expect(el.collapsedNodes.has(propertiesRange.nodeId)).to.be.true;
   });
+
+  it('should NOT collapse when JSON has parse error (INVALID token)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Manually set invalid JSON content with INVALID token
+    el.lines = [
+      '{',
+      '  "type": "Feature",',
+      '  "geometry": {',
+      '    "type": "Point",',
+      '    "coordinates": [INVALID, 0]',
+      '  },',
+      '  "properties": {}',
+      '}'
+    ];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    // Try to collapse coordinates
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    // Nothing should be collapsed because JSON has errors
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should NOT collapse when number has space (syntax error)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Number with space "1 2" instead of "12"
+    el.lines = [
+      '{',
+      '  "type": "Feature",',
+      '  "geometry": {',
+      '    "type": "Point",',
+      '    "coordinates": [1 2, 3]',
+      '  },',
+      '  "properties": {}',
+      '}'
+    ];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should NOT collapse when missing comma', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Missing comma after "Point"
+    el.lines = [
+      '{',
+      '  "type": "Feature",',
+      '  "geometry": {',
+      '    "type": "Point"',
+      '    "coordinates": [1, 2]',
+      '  },',
+      '  "properties": {}',
+      '}'
+    ];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should NOT collapse when missing opening bracket [', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Missing [ before coordinates
+    el.lines = [
+      '{',
+      '  "type": "Feature",',
+      '  "geometry": {',
+      '    "type": "Point",',
+      '    "coordinates": 1, 2]',
+      '  },',
+      '  "properties": {}',
+      '}'
+    ];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should NOT collapse when missing opening bracket {', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Missing { before geometry content
+    el.lines = [
+      '{',
+      '  "type": "Feature",',
+      '  "geometry":',
+      '    "type": "Point",',
+      '    "coordinates": [1, 2]',
+      '  },',
+      '  "properties": {}',
+      '}'
+    ];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should NOT collapse when multiple brackets missing', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Multiple missing brackets
+    el.lines = [
+      '"type": "Feature",',
+      '"geometry":',
+      '  "type": "Point",',
+      '  "coordinates": 1, 2',
+      '"properties":'
+    ];
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    expect(el.collapsedNodes.size).to.equal(0);
+  });
+
+  it('should collapse when JSON is valid', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Valid JSON
+    el.set([validPolygon], { collapsed: [] });
+    await waitFor(200);
+
+    // Verify no collapsed yet
+    expect(el.collapsedNodes.size).to.equal(0);
+
+    // Now collapse
+    el.autoCollapseCoordinates();
+    await waitFor(100);
+
+    // Should have collapsed coordinates
+    expect(el.collapsedNodes.size).to.be.greaterThan(0);
+  });
 });
 
 describe('GeoJsonEditor - Inline Controls', () => {

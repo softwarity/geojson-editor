@@ -1012,10 +1012,15 @@ class GeoJsonEditor extends HTMLElement {
     
     const totalLines = this.visibleLines.length;
     const totalHeight = totalLines * this.lineHeight;
-    
-    // Set total scrollable height (only once or when content changes)
+
+    // Set total scrollable dimensions (height and width based on content)
     if (scrollContent) {
       scrollContent.style.height = `${totalHeight}px`;
+      // Calculate max line width to update horizontal scroll
+      const charWidth = this._getCharWidth();
+      const maxLineLength = this.lines.reduce((max, line) => Math.max(max, line.length), 0);
+      const minWidth = maxLineLength * charWidth + 20; // 20px padding
+      scrollContent.style.minWidth = `${minWidth}px`;
     }
     
     // Calculate visible range based on scroll position
@@ -1418,8 +1423,7 @@ class GeoJsonEditor extends HTMLElement {
     // Block in collapsed zones
     if (ctx.inCollapsedZone) return;
 
-    // Normal Enter: insert newline
-    this.insertNewline();
+    // Enter anywhere else: do nothing (JSON structure is managed automatically)
   }
 
   private _handleBackspace(ctx: CollapsedZoneContext): void {
@@ -1502,6 +1506,7 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Navigate to the next attribute (key or value) in the JSON
+   * Also stops on collapsed node brackets to allow expansion with Enter
    */
   private _navigateToNextAttribute(): void {
     const totalLines = this.visibleLines.length;
@@ -1514,13 +1519,17 @@ class GeoJsonEditor extends HTMLElement {
       const line = this.lines[vl.index];
       const startCol = (i === currentVisibleIdx) ? this.cursorColumn : 0;
 
-      const pos = this._findNextAttributeInLine(line, startCol);
+      const pos = this._findNextAttributeOrBracket(line, startCol, vl.index);
       if (pos !== null) {
         this.cursorLine = vl.index;
         this.cursorColumn = pos.start;
-        // Select the attribute key or value
-        this.selectionStart = { line: vl.index, column: pos.start };
-        this.selectionEnd = { line: vl.index, column: pos.end };
+        // Select the attribute key or value (not brackets)
+        if (!pos.isBracket) {
+          this.selectionStart = { line: vl.index, column: pos.start };
+          this.selectionEnd = { line: vl.index, column: pos.end };
+        } else {
+          this._clearSelection();
+        }
         this._scrollToCursor();
         this._invalidateRenderCache();
         this.scheduleRender();
@@ -1532,12 +1541,16 @@ class GeoJsonEditor extends HTMLElement {
     for (let i = 0; i < currentVisibleIdx; i++) {
       const vl = this.visibleLines[i];
       const line = this.lines[vl.index];
-      const pos = this._findNextAttributeInLine(line, 0);
+      const pos = this._findNextAttributeOrBracket(line, 0, vl.index);
       if (pos !== null) {
         this.cursorLine = vl.index;
         this.cursorColumn = pos.start;
-        this.selectionStart = { line: vl.index, column: pos.start };
-        this.selectionEnd = { line: vl.index, column: pos.end };
+        if (!pos.isBracket) {
+          this.selectionStart = { line: vl.index, column: pos.start };
+          this.selectionEnd = { line: vl.index, column: pos.end };
+        } else {
+          this._clearSelection();
+        }
         this._scrollToCursor();
         this._invalidateRenderCache();
         this.scheduleRender();
@@ -1548,6 +1561,7 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Navigate to the previous attribute (key or value) in the JSON
+   * Also stops on collapsed node brackets to allow expansion with Enter
    */
   private _navigateToPrevAttribute(): void {
     const totalLines = this.visibleLines.length;
@@ -1560,12 +1574,16 @@ class GeoJsonEditor extends HTMLElement {
       const line = this.lines[vl.index];
       const endCol = (i === currentVisibleIdx) ? this.cursorColumn : line.length;
 
-      const pos = this._findPrevAttributeInLine(line, endCol);
+      const pos = this._findPrevAttributeOrBracket(line, endCol, vl.index);
       if (pos !== null) {
         this.cursorLine = vl.index;
         this.cursorColumn = pos.start;
-        this.selectionStart = { line: vl.index, column: pos.start };
-        this.selectionEnd = { line: vl.index, column: pos.end };
+        if (!pos.isBracket) {
+          this.selectionStart = { line: vl.index, column: pos.start };
+          this.selectionEnd = { line: vl.index, column: pos.end };
+        } else {
+          this._clearSelection();
+        }
         this._scrollToCursor();
         this._invalidateRenderCache();
         this.scheduleRender();
@@ -1577,12 +1595,16 @@ class GeoJsonEditor extends HTMLElement {
     for (let i = totalLines - 1; i > currentVisibleIdx; i--) {
       const vl = this.visibleLines[i];
       const line = this.lines[vl.index];
-      const pos = this._findPrevAttributeInLine(line, line.length);
+      const pos = this._findPrevAttributeOrBracket(line, line.length, vl.index);
       if (pos !== null) {
         this.cursorLine = vl.index;
         this.cursorColumn = pos.start;
-        this.selectionStart = { line: vl.index, column: pos.start };
-        this.selectionEnd = { line: vl.index, column: pos.end };
+        if (!pos.isBracket) {
+          this.selectionStart = { line: vl.index, column: pos.start };
+          this.selectionEnd = { line: vl.index, column: pos.end };
+        } else {
+          this._clearSelection();
+        }
         this._scrollToCursor();
         this._invalidateRenderCache();
         this.scheduleRender();
@@ -1594,52 +1616,66 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Find next attribute position in a line after startCol
    * Returns {start, end} for the key or value, or null if none found
+   * Also finds standalone values (numbers in arrays, etc.)
    */
   private _findNextAttributeInLine(line: string, startCol: number): { start: number; end: number } | null {
-    // Pattern: "key": value where value can be "string", number, true, false, null
-    const re = /"([^"]+)"(?:\s*:\s*(?:"([^"]*)"|(-?\d+\.?\d*(?:e[+-]?\d+)?)|true|false|null))?/gi;
+    // Collect all navigable positions
+    const positions: { start: number; end: number }[] = [];
+
+    // Pattern for "key": value pairs
+    const keyValueRe = /"([^"]+)"(?:\s*:\s*(?:"([^"]*)"|(-?\d+\.?\d*(?:e[+-]?\d+)?)|true|false|null))?/gi;
     let match;
 
-    while ((match = re.exec(line)) !== null) {
+    while ((match = keyValueRe.exec(line)) !== null) {
       const keyStart = match.index + 1; // Skip opening quote
       const keyEnd = keyStart + match[1].length;
-
-      // If key is after startCol, return key position
-      if (keyStart > startCol) {
-        return { start: keyStart, end: keyEnd };
-      }
+      positions.push({ start: keyStart, end: keyEnd });
 
       // Check if there's a value (string, number, boolean, null)
       if (match[2] !== undefined) {
-        // String value - find its position
+        // String value
         const valueMatch = line.substring(match.index).match(/:\s*"([^"]*)"/);
         if (valueMatch) {
           const valueStart = match.index + (valueMatch.index || 0) + valueMatch[0].indexOf('"') + 1;
           const valueEnd = valueStart + match[2].length;
-          if (valueStart > startCol) {
-            return { start: valueStart, end: valueEnd };
-          }
+          positions.push({ start: valueStart, end: valueEnd });
         }
       } else if (match[3] !== undefined) {
-        // Number value
+        // Number value after colon
         const numMatch = line.substring(match.index).match(/:\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/i);
         if (numMatch) {
           const valueStart = match.index + (numMatch.index || 0) + numMatch[0].indexOf(numMatch[1]);
           const valueEnd = valueStart + numMatch[1].length;
-          if (valueStart > startCol) {
-            return { start: valueStart, end: valueEnd };
-          }
+          positions.push({ start: valueStart, end: valueEnd });
         }
       } else {
-        // Boolean or null - check after the colon
+        // Boolean or null
         const boolMatch = line.substring(match.index).match(/:\s*(true|false|null)/);
         if (boolMatch) {
           const valueStart = match.index + (boolMatch.index || 0) + boolMatch[0].indexOf(boolMatch[1]);
           const valueEnd = valueStart + boolMatch[1].length;
-          if (valueStart > startCol) {
-            return { start: valueStart, end: valueEnd };
-          }
+          positions.push({ start: valueStart, end: valueEnd });
         }
+      }
+    }
+
+    // Also find standalone numbers (not after a colon) - for array elements
+    const standaloneNumRe = /(?:^|[\[,\s])(-?\d+\.?\d*(?:e[+-]?\d+)?)\s*(?:[,\]]|$)/gi;
+    while ((match = standaloneNumRe.exec(line)) !== null) {
+      const numStr = match[1];
+      const numStart = match.index + match[0].indexOf(numStr);
+      const numEnd = numStart + numStr.length;
+      // Avoid duplicates (numbers already captured by key-value pattern)
+      if (!positions.some(p => p.start === numStart && p.end === numEnd)) {
+        positions.push({ start: numStart, end: numEnd });
+      }
+    }
+
+    // Sort by start position and find first after startCol
+    positions.sort((a, b) => a.start - b.start);
+    for (const pos of positions) {
+      if (pos.start > startCol) {
+        return pos;
       }
     }
 
@@ -1648,17 +1684,20 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Find previous attribute position in a line before endCol
+   * Also finds standalone values (numbers in arrays, etc.)
    */
   private _findPrevAttributeInLine(line: string, endCol: number): { start: number; end: number } | null {
-    // Collect all attributes in the line
-    const attrs: { start: number; end: number }[] = [];
-    const re = /"([^"]+)"(?:\s*:\s*(?:"([^"]*)"|(-?\d+\.?\d*(?:e[+-]?\d+)?)|true|false|null))?/gi;
+    // Collect all navigable positions
+    const positions: { start: number; end: number }[] = [];
+
+    // Pattern for "key": value pairs
+    const keyValueRe = /"([^"]+)"(?:\s*:\s*(?:"([^"]*)"|(-?\d+\.?\d*(?:e[+-]?\d+)?)|true|false|null))?/gi;
     let match;
 
-    while ((match = re.exec(line)) !== null) {
+    while ((match = keyValueRe.exec(line)) !== null) {
       const keyStart = match.index + 1;
       const keyEnd = keyStart + match[1].length;
-      attrs.push({ start: keyStart, end: keyEnd });
+      positions.push({ start: keyStart, end: keyEnd });
 
       // Check for value
       if (match[2] !== undefined) {
@@ -1666,30 +1705,115 @@ class GeoJsonEditor extends HTMLElement {
         if (valueMatch) {
           const valueStart = match.index + (valueMatch.index || 0) + valueMatch[0].indexOf('"') + 1;
           const valueEnd = valueStart + match[2].length;
-          attrs.push({ start: valueStart, end: valueEnd });
+          positions.push({ start: valueStart, end: valueEnd });
         }
       } else if (match[3] !== undefined) {
         const numMatch = line.substring(match.index).match(/:\s*(-?\d+\.?\d*(?:e[+-]?\d+)?)/i);
         if (numMatch) {
           const valueStart = match.index + (numMatch.index || 0) + numMatch[0].indexOf(numMatch[1]);
           const valueEnd = valueStart + numMatch[1].length;
-          attrs.push({ start: valueStart, end: valueEnd });
+          positions.push({ start: valueStart, end: valueEnd });
         }
       } else {
         const boolMatch = line.substring(match.index).match(/:\s*(true|false|null)/);
         if (boolMatch) {
           const valueStart = match.index + (boolMatch.index || 0) + boolMatch[0].indexOf(boolMatch[1]);
           const valueEnd = valueStart + boolMatch[1].length;
-          attrs.push({ start: valueStart, end: valueEnd });
+          positions.push({ start: valueStart, end: valueEnd });
         }
       }
     }
 
-    // Find the last attribute that ends before endCol
-    for (let i = attrs.length - 1; i >= 0; i--) {
-      if (attrs[i].end < endCol) {
-        return attrs[i];
+    // Also find standalone numbers (not after a colon) - for array elements
+    const standaloneNumRe = /(?:^|[\[,\s])(-?\d+\.?\d*(?:e[+-]?\d+)?)\s*(?:[,\]]|$)/gi;
+    while ((match = standaloneNumRe.exec(line)) !== null) {
+      const numStr = match[1];
+      const numStart = match.index + match[0].indexOf(numStr);
+      const numEnd = numStart + numStr.length;
+      // Avoid duplicates
+      if (!positions.some(p => p.start === numStart && p.end === numEnd)) {
+        positions.push({ start: numStart, end: numEnd });
       }
+    }
+
+    // Sort by start position and find last that ends before endCol
+    positions.sort((a, b) => a.start - b.start);
+    for (let i = positions.length - 1; i >= 0; i--) {
+      if (positions[i].end < endCol) {
+        return positions[i];
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Find bracket position in a line (opening bracket for collapsible nodes)
+   * Looks for { or [ at end of line (for both expanded and collapsed nodes)
+   * Returns position AFTER the bracket, or null if not found
+   */
+  private _findBracketInLine(line: string): number | null {
+    // Look for { or [ at end of line (indicates a collapsible node)
+    // Works for both expanded and collapsed nodes - collapsed nodes still have
+    // the bracket in raw text, the "..." is only added visually via CSS
+    const bracketMatch = line.match(/[\[{]\s*$/);
+    if (bracketMatch && bracketMatch.index !== undefined) {
+      return bracketMatch.index + 1; // Position after bracket
+    }
+    return null;
+  }
+
+  /**
+   * Find next attribute or bracket position in a line
+   * Returns position with isBracket flag to indicate if it's a bracket
+   * For brackets, cursor is placed AFTER the bracket (where Enter/Shift+Enter works)
+   * Stops on ALL opening brackets to allow collapse/expand navigation
+   */
+  private _findNextAttributeOrBracket(line: string, startCol: number, _lineIndex: number): { start: number; end: number; isBracket: boolean } | null {
+    // First check for regular attributes
+    const attrPos = this._findNextAttributeInLine(line, startCol);
+
+    // Find opening bracket position (collapsed or expanded)
+    const bracketPos = this._findBracketInLine(line);
+
+    // Return whichever comes first after startCol
+    if (attrPos !== null && bracketPos !== null) {
+      if (bracketPos > startCol && (bracketPos < attrPos.start)) {
+        return { start: bracketPos, end: bracketPos, isBracket: true };
+      }
+      return { ...attrPos, isBracket: false };
+    } else if (attrPos !== null) {
+      return { ...attrPos, isBracket: false };
+    } else if (bracketPos !== null && bracketPos > startCol) {
+      return { start: bracketPos, end: bracketPos, isBracket: true };
+    }
+
+    return null;
+  }
+
+  /**
+   * Find previous attribute or bracket position in a line
+   * Returns position with isBracket flag to indicate if it's a bracket
+   * For brackets, cursor is placed AFTER the bracket (where Enter/Shift+Enter works)
+   * Stops on ALL opening brackets to allow collapse/expand navigation
+   */
+  private _findPrevAttributeOrBracket(line: string, endCol: number, _lineIndex: number): { start: number; end: number; isBracket: boolean } | null {
+    // First check for regular attributes
+    const attrPos = this._findPrevAttributeInLine(line, endCol);
+
+    // Find opening bracket position (collapsed or expanded)
+    const bracketPos = this._findBracketInLine(line);
+
+    // Return whichever comes last STRICTLY BEFORE endCol (to avoid staying in place)
+    if (attrPos !== null && bracketPos !== null) {
+      if (bracketPos < endCol && bracketPos > attrPos.end) {
+        return { start: bracketPos, end: bracketPos, isBracket: true };
+      }
+      return { ...attrPos, isBracket: false };
+    } else if (attrPos !== null) {
+      return { ...attrPos, isBracket: false };
+    } else if (bracketPos !== null && bracketPos < endCol) {
+      return { start: bracketPos, end: bracketPos, isBracket: true };
     }
 
     return null;
@@ -2098,9 +2222,9 @@ class GeoJsonEditor extends HTMLElement {
     this.selectionEnd = { line: lastLine, column: this.lines[lastLine]?.length || 0 };
     this.cursorLine = lastLine;
     this.cursorColumn = this.lines[lastLine]?.length || 0;
-    
+
     this._invalidateRenderCache();
-    this._scrollToCursor();
+    // Don't scroll - viewport should stay in place when selecting all
     this.scheduleRender();
   }
 
@@ -2252,15 +2376,19 @@ class GeoJsonEditor extends HTMLElement {
       this.insertText(text);
     }
 
+    // Cancel any pending render from insertText/formatAndUpdate
+    if (this.renderTimer) {
+      cancelAnimationFrame(this.renderTimer);
+      this.renderTimer = undefined;
+    }
+
     // Auto-collapse coordinates after pasting into empty editor
     if (wasEmpty && this.lines.length > 0) {
-      // Cancel pending render, collapse first, then render once
-      if (this.renderTimer) {
-        cancelAnimationFrame(this.renderTimer);
-        this.renderTimer = undefined;
-      }
       this.autoCollapseCoordinates();
     }
+
+    // Force immediate render (not via RAF) to ensure content displays instantly
+    this.renderViewport();
   }
 
   handleCopy(e: ClipboardEvent): void {
@@ -2445,13 +2573,47 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   autoCollapseCoordinates() {
+    // Don't collapse if there are errors - they should remain visible
+    if (this._hasErrors()) {
+      return;
+    }
     this._applyCollapsedOption(['coordinates']);
   }
 
   /**
+   * Check if current content has any errors (JSON parse errors or syntax highlighting errors)
+   */
+  private _hasErrors(): boolean {
+    // Check JSON parse errors
+    try {
+      const content = this.lines.join('\n');
+      const wrapped = '[' + content + ']';
+      JSON.parse(wrapped);
+    } catch {
+      return true;
+    }
+
+    // Check for syntax highlighting errors (json-error class)
+    for (const line of this.lines) {
+      const highlighted = highlightSyntax(line, '', undefined);
+      if (highlighted.includes('json-error')) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Helper to apply collapsed option from API methods
+   * Does not collapse if there are errors (so they remain visible)
    */
   private _applyCollapsedFromOptions(options: SetOptions, features: Feature[]): void {
+    // Don't collapse if there are errors - they should remain visible
+    if (this._hasErrors()) {
+      return;
+    }
+
     const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
     if (collapsed && (Array.isArray(collapsed) ? collapsed.length > 0 : true)) {
       this._applyCollapsedOption(collapsed, features);
@@ -2615,20 +2777,101 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Format and Update ==========
-  
+
+  /**
+   * Best-effort formatting for invalid JSON
+   * Splits on structural characters and indents as much as possible
+   */
+  private _bestEffortFormat(content: string): string[] {
+    const result: string[] = [];
+    let currentLine = '';
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+
+      // Track escape sequences inside strings
+      if (escaped) {
+        currentLine += char;
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\' && inString) {
+        currentLine += char;
+        escaped = true;
+        continue;
+      }
+
+      // Track if we're inside a string
+      if (char === '"') {
+        inString = !inString;
+        currentLine += char;
+        continue;
+      }
+
+      // Inside string - just append
+      if (inString) {
+        currentLine += char;
+        continue;
+      }
+
+      // Outside string - handle structural characters
+      if (char === '{' || char === '[') {
+        currentLine += char;
+        result.push('  '.repeat(depth) + currentLine.trim());
+        depth++;
+        currentLine = '';
+      } else if (char === '}' || char === ']') {
+        if (currentLine.trim()) {
+          result.push('  '.repeat(depth) + currentLine.trim());
+        }
+        depth = Math.max(0, depth - 1);
+        currentLine = char;
+      } else if (char === ',') {
+        currentLine += char;
+        result.push('  '.repeat(depth) + currentLine.trim());
+        currentLine = '';
+      } else if (char === ':') {
+        currentLine += ': '; // Add space after colon for readability
+        i++; // Skip if next char is space
+        if (content[i] === ' ') continue;
+        i--; // Not a space, go back
+      } else if (char === '\n' || char === '\r') {
+        // Ignore existing newlines
+        continue;
+      } else {
+        currentLine += char;
+      }
+    }
+
+    // Don't forget last line
+    if (currentLine.trim()) {
+      result.push('  '.repeat(depth) + currentLine.trim());
+    }
+
+    return result;
+  }
+
   formatAndUpdate() {
     try {
       const content = this.lines.join('\n');
       const wrapped = '[' + content + ']';
       const parsed = JSON.parse(wrapped);
-      
+
       const formatted = JSON.stringify(parsed, null, 2);
       const lines = formatted.split('\n');
       this.lines = lines.slice(1, -1); // Remove wrapper brackets
-    } catch (e) {
-      // Invalid JSON, keep as-is
+    } catch {
+      // Invalid JSON - apply best-effort formatting
+      const content = this.lines.join('\n');
+      if (content.trim()) {
+        this.lines = this._bestEffortFormat(content);
+      }
     }
-    
+
     this.updateModel();
     this.scheduleRender();
     this.updatePlaceholderVisibility();
