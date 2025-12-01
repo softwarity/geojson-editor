@@ -22,6 +22,7 @@
 - Fixed paste not rendering content until focus lost
 - Fixed node collapse state: manually opened nodes (or auto-expanded due to errors) now stay open during editing
 - Fixed multi-feature collapse isolation: opening one coordinates node no longer opens all coordinates nodes across features
+- Fixed best-effort formatting causing text to jump while typing on invalid JSON lines (cursor line now preserved as-is)
 
 ### Code Quality
 
