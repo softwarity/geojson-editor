@@ -89,8 +89,8 @@ test/api.test.js:
   ✓ GeoJsonEditor - Features API > should set features via set()
   ...
 
-Chromium: 286 passed, 0 failed
-Finished running tests in 21s, all tests passed! 🎉
+Chromium: 317 passed, 0 failed
+Finished running tests in 23s, all tests passed! 🎉
 ```
 
 ### Test Organization
@@ -164,7 +164,8 @@ The demo page (`demo/index.html`) includes comprehensive examples:
    - FeatureCollection output (prefix/suffix display)
    - Color scheme (Dark/Light)
    - Readonly mode
-   - Collapsible nodes (Tab/Shift+Tab)
+   - Collapsible nodes (Enter/Shift+Enter)
+   - Attribute navigation (Tab/Shift+Tab)
    - Virtualized rendering
    - Inline color picker
    - Boolean toggle checkbox
@@ -262,7 +263,7 @@ geojson-editor/
 ├── demo/
 │   └── index.html              # Interactive demo page
 ├── dist/                       # Built output (generated)
-│   └── geojson-editor.js       # Production bundle (~13.5 KB gzipped)
+│   └── geojson-editor.js       # Production bundle (~15.7 KB gzipped)
 ├── coverage/                   # Coverage reports (generated)
 │   └── lcov-report/            # HTML coverage report
 ├── .github/
@@ -405,11 +406,12 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all 304 unit tests
+- [ ] `npm test` passes all 317 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work:
-  - Collapse/expand with Tab/Shift+Tab
+  - Collapse/expand with Enter/Shift+Enter
+  - Attribute navigation with Tab/Shift+Tab
   - Inline color picker
   - Boolean checkbox toggle
   - Color schemes (dark/light)

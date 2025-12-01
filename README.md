@@ -23,7 +23,7 @@
 
 A feature-rich, framework-agnostic **Web Component** for editing GeoJSON features with syntax highlighting, collapsible nodes, and integrated color picker.
 
-**[🚀 Try the Live Demo](https://softwarity.github.io/geojson-editor/)**
+**[🚀 Try the Live Demo](https://softwarity.github.io/geojson-editor/)** | **[📋 Release Notes](RELEASE_NOTES.md)**
 
 <p align="center">
   <a href="https://softwarity.github.io/geojson-editor/">
@@ -62,7 +62,8 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **GeoJSON-Aware Highlighting** - Distinct colors for GeoJSON keywords (`type`, `coordinates`, `geometry`, etc.)
 - **GeoJSON Type Validation** - Valid types (`Point`, `LineString`, `Polygon`, etc.) highlighted distinctly; invalid types (`LinearRing`, unknown types) shown with error styling (colors configurable via theme)
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
-- **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); use Tab to expand and Shift+Tab to collapse; `coordinates` auto-collapsed on load
+- **Collapsible Nodes** - Collapse/expand JSON objects and arrays with visual indicators (`{...}` / `[...]`); use Enter to expand and Shift+Enter to collapse; `coordinates` auto-collapsed on load
+- **Attribute Navigation** - Tab/Shift+Tab to navigate between JSON attributes (keys and values) for quick editing
 - **Virtualized Rendering** - Monaco-like architecture: only visible lines are rendered to DOM for optimal performance with large GeoJSON files
 - **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
 - **Color Picker** - Built-in color swatch for hex color properties (`#rrggbb`) displayed inline next to the value; click to open native color picker
@@ -191,7 +192,7 @@ editor.addEventListener('error', (e) => {
 | `readonly` | `boolean` | `false` | Make editor read-only |
 | `dark-selector` | `string` | `".dark"` | CSS selector for dark color scheme detection |
 
-**Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. Use Tab to expand and Shift+Tab to collapse nodes, or click the gutter toggle.
+**Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. Use Enter to expand and Shift+Enter to collapse nodes, or click the gutter toggle. Use Tab/Shift+Tab to navigate between attributes.
 
 ### Dark Selector Syntax
 
@@ -415,8 +416,10 @@ const success = await editor.open({ collapsed: ['$root'] });
 | `Ctrl+→` / `Cmd+→` | Move cursor to next word |
 | `Ctrl+Shift+←` / `Cmd+Shift+←` | Select to previous word |
 | `Ctrl+Shift+→` / `Cmd+Shift+→` | Select to next word |
-| `Tab` | Expand collapsed node at cursor |
-| `Shift+Tab` | Collapse innermost node containing cursor |
+| `Enter` | Expand collapsed node at cursor |
+| `Shift+Enter` | Collapse innermost node containing cursor |
+| `Tab` | Navigate to next attribute (key or value) |
+| `Shift+Tab` | Navigate to previous attribute |
 
 ## Events
 
