@@ -36,6 +36,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 | | @softwarity/geojson-editor | Monaco Editor | CodeMirror 6 | Prism.js |
 |---|:---:|:---:|:---:|:---:|
 | **Size (gzip)** | <img src="https://img.shields.io/bundlephobia/minzip/@softwarity/geojson-editor?label="> | ~2.5 MB* | ~150 KB* | ~20 KB* |
+| **Editable** | ✅ Full editor | ✅ Full editor | ✅ Full editor | ❌ Read-only |
 | **GeoJSON validation** | ✅ Built-in | ❌ Manual | ❌ Manual | ❌ None |
 | **Type highlighting** | ✅ Contextual | ⚠️ Generic JSON | ⚠️ Generic JSON | ⚠️ Generic JSON |
 | **Invalid type detection** | ✅ Visual feedback | ❌ | ❌ | ❌ |
@@ -59,6 +60,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 
 ## Features
 
+- **Full Editor** - Complete editing capabilities with cursor navigation, selection, copy/paste, and keyboard shortcuts — unlike read-only syntax highlighters
 - **GeoJSON-Aware Highlighting** - Distinct colors for GeoJSON keywords (`type`, `coordinates`, `geometry`, etc.)
 - **GeoJSON Type Validation** - Valid types (`Point`, `LineString`, `Polygon`, etc.) highlighted distinctly; invalid types (`LinearRing`, unknown types) shown with error styling (colors configurable via theme)
 - **Syntax Highlighting** - JSON syntax highlighting with customizable color schemes
