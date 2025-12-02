@@ -9,6 +9,7 @@
 - **PageUp/PageDown** - Page navigation with cursor movement
 - **Shift Selection** - Home, End, PageUp, PageDown all support Shift for extending selection
 - **goToNextError()/goToPrevError() API** - Programmatic error navigation
+- **Double-click to select** - Double-click on a word, JSON key, or string value to select it
 
 ### Improvements
 

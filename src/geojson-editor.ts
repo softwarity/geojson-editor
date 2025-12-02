@@ -586,6 +586,17 @@ class GeoJsonEditor extends HTMLElement {
       // Prevent default to avoid losing focus after click
       e.preventDefault();
 
+      // Double-click: select word (e.detail === 2)
+      if (e.detail === 2) {
+        const pos = this._getPositionFromClick(e);
+        this._selectWordAt(pos.line, pos.column);
+        this._isSelecting = false;
+        hiddenTextarea.focus();
+        this._invalidateRenderCache();
+        this.scheduleRender();
+        return;
+      }
+
       // Calculate click position
       const pos = this._getPositionFromClick(e);
 
@@ -2508,6 +2519,78 @@ class GeoJsonEditor extends HTMLElement {
   private _clearSelection() {
     this.selectionStart = null;
     this.selectionEnd = null;
+  }
+
+  /**
+   * Select word/token at given position (for double-click)
+   */
+  private _selectWordAt(line: number, column: number): void {
+    if (line < 0 || line >= this.lines.length) return;
+    const lineContent = this.lines[line];
+    if (!lineContent || column > lineContent.length) return;
+
+    // Define word characters (letters, digits, underscore, hyphen for JSON keys)
+    const isWordChar = (ch: string) => /[\w\-]/.test(ch);
+
+    // Check if we're inside a string (find surrounding quotes)
+    let inString = false;
+    let stringStart = -1;
+    let stringEnd = -1;
+    let escaped = false;
+
+    for (let i = 0; i < lineContent.length; i++) {
+      const ch = lineContent[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escaped = true;
+        continue;
+      }
+      if (ch === '"') {
+        if (!inString) {
+          inString = true;
+          stringStart = i;
+        } else {
+          stringEnd = i;
+          // Check if column is within this string (including quotes)
+          if (column >= stringStart && column <= stringEnd) {
+            // Select the string content (without quotes)
+            this.selectionStart = { line, column: stringStart + 1 };
+            this.selectionEnd = { line, column: stringEnd };
+            this.cursorLine = line;
+            this.cursorColumn = stringEnd;
+            return;
+          }
+          inString = false;
+          stringStart = -1;
+          stringEnd = -1;
+        }
+      }
+    }
+
+    // Not in a string - select word characters
+    let start = column;
+    let end = column;
+
+    // Find start of word
+    while (start > 0 && isWordChar(lineContent[start - 1])) {
+      start--;
+    }
+
+    // Find end of word
+    while (end < lineContent.length && isWordChar(lineContent[end])) {
+      end++;
+    }
+
+    // If we found a word, select it
+    if (start < end) {
+      this.selectionStart = { line, column: start };
+      this.selectionEnd = { line, column: end };
+      this.cursorLine = line;
+      this.cursorColumn = end;
+    }
   }
 
   /**
