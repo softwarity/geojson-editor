@@ -882,6 +882,10 @@ Example:
               <input type="checkbox" id="readonlyToggle" onchange="toggleReadonly()">
               <span>Readonly</span>
             </label>
+            <label class="editor-checkbox" title="Enable Ctrl+I to add features via prompt">
+              <input type="checkbox" id="internalAddToggle" onchange="toggleInternalAdd()">
+              <span>Ctrl+I Add</span>
+            </label>
             <button id="resetBtn" onclick="resetEditor()" title="Reset to original sample">↺</button>
           </div>
         </div>
@@ -1799,7 +1803,9 @@ Example:
     function updateHTMLCode() {
       const placeholder = placeholderInput.value;
       const readonlyToggle = document.getElementById('readonlyToggle');
+      const internalAddToggle = document.getElementById('internalAddToggle');
       const readonly = readonlyToggle ? readonlyToggle.checked : false;
+      const internalAdd = internalAddToggle ? internalAddToggle.checked : false;
       const scheme = colorSchemeSelect.value;
       const isDark = scheme === 'dark';
 
@@ -1810,6 +1816,7 @@ Example:
       let attrs = [];
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (readonly) attrs.push('readonly');
+      if (internalAdd) attrs.push('internal-add-shortcut');
       if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
 
       // Build HTML tag attributes based on selector type
@@ -2249,13 +2256,26 @@ editor.setTheme(${themeTextarea.value});`;
     // Toggle readonly mode
     function toggleReadonly() {
       const readonlyToggle = document.getElementById('readonlyToggle');
-      
+
       if (readonlyToggle.checked) {
         editor.setAttribute('readonly', '');
       } else {
         editor.removeAttribute('readonly');
       }
-      
+
+      updateHTMLCode();
+    }
+
+    // Toggle internal add shortcut (Ctrl+I)
+    function toggleInternalAdd() {
+      const internalAddToggle = document.getElementById('internalAddToggle');
+
+      if (internalAddToggle.checked) {
+        editor.setAttribute('internal-add-shortcut', '');
+      } else {
+        editor.removeAttribute('internal-add-shortcut');
+      }
+
       updateHTMLCode();
     }
 

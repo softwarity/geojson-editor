@@ -1105,3 +1105,194 @@ describe('GeoJsonEditor - Copy/Paste Shortcuts', () => {
     expect(el.lines.length).to.equal(0);
   });
 });
+
+describe('GeoJsonEditor - Ctrl+I Add Feature Shortcut', () => {
+
+  it('should have internalAddShortcut property', async () => {
+    const el = await createSizedFixture();
+    expect(el.internalAddShortcut).to.be.false;
+  });
+
+  it('should enable internal add shortcut via attribute', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut></geojson-editor>`);
+    expect(el.internalAddShortcut).to.be.true;
+  });
+
+  it('should not trigger add prompt when attribute is not set', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    let promptCalled = false;
+    const originalPrompt = window.prompt;
+    window.prompt = () => { promptCalled = true; return null; };
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(50);
+
+    window.prompt = originalPrompt;
+    expect(promptCalled).to.be.false;
+  });
+
+  it('should trigger add prompt when attribute is set', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    let promptCalled = false;
+    const originalPrompt = window.prompt;
+    window.prompt = () => { promptCalled = true; return null; };
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(50);
+
+    window.prompt = originalPrompt;
+    expect(promptCalled).to.be.true;
+  });
+
+  it('should not trigger add prompt in readonly mode', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut readonly style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    let promptCalled = false;
+    const originalPrompt = window.prompt;
+    window.prompt = () => { promptCalled = true; return null; };
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(50);
+
+    window.prompt = originalPrompt;
+    expect(promptCalled).to.be.false;
+  });
+
+  it('should add feature when valid JSON is entered', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    const originalPrompt = window.prompt;
+    window.prompt = () => JSON.stringify(validPoint);
+
+    const initialCount = el.getAll().length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(200);
+
+    window.prompt = originalPrompt;
+    expect(el.getAll().length).to.equal(initialCount + 1);
+  });
+
+  it('should add multiple features from FeatureCollection', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    const originalPrompt = window.prompt;
+    const featureCollection = {
+      type: 'FeatureCollection',
+      features: [validPoint, validPolygon]
+    };
+    window.prompt = () => JSON.stringify(featureCollection);
+
+    const initialCount = el.getAll().length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(200);
+
+    window.prompt = originalPrompt;
+    expect(el.getAll().length).to.equal(initialCount + 2);
+  });
+
+  it('should ignore invalid JSON input', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    const originalPrompt = window.prompt;
+    window.prompt = () => 'not valid json {{{';
+
+    const initialCount = el.getAll().length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(200);
+
+    window.prompt = originalPrompt;
+    expect(el.getAll().length).to.equal(initialCount);
+  });
+
+  it('should ignore empty input', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    const originalPrompt = window.prompt;
+    window.prompt = () => '';
+
+    const initialCount = el.getAll().length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(200);
+
+    window.prompt = originalPrompt;
+    expect(el.getAll().length).to.equal(initialCount);
+  });
+
+  it('should ignore cancelled prompt', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    const originalPrompt = window.prompt;
+    window.prompt = () => null; // User cancelled
+
+    const initialCount = el.getAll().length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(200);
+
+    window.prompt = originalPrompt;
+    expect(el.getAll().length).to.equal(initialCount);
+  });
+});

@@ -446,6 +446,29 @@ editor.goToPrevError();
 | `PageUp` | Scroll up one page |
 | `PageDown` | Scroll down one page |
 | `Shift+Home/End/PageUp/PageDown` | Extend selection while navigating |
+| `Ctrl+I` / `Cmd+I` | Add feature via prompt (requires `internal-add-shortcut` attribute) |
+
+### Overriding Shortcuts
+
+All keyboard shortcuts handled by the editor call `stopPropagation()` to prevent them from bubbling up. To override a default shortcut behavior, use a capture-phase event listener:
+
+```javascript
+editor.addEventListener('keydown', async (e) => {
+  // Override Ctrl+S to save to a remote server instead of downloading
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    e.stopPropagation();
+    await saveToRemoteServer(editor.getAll());
+  }
+  // Override Ctrl+O to load from a remote API instead of local filesystem
+  if (e.ctrlKey && e.key === 'o') {
+    e.preventDefault();
+    e.stopPropagation();
+    const features = await openRemoteFeatureSelector();
+    if (features) editor.set(features);
+  }
+}, { capture: true });  // capture: true is required to intercept before the editor
+```
 
 ## Events
 

@@ -440,7 +440,7 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Observed Attributes ==========
   static get observedAttributes() {
-    return ['readonly', 'value', 'placeholder', 'dark-selector'];
+    return ['readonly', 'value', 'placeholder', 'dark-selector', 'internal-add-shortcut'];
   }
 
   // ========== Lifecycle ==========
@@ -494,6 +494,7 @@ class GeoJsonEditor extends HTMLElement {
   get readonly() { return this.hasAttribute('readonly'); }
   get value() { return this.getAttribute('value') || ''; }
   get placeholder() { return this.getAttribute('placeholder') || ''; }
+  get internalAddShortcut() { return this.hasAttribute('internal-add-shortcut'); }
   get prefix() { return '{"type": "FeatureCollection", "features": ['; }
   get suffix() { return ']}'; }
 
@@ -1542,12 +1543,14 @@ class GeoJsonEditor extends HTMLElement {
       'z': () => e.shiftKey ? this.redo() : this.undo(),
       'y': () => this.redo(),
       's': () => this.save(),
-      'o': () => !this.hasAttribute('readonly') && this.open()
+      'o': () => !this.hasAttribute('readonly') && this.open(),
+      'i': () => this.internalAddShortcut && !this.readonly && this._handleAddFeaturePrompt()
     };
 
     // Check for direct key match
     if (keyHandlers[e.key]) {
       e.preventDefault();
+      e.stopPropagation();
       keyHandlers[e.key]();
       return;
     }
@@ -1555,6 +1558,7 @@ class GeoJsonEditor extends HTMLElement {
     // Check for modifier key combinations
     if ((e.ctrlKey || e.metaKey) && modifierHandlers[e.key]) {
       e.preventDefault();
+      e.stopPropagation();
       modifierHandlers[e.key]();
     }
   }
@@ -3781,6 +3785,24 @@ class GeoJsonEditor extends HTMLElement {
       document.body.appendChild(input);
       input.click();
     });
+  }
+
+  /**
+   * Handle Ctrl+I shortcut - prompt user to add Feature/Features/FeatureCollection
+   */
+  private _handleAddFeaturePrompt(): void {
+    const input = prompt('Enter GeoJSON (Feature, Feature[], or FeatureCollection):');
+    if (!input || !input.trim()) return;
+
+    try {
+      const parsed = JSON.parse(input);
+      const features = normalizeToFeatures(parsed);
+      if (features.length > 0) {
+        this.add(features);
+      }
+    } catch {
+      // Invalid JSON - ignore silently
+    }
   }
 
   private _parseFeatures() {

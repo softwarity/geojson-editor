@@ -2,9 +2,17 @@
 
 ## v1.0.21
 
+### New Features
+
+- **Ctrl+I Add Feature Shortcut** - Optional shortcut to add features via native prompt (accepts Feature, Feature[], or FeatureCollection). Enable with `internal-add-shortcut` attribute.
+
 ### Bug Fixes
 
 - Fixed cursor position jumping to wrong line when adding characters at end of file in invalid JSON
+
+### Code Quality
+
+- 343 unit tests (10 new tests for Ctrl+I shortcut)
 
 ---
 
