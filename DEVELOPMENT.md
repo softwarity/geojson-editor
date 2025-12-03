@@ -278,7 +278,6 @@ geojson-editor/
 ├── web-test-runner.config.js   # Test runner configuration (with CSS middleware)
 ├── README.md                   # User documentation
 ├── DEVELOPMENT.md              # This file
-├── CLAUDE.md                   # AI assistant guidelines
 ├── RELEASE.md                  # Release process guide
 └── LICENSE                     # MIT License
 ```
