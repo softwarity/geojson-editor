@@ -3267,7 +3267,19 @@ class GeoJsonEditor extends HTMLElement {
         // If cursor line is short, likely typing. Long lines = paste
         const isSmallEdit = cursorLineContent.length < 80;
         const skipLine = isSmallEdit ? oldCursorLine : undefined;
+
+        // Format and track where the skipped line ends up
+        const sourceLines = oldContent.split('\n');
+        const beforeLinesCount = skipLine !== undefined
+          ? this._formatChunk(sourceLines.slice(0, skipLine).join('\n')).length
+          : 0;
+
         this.lines = this._bestEffortFormat(oldContent, skipLine);
+
+        // Update cursor line to point to the skipped line's new position
+        if (skipLine !== undefined && beforeLinesCount >= 0) {
+          this.cursorLine = beforeLinesCount;
+        }
       }
     }
 
