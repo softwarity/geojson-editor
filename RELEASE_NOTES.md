@@ -1,5 +1,21 @@
 # Release Notes - @softwarity/geojson-editor
 
+## v1.0.21
+
+### Bug Fixes
+
+- Fixed cursor position jumping to wrong line when adding characters at end of file in invalid JSON
+
+---
+
+## v1.0.20
+
+### New Features
+
+- **Double-click to select** - Double-click on a word, JSON key, or string value to select it
+
+---
+
 ## v1.0.19
 
 ### New Features
@@ -9,7 +25,6 @@
 - **PageUp/PageDown** - Page navigation with cursor movement
 - **Shift Selection** - Home, End, PageUp, PageDown all support Shift for extending selection
 - **goToNextError()/goToPrevError() API** - Programmatic error navigation
-- **Double-click to select** - Double-click on a word, JSON key, or string value to select it
 
 ### Improvements
 
@@ -29,7 +44,7 @@
 
 - Removed unused CSS rule (`.json-key-invalid`)
 - Added `uniqueKey` to NodeRangeInfo for stable node identification across edits
-- 333 unit tests (16 new tests for v1.0.19)
+- 333 unit tests
 - Coverage: 85% statements, 80% branches, 91% functions
 
 ---
