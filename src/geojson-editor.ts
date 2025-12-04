@@ -739,6 +739,20 @@ class GeoJsonEditor extends HTMLElement {
       this.removeAll();
     });
 
+    // Info button - toggle popup
+    const infoBtn = this._id('infoBtn');
+    const infoPopup = this._id('infoPopup');
+    if (infoBtn && infoPopup) {
+      infoBtn.addEventListener('click', (e: MouseEvent) => {
+        e.stopPropagation();
+        infoPopup.classList.toggle('visible');
+      });
+      // Close popup when clicking outside
+      document.addEventListener('click', () => {
+        infoPopup.classList.remove('visible');
+      });
+    }
+
     // Error navigation buttons
     this._prevErrorBtn?.addEventListener('click', () => {
       this.goToPrevError();

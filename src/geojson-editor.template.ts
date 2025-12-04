@@ -44,6 +44,13 @@ export function getTemplate(placeholder: string = '', version: string = ''): str
       </div>
       <button class="clear-btn" id="clearBtn" title="Clear editor">✕</button>
     </div>
+    <div class="info-popup" id="infoPopup">
+      <div class="info-popup-content">
+        <div class="info-popup-title">GeoJSON Editor</div>
+        <a class="info-popup-version" href="https://www.npmjs.com/package/@softwarity/geojson-editor/v/${version}" target="_blank" rel="noopener">v${version}</a>
+        <div class="info-popup-copyright">© ${new Date().getFullYear()} Softwarity</div>
+      </div>
+    </div>
   `;
 }
 
