@@ -346,16 +346,63 @@ describe('GeoJsonEditor - Scroll and Viewport', () => {
   it('should render visible lines only', async () => {
     const el = await createSizedFixture();
     await waitFor();
-    
+
     el.set([validPolygon]);
     await waitFor(200);
-    
+
     el.renderViewport();
-    
+
     const linesContainer = el.shadowRoot.getElementById('linesContainer');
     const renderedLines = linesContainer.querySelectorAll('.line');
-    
+
     // Should render some but not necessarily all lines
     expect(renderedLines.length).to.be.greaterThan(0);
+  });
+
+  it('should update selection when scrolling up during drag', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Start a selection from middle of document
+    el.selectionStart = { line: 5, column: 2 };
+    el.selectionEnd = { line: 5, column: 5 };
+    el.cursorLine = 5;
+    el.cursorColumn = 5;
+
+    // Simulate scrolling up during drag
+    el._updateSelectionFromScroll('up');
+
+    // Selection should extend to first visible line at column 0
+    expect(el.selectionEnd.line).to.equal(el.visibleLines[0].index);
+    expect(el.selectionEnd.column).to.equal(0);
+    expect(el.cursorLine).to.equal(el.visibleLines[0].index);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('should update selection when scrolling down during drag', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Start a selection from middle of document
+    el.selectionStart = { line: 2, column: 0 };
+    el.selectionEnd = { line: 2, column: 3 };
+    el.cursorLine = 2;
+    el.cursorColumn = 3;
+
+    // Simulate scrolling down during drag
+    el._updateSelectionFromScroll('down');
+
+    // Selection should extend to last visible line at end of line
+    const lastVisible = el.visibleLines[el.visibleLines.length - 1];
+    expect(el.selectionEnd.line).to.equal(lastVisible.index);
+    expect(el.selectionEnd.column).to.equal(lastVisible.content?.length || 0);
+    expect(el.cursorLine).to.equal(lastVisible.index);
+    expect(el.cursorColumn).to.equal(lastVisible.content?.length || 0);
   });
 });

@@ -621,34 +621,75 @@ class GeoJsonEditor extends HTMLElement {
       this.scheduleRender();
     });
     
-    // Mouse move for drag selection
-    viewport.addEventListener('mousemove', (e: MouseEvent) => {
-      if (!this._isSelecting) return;
-      const pos = this._getPositionFromClick(e);
-      this.selectionEnd = pos;
-      this.cursorLine = pos.line;
-      this.cursorColumn = pos.column;
+    // Auto-scroll interval for drag selection outside editor
+    let autoScrollInterval: ReturnType<typeof setInterval> | null = null;
 
-      // Auto-scroll when near edges
-      const rect = viewport.getBoundingClientRect();
-      const scrollMargin = 30; // pixels from edge to start scrolling
-      const scrollSpeed = 20; // pixels to scroll per frame
-
-      if (e.clientY < rect.top + scrollMargin) {
-        // Near top edge, scroll up
-        viewport.scrollTop -= scrollSpeed;
-      } else if (e.clientY > rect.bottom - scrollMargin) {
-        // Near bottom edge, scroll down
-        viewport.scrollTop += scrollSpeed;
+    const stopAutoScroll = () => {
+      if (autoScrollInterval) {
+        clearInterval(autoScrollInterval);
+        autoScrollInterval = null;
       }
+    };
 
-      this._invalidateRenderCache();
-      this.scheduleRender();
+    const startAutoScroll = (direction: 'up' | 'down') => {
+      stopAutoScroll();
+      const scrollSpeed = 20;
+      autoScrollInterval = setInterval(() => {
+        if (!this._isSelecting) {
+          stopAutoScroll();
+          return;
+        }
+        if (direction === 'up') {
+          viewport.scrollTop -= scrollSpeed;
+        } else {
+          viewport.scrollTop += scrollSpeed;
+        }
+        // Update selection based on scroll position
+        this._updateSelectionFromScroll(direction);
+        this._invalidateRenderCache();
+        this.scheduleRender();
+      }, 50);
+    };
+
+    // Mouse move for drag selection - listen on document to handle drag outside editor
+    document.addEventListener('mousemove', (e: MouseEvent) => {
+      if (!this._isSelecting) return;
+
+      const rect = viewport.getBoundingClientRect();
+      const scrollMargin = 30;
+      const scrollSpeed = 20;
+
+      // Check if mouse is outside the viewport
+      if (e.clientY < rect.top) {
+        // Mouse above viewport - start continuous scroll up
+        startAutoScroll('up');
+      } else if (e.clientY > rect.bottom) {
+        // Mouse below viewport - start continuous scroll down
+        startAutoScroll('down');
+      } else {
+        // Mouse inside viewport - stop auto-scroll and update normally
+        stopAutoScroll();
+        const pos = this._getPositionFromClick(e);
+        this.selectionEnd = pos;
+        this.cursorLine = pos.line;
+        this.cursorColumn = pos.column;
+
+        // Auto-scroll when near edges (inside viewport)
+        if (e.clientY < rect.top + scrollMargin) {
+          viewport.scrollTop -= scrollSpeed;
+        } else if (e.clientY > rect.bottom - scrollMargin) {
+          viewport.scrollTop += scrollSpeed;
+        }
+
+        this._invalidateRenderCache();
+        this.scheduleRender();
+      }
     });
-    
+
     // Mouse up to end selection
     document.addEventListener('mouseup', () => {
       this._isSelecting = false;
+      stopAutoScroll();
     });
 
     // Focus/blur handling to show/hide cursor
@@ -2677,9 +2718,25 @@ class GeoJsonEditor extends HTMLElement {
       this.cursorLine = textLines.length - 1;
       this.cursorColumn = textLines[textLines.length - 1].length;
     } else if (this.cursorLine < this.lines.length) {
+      const textLines = text.split('\n');
       const line = this.lines[this.cursorLine];
-      this.lines[this.cursorLine] = line.substring(0, this.cursorColumn) + text + line.substring(this.cursorColumn);
-      this.cursorColumn += text.length;
+      const before = line.substring(0, this.cursorColumn);
+      const after = line.substring(this.cursorColumn);
+
+      if (textLines.length === 1) {
+        // Single line insertion
+        this.lines[this.cursorLine] = before + text + after;
+        this.cursorColumn += text.length;
+      } else {
+        // Multi-line insertion
+        const firstLine = before + textLines[0];
+        const lastLine = textLines[textLines.length - 1] + after;
+        const middleLines = textLines.slice(1, -1);
+
+        this.lines.splice(this.cursorLine, 1, firstLine, ...middleLines, lastLine);
+        this.cursorLine += textLines.length - 1;
+        this.cursorColumn = textLines[textLines.length - 1].length;
+      }
     }
     this.formatAndUpdate();
   }
@@ -2794,6 +2851,28 @@ class GeoJsonEditor extends HTMLElement {
     }
 
     return { line, column };
+  }
+
+  /**
+   * Update selection during auto-scroll when dragging outside editor
+   */
+  private _updateSelectionFromScroll(direction: 'up' | 'down'): void {
+    if (!this.visibleLines.length) return;
+
+    if (direction === 'up') {
+      // Scrolling up - select to first visible line
+      const firstVisible = this.visibleLines[0];
+      this.selectionEnd = { line: firstVisible.index, column: 0 };
+      this.cursorLine = firstVisible.index;
+      this.cursorColumn = 0;
+    } else {
+      // Scrolling down - select to last visible line
+      const lastVisible = this.visibleLines[this.visibleLines.length - 1];
+      const lineLength = lastVisible.content?.length || 0;
+      this.selectionEnd = { line: lastVisible.index, column: lineLength };
+      this.cursorLine = lastVisible.index;
+      this.cursorColumn = lineLength;
+    }
   }
 
   // ========== Gutter Interactions ==========
@@ -3313,23 +3392,43 @@ class GeoJsonEditor extends HTMLElement {
       // operation (insertText, insertNewline, etc.) BEFORE formatAndUpdate was called.
       // We need to adjust for indentation changes while keeping the logical position.
 
-      // If cursor is at column 0 (e.g., after newline), keep it there
-      // This preserves expected behavior for newline insertion
-      if (this.cursorColumn === 0) {
-        // Just keep line, column 0 - indentation will be handled by auto-indent
+      // Special case: cursor at column 0 means we're at start of a line (after newline)
+      // Keep both line and column as set by the calling operation
+      if (oldCursorColumn === 0) {
+        // cursorLine was already set by the calling operation, keep column at 0
+        this.cursorColumn = 0;
       } else {
-        // For other cases, try to maintain position relative to content (not indentation)
+        // Calculate character offset in old content (ignoring whitespace for comparison)
         const oldLines = oldContent.split('\n');
-        const oldLineContent = oldLines[oldCursorLine] || '';
-        const oldLeadingSpaces = oldLineContent.length - oldLineContent.trimStart().length;
-        const oldColumnInContent = Math.max(0, oldCursorColumn - oldLeadingSpaces);
-
-        // Apply same offset to new line's indentation
-        if (this.cursorLine < this.lines.length) {
-          const newLineContent = this.lines[this.cursorLine];
-          const newLeadingSpaces = newLineContent.length - newLineContent.trimStart().length;
-          this.cursorColumn = newLeadingSpaces + oldColumnInContent;
+        let oldCharOffset = 0;
+        for (let i = 0; i < oldCursorLine && i < oldLines.length; i++) {
+          oldCharOffset += oldLines[i].replace(/\s/g, '').length;
         }
+        const oldLineContent = oldLines[oldCursorLine] || '';
+        const oldLineUpToCursor = oldLineContent.substring(0, oldCursorColumn);
+        oldCharOffset += oldLineUpToCursor.replace(/\s/g, '').length;
+
+        // Find corresponding position in new content
+        let charCount = 0;
+        let newLine = 0;
+        let newCol = 0;
+        for (let i = 0; i < this.lines.length; i++) {
+          const lineContent = this.lines[i];
+          for (let j = 0; j <= lineContent.length; j++) {
+            if (charCount >= oldCharOffset) {
+              newLine = i;
+              newCol = j;
+              break;
+            }
+            if (j < lineContent.length && !/\s/.test(lineContent[j])) {
+              charCount++;
+            }
+          }
+          if (charCount >= oldCharOffset) break;
+        }
+
+        this.cursorLine = newLine;
+        this.cursorColumn = newCol;
       }
     }
 
@@ -3641,8 +3740,10 @@ class GeoJsonEditor extends HTMLElement {
    */
   add(input: FeatureInput, options: SetOptions = {}): void {
     const newFeatures = normalizeToFeatures(input);
+    const existingCount = this._parseFeatures().length;
     const allFeatures = [...this._parseFeatures(), ...newFeatures];
-    this._setFeaturesInternal(allFeatures, options);
+    // Preserve collapsed state for existing features, apply options only to new ones
+    this._setFeaturesInternalPreserving(allFeatures, options, existingCount);
   }
 
   /**
@@ -3658,8 +3759,10 @@ class GeoJsonEditor extends HTMLElement {
     const newFeatures = normalizeToFeatures(input);
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
-    features.splice(Math.max(0, Math.min(idx, features.length)), 0, ...newFeatures);
-    this._setFeaturesInternal(features, options);
+    const insertIdx = Math.max(0, Math.min(idx, features.length));
+    features.splice(insertIdx, 0, ...newFeatures);
+    // Preserve collapsed state, apply options only to inserted features
+    this._setFeaturesInternalPreserving(features, options, insertIdx, newFeatures.length);
   }
 
   /**
@@ -3671,12 +3774,169 @@ class GeoJsonEditor extends HTMLElement {
     this._applyCollapsedFromOptions(options, features);
   }
 
+  /**
+   * Internal method to set features while preserving collapsed state of existing features
+   * @param features All features (existing + new)
+   * @param options Collapse options for new features
+   * @param newStartIndex Index where new features start (for add) or were inserted (for insertAt)
+   * @param newCount Number of new features (optional, defaults to features from newStartIndex to end)
+   */
+  private _setFeaturesInternalPreserving(
+    features: Feature[],
+    options: SetOptions,
+    newStartIndex: number,
+    newCount?: number
+  ): void {
+    // Save collapsed state by nodeKey before modification
+    const collapsedKeys = new Set<string>();
+    for (const nodeId of this.collapsedNodes) {
+      const nodeInfo = this._nodeIdToLines.get(nodeId);
+      if (nodeInfo?.nodeKey) {
+        // Include feature index in key to handle multiple features with same structure
+        const featureIndex = this._getFeatureIndexForLine(nodeInfo.startLine);
+        collapsedKeys.add(`${featureIndex}:${nodeInfo.nodeKey}`);
+      }
+    }
+
+    // Format and set content
+    const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
+    this.setValue(formatted, false);
+
+    // Restore collapsed state for existing features
+    const ranges = this._findCollapsibleRanges();
+    const featureRanges = ranges.filter(r => r.isRootFeature);
+    const actualNewCount = newCount !== undefined ? newCount : features.length - newStartIndex;
+
+    for (const range of ranges) {
+      // Find which feature this range belongs to
+      const featureIndex = featureRanges.findIndex(fr =>
+        range.startLine >= fr.startLine && range.endLine <= fr.endLine
+      );
+
+      // Determine if this is an existing feature (adjust index for insertAt case)
+      let originalFeatureIndex = featureIndex;
+      if (featureIndex >= newStartIndex && featureIndex < newStartIndex + actualNewCount) {
+        // This is a new feature - apply options
+        continue;
+      } else if (featureIndex >= newStartIndex + actualNewCount) {
+        // Feature was shifted by insertion - adjust index
+        originalFeatureIndex = featureIndex - actualNewCount;
+      }
+
+      // Check if this node was collapsed before
+      const key = `${originalFeatureIndex}:${range.nodeKey}`;
+      if (collapsedKeys.has(key)) {
+        this.collapsedNodes.add(range.nodeId);
+      }
+    }
+
+    // Apply collapse options to new features only
+    this._applyCollapsedToNewFeatures(options, features, newStartIndex, actualNewCount);
+
+    // Use updateView instead of updateModel since setValue already rebuilt mappings
+    // and we just need to recompute visible lines with new collapsed state
+    this.updateView();
+    this.scheduleRender();
+  }
+
+  /**
+   * Apply collapsed options only to specific new features
+   */
+  private _applyCollapsedToNewFeatures(
+    options: SetOptions,
+    features: Feature[],
+    startIndex: number,
+    count: number
+  ): void {
+    const collapsed = options.collapsed !== undefined ? options.collapsed : ['coordinates'];
+    if (!collapsed || (Array.isArray(collapsed) && collapsed.length === 0)) return;
+
+    const ranges = this._findCollapsibleRanges();
+    const featureRanges = ranges.filter(r => r.isRootFeature);
+
+    for (const range of ranges) {
+      // Find which feature this range belongs to
+      const featureIndex = featureRanges.findIndex(fr =>
+        range.startLine >= fr.startLine && range.endLine <= fr.endLine
+      );
+
+      // Only process new features
+      if (featureIndex < startIndex || featureIndex >= startIndex + count) continue;
+
+      let shouldCollapse = false;
+      if (typeof collapsed === 'function') {
+        const feature = features[featureIndex];
+        const collapsedAttrs = collapsed(feature, featureIndex);
+        shouldCollapse = range.isRootFeature
+          ? collapsedAttrs.includes('$root')
+          : collapsedAttrs.includes(range.nodeKey);
+      } else if (Array.isArray(collapsed)) {
+        shouldCollapse = range.isRootFeature
+          ? collapsed.includes('$root')
+          : collapsed.includes(range.nodeKey);
+      }
+
+      if (shouldCollapse) {
+        this.collapsedNodes.add(range.nodeId);
+      }
+    }
+  }
+
+  /**
+   * Get feature index for a given line
+   */
+  private _getFeatureIndexForLine(line: number): number {
+    let index = 0;
+    for (const [, range] of this.featureRanges) {
+      if (line >= range.startLine && line <= range.endLine) {
+        return range.featureIndex;
+      }
+      index++;
+    }
+    return -1;
+  }
+
   removeAt(index: number): Feature | undefined {
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
     if (idx >= 0 && idx < features.length) {
+      // Save collapsed state by nodeKey before modification
+      const collapsedKeys = new Set<string>();
+      for (const nodeId of this.collapsedNodes) {
+        const nodeInfo = this._nodeIdToLines.get(nodeId);
+        if (nodeInfo?.nodeKey) {
+          const featureIndex = this._getFeatureIndexForLine(nodeInfo.startLine);
+          // Skip the feature being removed, adjust indices for features after it
+          if (featureIndex === idx) continue;
+          const adjustedIndex = featureIndex > idx ? featureIndex - 1 : featureIndex;
+          collapsedKeys.add(`${adjustedIndex}:${nodeInfo.nodeKey}`);
+        }
+      }
+
       const removed = features.splice(idx, 1)[0];
-      this.set(features);
+
+      // Format and set content
+      const formatted = features.map((f: Feature) => JSON.stringify(f, null, 2)).join(',\n');
+      this.setValue(formatted, false);
+
+      // Restore collapsed state for remaining features
+      const ranges = this._findCollapsibleRanges();
+      const featureRanges = ranges.filter(r => r.isRootFeature);
+
+      for (const range of ranges) {
+        const featureIndex = featureRanges.findIndex(fr =>
+          range.startLine >= fr.startLine && range.endLine <= fr.endLine
+        );
+        const key = `${featureIndex}:${range.nodeKey}`;
+        if (collapsedKeys.has(key)) {
+          this.collapsedNodes.add(range.nodeId);
+        }
+      }
+
+      // Use updateView instead of updateModel since setValue already rebuilt mappings
+      this.updateView();
+      this.scheduleRender();
+      this.emitChange();
       return removed;
     }
     return undefined;

@@ -1,5 +1,20 @@
 # Release Notes - @softwarity/geojson-editor
 
+## v1.0.22
+
+### Bug Fixes
+
+- Fixed `add()`, `insertAt()`, and Ctrl+I reopening previously collapsed features (collapsed state now preserved)
+- Fixed `removeAt()` reopening collapsed features (collapsed state now preserved)
+- Fixed drag selection auto-scroll not continuing when mouse exits editor bounds
+- Fixed cursor position after pasting multi-line content (cursor now correctly positioned at end of pasted text)
+
+### Code Quality
+
+- 346 unit tests
+
+---
+
 ## v1.0.21
 
 ### New Features
@@ -9,10 +24,6 @@
 ### Bug Fixes
 
 - Fixed cursor position jumping to wrong line when adding characters at end of file in invalid JSON
-
-### Code Quality
-
-- 343 unit tests (10 new tests for Ctrl+I shortcut)
 
 ---
 

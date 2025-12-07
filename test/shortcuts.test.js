@@ -1295,4 +1295,42 @@ describe('GeoJsonEditor - Ctrl+I Add Feature Shortcut', () => {
     window.prompt = originalPrompt;
     expect(el.getAll().length).to.equal(initialCount);
   });
+
+  it('should preserve collapsed state of existing features when adding via Ctrl+I', async () => {
+    const el = await fixture(html`<geojson-editor internal-add-shortcut style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set initial feature with coordinates collapsed
+    el.set([validPolygon], { collapsed: ['coordinates'] });
+    await waitFor(200);
+
+    // Verify coordinates is collapsed
+    const rangesBefore = el._findCollapsibleRanges();
+    const coordsRangeBefore = rangesBefore.find(r => r.nodeKey === 'coordinates');
+    expect(el.collapsedNodes.has(coordsRangeBefore.nodeId)).to.be.true;
+
+    // Add a new feature via Ctrl+I
+    const originalPrompt = window.prompt;
+    window.prompt = () => JSON.stringify(validPoint);
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'i',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+    await waitFor(200);
+
+    window.prompt = originalPrompt;
+
+    // Verify we now have 2 features
+    expect(el.getAll().length).to.equal(2);
+
+    // Verify the first feature's coordinates is STILL collapsed (state preserved)
+    const rangesAfter = el._findCollapsibleRanges();
+    const coordsRangesAfter = rangesAfter.filter(r => r.nodeKey === 'coordinates');
+    // First feature should still have coordinates collapsed
+    const firstFeatureCoords = coordsRangesAfter[0];
+    expect(el.collapsedNodes.has(firstFeatureCoords.nodeId)).to.be.true;
+  });
 });

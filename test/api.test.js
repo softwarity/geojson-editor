@@ -1574,16 +1574,25 @@ describe('GeoJsonEditor - Collapsed Option', () => {
     el.set([validPoint]);
     await waitFor(200);
 
+    // Manually expand first feature's geometry
+    const rangesBefore = el._findCollapsibleRanges();
+    const firstGeometry = rangesBefore.find(r => r.nodeKey === 'geometry');
+    if (firstGeometry && el.collapsedNodes.has(firstGeometry.nodeId)) {
+      el.collapsedNodes.delete(firstGeometry.nodeId);
+    }
+
     el.add([validPolygon], { collapsed: ['geometry', 'properties'] });
     await waitFor(200);
 
     const ranges = el._findCollapsibleRanges();
     const geometryRanges = ranges.filter(r => r.nodeKey === 'geometry');
 
-    // Both features have geometry, both should be collapsed
-    for (const range of geometryRanges) {
-      expect(el.collapsedNodes.has(range.nodeId)).to.be.true;
-    }
+    // First feature's geometry should still be expanded (preserved)
+    // Second feature (added) should have geometry collapsed per options
+    expect(geometryRanges.length).to.equal(2);
+    // The newly added feature (second) should be collapsed
+    const secondGeometry = geometryRanges[1];
+    expect(el.collapsedNodes.has(secondGeometry.nodeId)).to.be.true;
   });
 
   it('should work with insertAt() and collapsed option', async () => {
@@ -1598,16 +1607,16 @@ describe('GeoJsonEditor - Collapsed Option', () => {
     el.insertAt(newFeature, 1, { collapsed: ['properties'] });
     await waitFor(200);
 
-    // insertAt applies collapsed to all features after insertion
+    // insertAt preserves existing features' state, applies collapsed only to inserted
     const ranges = el._findCollapsibleRanges();
     const propertiesRanges = ranges.filter(r => r.nodeKey === 'properties');
 
     // 3 features = 3 properties nodes
     expect(propertiesRanges.length).to.equal(3);
 
-    // All properties should be collapsed (insertAt re-applies collapsed to all)
+    // Only the inserted feature (index 1) should have properties collapsed
     const collapsedProperties = propertiesRanges.filter(r => el.collapsedNodes.has(r.nodeId));
-    expect(collapsedProperties.length).to.equal(3);
+    expect(collapsedProperties.length).to.equal(1);
   });
 
   it('should collapse multiple attributes', async () => {
