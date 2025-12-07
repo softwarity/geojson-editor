@@ -1,30 +1,9 @@
-import type { Feature } from 'geojson';
 import type { BracketCount } from './internal-types.js';
 
 /**
  * Alias for document.createElement - optimized for minification
  */
 export const createElement = (tag: string): HTMLElement => document.createElement(tag);
-
-/**
- * Generate a unique feature key from a feature object
- * Uses id, properties.id, or a hash of geometry coordinates
- */
-export function getFeatureKey(feature: Feature | null): string | null {
-  if (!feature) return null;
-  if (feature.id !== undefined) return `id:${feature.id}`;
-  if (feature.properties?.id !== undefined) return `prop:${feature.properties.id}`;
-
-  const geomType = feature.geometry?.type || 'null';
-  const geom = feature.geometry as { coordinates?: unknown } | null;
-  const coords = JSON.stringify(geom?.coordinates || []);
-  let hash = 0;
-  for (let i = 0; i < coords.length; i++) {
-    hash = ((hash << 5) - hash) + coords.charCodeAt(i);
-    hash = hash & hash;
-  }
-  return `hash:${geomType}:${hash.toString(36)}`;
-}
 
 /**
  * Count open and close brackets in a line

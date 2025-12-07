@@ -1334,3 +1334,217 @@ describe('GeoJsonEditor - Ctrl+I Add Feature Shortcut', () => {
     expect(el.collapsedNodes.has(firstFeatureCoords.nodeId)).to.be.true;
   });
 });
+
+describe('GeoJsonEditor - Home/End Navigation', () => {
+
+  it('should move cursor to start of line with Home', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Position cursor in middle of a line
+    el.cursorLine = 1;
+    el.cursorColumn = 5;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Home',
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('should stay at start of line when Home pressed twice (no document jump)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Position cursor on line 2, column 5
+    el.cursorLine = 2;
+    el.cursorColumn = 5;
+
+    // First Home - go to start of line
+    const event1 = new KeyboardEvent('keydown', {
+      key: 'Home',
+      bubbles: true
+    });
+    el.handleKeydown(event1);
+
+    expect(el.cursorLine).to.equal(2);
+    expect(el.cursorColumn).to.equal(0);
+
+    // Second Home - should stay at start of line (not jump to document start)
+    const event2 = new KeyboardEvent('keydown', {
+      key: 'Home',
+      bubbles: true
+    });
+    el.handleKeydown(event2);
+
+    expect(el.cursorLine).to.equal(2);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('should move cursor to end of line with End', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Position cursor at start of a line
+    el.cursorLine = 1;
+    el.cursorColumn = 0;
+
+    const lineLength = el.lines[1].length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'End',
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(el.cursorLine).to.equal(1);
+    expect(el.cursorColumn).to.equal(lineLength);
+  });
+
+  it('should stay at end of line when End pressed twice (no document jump)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Position cursor on line 2
+    el.cursorLine = 2;
+    el.cursorColumn = 0;
+    const lineLength = el.lines[2].length;
+
+    // First End - go to end of line
+    const event1 = new KeyboardEvent('keydown', {
+      key: 'End',
+      bubbles: true
+    });
+    el.handleKeydown(event1);
+
+    expect(el.cursorLine).to.equal(2);
+    expect(el.cursorColumn).to.equal(lineLength);
+
+    // Second End - should stay at end of line (not jump to document end)
+    const event2 = new KeyboardEvent('keydown', {
+      key: 'End',
+      bubbles: true
+    });
+    el.handleKeydown(event2);
+
+    expect(el.cursorLine).to.equal(2);
+    expect(el.cursorColumn).to.equal(lineLength);
+  });
+
+  it('should move cursor to start of document with Ctrl+Home', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Position cursor somewhere in the middle
+    el.cursorLine = 5;
+    el.cursorColumn = 3;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Home',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(el.cursorLine).to.equal(0);
+    expect(el.cursorColumn).to.equal(0);
+  });
+
+  it('should move cursor to end of document with Ctrl+End', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Position cursor at start
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+
+    const lastLine = el.lines.length - 1;
+    const lastLineLength = el.lines[lastLine].length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'End',
+      ctrlKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(el.cursorLine).to.equal(lastLine);
+    expect(el.cursorColumn).to.equal(lastLineLength);
+  });
+
+  it('should select from cursor to start of line with Shift+Home', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Position cursor in middle of a line
+    el.cursorLine = 1;
+    el.cursorColumn = 5;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Home',
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(el.cursorColumn).to.equal(0);
+    expect(el.selectionStart).to.exist;
+    expect(el.selectionStart.line).to.equal(1);
+    expect(el.selectionStart.column).to.equal(5);
+    expect(el.selectionEnd).to.exist;
+    expect(el.selectionEnd.line).to.equal(1);
+    expect(el.selectionEnd.column).to.equal(0);
+  });
+
+  it('should select from cursor to end of line with Shift+End', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Position cursor at start of a line
+    el.cursorLine = 1;
+    el.cursorColumn = 0;
+    const lineLength = el.lines[1].length;
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'End',
+      shiftKey: true,
+      bubbles: true
+    });
+    el.handleKeydown(event);
+
+    expect(el.cursorColumn).to.equal(lineLength);
+    expect(el.selectionStart).to.exist;
+    expect(el.selectionStart.line).to.equal(1);
+    expect(el.selectionStart.column).to.equal(0);
+    expect(el.selectionEnd).to.exist;
+    expect(el.selectionEnd.line).to.equal(1);
+    expect(el.selectionEnd.column).to.equal(lineLength);
+  });
+});

@@ -665,10 +665,10 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     el.set([validPoint]);
     await waitFor(200);
 
-    const featureKey = '0';
-    el.toggleFeatureVisibility(featureKey);
+    const featureIndex = 0;
+    el.toggleFeatureVisibility(featureIndex);
 
-    expect(el.hiddenFeatures.has(featureKey)).to.be.true;
+    expect(el.hiddenFeatures.has(featureIndex)).to.be.true;
   });
 
   it('should show feature when toggled again', async () => {
@@ -678,11 +678,11 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     el.set([validPoint]);
     await waitFor(200);
 
-    const featureKey = '0';
-    el.hiddenFeatures.add(featureKey);
-    el.toggleFeatureVisibility(featureKey);
+    const featureIndex = 0;
+    el.hiddenFeatures.add(featureIndex);
+    el.toggleFeatureVisibility(featureIndex);
 
-    expect(el.hiddenFeatures.has(featureKey)).to.be.false;
+    expect(el.hiddenFeatures.has(featureIndex)).to.be.false;
   });
 
   it('should apply hidden state when toggling feature visibility', async () => {
@@ -692,18 +692,18 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     el.set([validPoint]);
     await waitFor(300);
 
-    // Get the first feature key from featureRanges
-    const keys = Array.from(el.featureRanges.keys());
-    expect(keys.length).to.be.greaterThan(0);
+    // Get the first feature index from featureRanges
+    const indices = Array.from(el.featureRanges.keys());
+    expect(indices.length).to.be.greaterThan(0);
 
-    const featureKey = keys[0];
+    const featureIndex = indices[0];
 
     // Toggle visibility
-    el.toggleFeatureVisibility(featureKey);
+    el.toggleFeatureVisibility(featureIndex);
     await waitFor(200);
 
     // Check the feature is marked as hidden
-    expect(el.hiddenFeatures.has(featureKey)).to.be.true;
+    expect(el.hiddenFeatures.has(featureIndex)).to.be.true;
   });
 
   it('should toggle visibility on first click after paste into empty editor', async () => {
@@ -730,8 +730,8 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     expect(visibilityLines.length).to.be.greaterThan(0);
 
     const firstVisibilityLine = visibilityLines[0];
-    const featureKey = firstVisibilityLine.dataset.featureKey;
-    expect(featureKey).to.exist;
+    const featureIndex = firstVisibilityLine.dataset.featureIndex;
+    expect(featureIndex).to.exist;
 
     // Simulate mousedown on visibility button area (clickX < 14)
     const rect = firstVisibilityLine.getBoundingClientRect();
@@ -758,7 +758,415 @@ describe('GeoJsonEditor - Feature Visibility', () => {
     expect(el._blockRender).to.be.false;
 
     // Verify visibility was toggled on first click
-    expect(el.hiddenFeatures.has(featureKey)).to.be.true;
+    expect(el.hiddenFeatures.has(parseInt(featureIndex, 10))).to.be.true;
+  });
+});
+
+describe('GeoJsonEditor - Visibility Index System', () => {
+
+  it('should preserve visibility after modifying feature property', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two features
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Hide feature 0
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Modify a property in feature 0 (change "name" property)
+    // Find the line with "name" property
+    const nameLineIndex = el.lines.findIndex(line => line.includes('"name"'));
+    expect(nameLineIndex).to.be.greaterThan(-1);
+
+    // Position cursor on the value and modify it
+    el.cursorLine = nameLineIndex;
+    el.cursorColumn = el.lines[nameLineIndex].length;
+
+    // Simulate backspace to delete something
+    const originalLine = el.lines[nameLineIndex];
+    if (originalLine.includes('"Test Point"')) {
+      el.lines[nameLineIndex] = originalLine.replace('"Test Point"', '"Modified Point"');
+      el.formatAndUpdate();
+      await waitFor(200);
+
+      // Visibility should be preserved
+      expect(el.hiddenFeatures.has(0)).to.be.true;
+    }
+  });
+
+  it('should shift indices when inserting feature at beginning', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two features
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Hide feature 1 (the polygon)
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+    expect(el.hiddenFeatures.has(0)).to.be.false;
+
+    // Insert a new feature at position 0
+    const newFeature = { type: 'Feature', geometry: null, properties: { inserted: true } };
+    el.insertAt(newFeature, 0);
+    await waitFor(200);
+
+    // The polygon was at index 1, now should be at index 2
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+
+    // New feature at index 0 should not be hidden
+    expect(el.hiddenFeatures.has(0)).to.be.false;
+  });
+
+  it('should shift indices when inserting feature in middle', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set three features
+    const feature3 = { type: 'Feature', geometry: { type: 'Point', coordinates: [3, 3] }, properties: { name: 'Point 3' } };
+    el.set([validPoint, validPolygon, feature3]);
+    await waitFor(200);
+
+    // Hide feature 2 (Point 3)
+    el.toggleFeatureVisibility(2);
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+
+    // Insert a new feature at position 1 (between Point and Polygon)
+    const newFeature = { type: 'Feature', geometry: null, properties: { inserted: true } };
+    el.insertAt(newFeature, 1);
+    await waitFor(200);
+
+    // Feature that was at index 2 should now be at index 3
+    expect(el.hiddenFeatures.has(2)).to.be.false;
+    expect(el.hiddenFeatures.has(3)).to.be.true;
+  });
+
+  it('should not shift indices for features before insertion point', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set three features
+    const feature3 = { type: 'Feature', geometry: { type: 'Point', coordinates: [3, 3] }, properties: { name: 'Point 3' } };
+    el.set([validPoint, validPolygon, feature3]);
+    await waitFor(200);
+
+    // Hide feature 0 (the point at beginning)
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Insert a new feature at position 2 (after the hidden feature)
+    const newFeature = { type: 'Feature', geometry: null, properties: { inserted: true } };
+    el.insertAt(newFeature, 2);
+    await waitFor(200);
+
+    // Feature 0 should still be at index 0 and hidden
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+  });
+
+  it('should shift indices when deleting feature before hidden one', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two features
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Hide feature 1 (the polygon)
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+
+    // Delete feature 0
+    el.removeAt(0);
+    await waitFor(200);
+
+    // The polygon should now be at index 0 and still hidden
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+  });
+
+  it('should remove hidden index when deleting hidden feature', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two features
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Hide feature 0 (the point)
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Delete feature 0
+    el.removeAt(0);
+    await waitFor(200);
+
+    // Hidden set should be empty or not contain 0
+    expect(el.hiddenFeatures.has(0)).to.be.false;
+  });
+
+  it('should preserve visibility when modifying coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set a point
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Hide the feature
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Find and modify coordinates
+    const coordLineIndex = el.lines.findIndex(line => line.includes('1.0'));
+    if (coordLineIndex > -1) {
+      el.lines[coordLineIndex] = el.lines[coordLineIndex].replace('1.0', '2.0');
+      el.formatAndUpdate();
+      await waitFor(200);
+
+      // Visibility should still be preserved
+      expect(el.hiddenFeatures.has(0)).to.be.true;
+    }
+  });
+
+  it('should preserve multiple hidden features after insertion', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set three features
+    const feature3 = { type: 'Feature', geometry: { type: 'Point', coordinates: [3, 3] }, properties: { name: 'Point 3' } };
+    el.set([validPoint, validPolygon, feature3]);
+    await waitFor(200);
+
+    // Hide features 0 and 2
+    el.toggleFeatureVisibility(0);
+    el.toggleFeatureVisibility(2);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+
+    // Insert at position 1
+    const newFeature = { type: 'Feature', geometry: null, properties: { inserted: true } };
+    el.insertAt(newFeature, 1);
+    await waitFor(200);
+
+    // Feature 0 should still be at 0, feature 2 should now be at 3
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(2)).to.be.false;
+    expect(el.hiddenFeatures.has(3)).to.be.true;
+  });
+
+  it('should handle add() with hidden features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set one feature
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Hide feature 0
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Add a new feature at the end
+    el.add(validPolygon);
+    await waitFor(200);
+
+    // Original hidden state should be preserved
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    // New feature should not be hidden
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+  });
+
+  it('should exclude hidden features from emitted change event', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two features
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Hide feature 0
+    el.toggleFeatureVisibility(0);
+
+    // Listen for change event
+    let emittedFeatures = null;
+    el.addEventListener('change', (e) => {
+      emittedFeatures = e.detail.features;
+    });
+
+    // Trigger a change
+    el.emitChange();
+    await waitFor(100);
+
+    // Only the non-hidden feature should be emitted
+    expect(emittedFeatures).to.not.be.null;
+    expect(emittedFeatures.length).to.equal(1);
+    expect(emittedFeatures[0].geometry.type).to.equal('Polygon');
+  });
+
+  it('should preserve visibility during temporary invalid JSON', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set a feature
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Hide feature 0
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Make JSON temporarily invalid by removing closing brace
+    // Use updateModel/updateView instead of formatAndUpdate to avoid emitting errors
+    const lastLine = el.lines.length - 1;
+    const originalLast = el.lines[lastLine];
+    el.lines[lastLine] = el.lines[lastLine].replace('}', '');
+
+    // Update model without emitting change (simulates mid-edit state)
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(100);
+
+    // Hidden state should be preserved even with invalid JSON
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Restore valid JSON
+    el.lines[lastLine] = originalLast;
+    el.updateModel();
+    el.scheduleRender();
+    await waitFor(200);
+
+    // Hidden state should still be preserved
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+  });
+
+  it('should handle paste of features preserving existing states', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two features
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+
+    // Hide feature 1
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+
+    // Paste a new feature at the beginning (simulate via insertAt)
+    const pastedFeature = { type: 'Feature', geometry: { type: 'Point', coordinates: [10, 10] }, properties: { name: 'Pasted' } };
+    el.insertAt(pastedFeature, 0);
+    await waitFor(200);
+
+    // Original feature 1 (polygon) should now be at index 2 and still hidden
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+    // Original feature 0 (point) should now be at index 1 and not hidden
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    // Pasted feature at index 0 should not be hidden
+    expect(el.hiddenFeatures.has(0)).to.be.false;
+  });
+
+  it('should handle removeAll clearing hidden features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set features and hide some
+    el.set([validPoint, validPolygon]);
+    await waitFor(200);
+    el.toggleFeatureVisibility(0);
+    el.toggleFeatureVisibility(1);
+
+    // Remove all
+    el.removeAll();
+    await waitFor(200);
+
+    // Hidden features should be cleared
+    expect(el.hiddenFeatures.size).to.equal(0);
+  });
+
+  it('should handle multiple sequential insertions with hidden features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set initial feature
+    el.set([validPoint]);
+    await waitFor(200);
+
+    // Hide it
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Insert at beginning multiple times
+    const f1 = { type: 'Feature', geometry: null, properties: { n: 1 } };
+    const f2 = { type: 'Feature', geometry: null, properties: { n: 2 } };
+
+    el.insertAt(f1, 0);
+    await waitFor(200);
+    expect(el.hiddenFeatures.has(1)).to.be.true; // Original moved to 1
+
+    el.insertAt(f2, 0);
+    await waitFor(200);
+    expect(el.hiddenFeatures.has(2)).to.be.true; // Original now at 2
+  });
+
+  it('should handle multiple sequential deletions with hidden features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set three features
+    const f3 = { type: 'Feature', geometry: { type: 'Point', coordinates: [3, 3] }, properties: { n: 3 } };
+    el.set([validPoint, validPolygon, f3]);
+    await waitFor(200);
+
+    // Hide last feature (index 2)
+    el.toggleFeatureVisibility(2);
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+
+    // Delete first feature
+    el.removeAt(0);
+    await waitFor(200);
+    expect(el.hiddenFeatures.has(1)).to.be.true; // Shifted from 2 to 1
+
+    // Delete first feature again
+    el.removeAt(0);
+    await waitFor(200);
+    expect(el.hiddenFeatures.has(0)).to.be.true; // Shifted from 1 to 0
+  });
+
+  it('should render visibility button for features with same coordinates but different properties', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Create two features with identical coordinates but different properties
+    const feature1 = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [1.0, 2.0] },
+      properties: { name: 'Feature A' }
+    };
+    const feature2 = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [1.0, 2.0] },
+      properties: { name: 'Feature B' }
+    };
+
+    el.set([feature1, feature2]);
+    await waitFor(300);
+
+    // Both features should have visibility buttons
+    const visibilityLines = el.shadowRoot.querySelectorAll('.line.has-visibility');
+    expect(visibilityLines.length).to.equal(2);
+
+    // Should be able to toggle each independently
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(1)).to.be.true;
   });
 });
 

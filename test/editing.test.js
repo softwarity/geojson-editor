@@ -305,6 +305,64 @@ describe('GeoJsonEditor - Copy/Cut/Paste', () => {
     expect(features.length).to.equal(2);
   });
 
+  it('should auto-collapse coordinates for all pasted features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Create two features with multi-line coordinates (Polygons have coordinates that span multiple lines)
+    const feature1 = {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
+      },
+      properties: { name: 'Polygon 1' }
+    };
+    const feature2 = {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[[10, 10], [11, 10], [11, 11], [10, 11], [10, 10]]]
+      },
+      properties: { name: 'Polygon 2' }
+    };
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => JSON.stringify([feature1, feature2])
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    // Verify features were pasted
+    const features = el.getAll();
+    expect(features.length).to.equal(2);
+
+    // Debug: check if there are errors
+    expect(el._hasErrors()).to.be.false;
+
+    // Debug: check _lineToNodeId - should have entries for coordinates
+    expect(el._lineToNodeId.size).to.be.greaterThan(0, '_lineToNodeId should not be empty');
+
+    // Check ranges found
+    const ranges = el._findCollapsibleRanges();
+    const coordRanges = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coordRanges.length).to.equal(2, 'Should find 2 coordinates ranges');
+
+    // Verify coordinates are collapsed
+    // There should be collapsed nodes (2 coordinates, one per feature)
+    expect(el.collapsedNodes.size).to.equal(2, 'collapsedNodes should have 2 entries (coordinates of each feature)');
+
+    // Check that collapsed nodes are coordinates
+    for (const nodeId of el.collapsedNodes) {
+      const info = el._nodeIdToLines.get(nodeId);
+      expect(info.nodeKey).to.equal('coordinates', 'Collapsed node should be coordinates');
+    }
+  });
+
   it('should fallback to raw text when pasting invalid GeoJSON', async () => {
     const el = await createSizedFixture();
     await waitFor();
@@ -967,5 +1025,62 @@ describe('GeoJsonEditor - Internal Cursor Movement', () => {
     // At minimum, should not throw and cursor should still be valid
     expect(el.cursorLine).to.be.at.least(prevLine);
     expect(el.cursorColumn).to.be.at.least(0);
+  });
+
+  it('should auto-collapse coordinates of pasted features while preserving existing collapsed state', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set two existing features with collapsed coordinates
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Verify coordinates are collapsed for both existing features
+    const initialCollapsedCount = el.collapsedNodes.size;
+    expect(initialCollapsedCount).to.be.greaterThan(0);
+
+    // Count features before paste
+    const featuresBefore = el._parseFeatures().length;
+    expect(featuresBefore).to.equal(2);
+
+    // Paste new features at the end
+    el.cursorLine = el.lines.length - 1;
+    el.cursorColumn = el.lines[el.lines.length - 1].length;
+
+    // Simulate paste with new features
+    const newFeature1 = { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1], [2, 2]] }, properties: {} };
+    const newFeature2 = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} };
+    const pasteText = ',\n' + JSON.stringify(newFeature1, null, 2) + ',\n' + JSON.stringify(newFeature2, null, 2);
+
+    // Create and dispatch paste event
+    const pasteEvent = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: new DataTransfer()
+    });
+    pasteEvent.clipboardData.setData('text/plain', pasteText);
+    el.handlePaste(pasteEvent);
+    await waitFor(200);
+
+    // Verify features were added
+    const featuresAfter = el._parseFeatures().length;
+    expect(featuresAfter).to.equal(4);
+
+    // Verify collapsed nodes exist for new features' coordinates
+    // The new LineString feature has coordinates that should be collapsed
+    const ranges = el._findCollapsibleRanges();
+    const coordinateRanges = ranges.filter(r => r.nodeKey === 'coordinates');
+
+    // Should have coordinates ranges for all features with coordinates
+    expect(coordinateRanges.length).to.be.greaterThan(0);
+
+    // Verify at least some coordinates are collapsed (both old and new)
+    let collapsedCoordinatesCount = 0;
+    for (const range of coordinateRanges) {
+      if (el.collapsedNodes.has(range.nodeId)) {
+        collapsedCoordinatesCount++;
+      }
+    }
+    expect(collapsedCoordinatesCount).to.be.greaterThan(0);
   });
 });

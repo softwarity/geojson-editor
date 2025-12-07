@@ -34,7 +34,7 @@ export interface CollapseButtonMeta {
 
 /** Visibility button metadata */
 export interface VisibilityButtonMeta {
-  featureKey: string;
+  featureIndex: number;
   isHidden: boolean;
 }
 
@@ -46,7 +46,7 @@ export interface LineMeta {
   visibilityButton: VisibilityButtonMeta | null;
   isHidden: boolean;
   isCollapsed: boolean;
-  featureKey: string | null;
+  featureIndex: number | null;
   hasError: boolean;
 }
 

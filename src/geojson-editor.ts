@@ -42,7 +42,7 @@ import {
   RE_CLOSE_BRACKET
 } from './constants.js';
 
-import { createElement, getFeatureKey, countBrackets, parseSelectorToHostRule } from './utils.js';
+import { createElement, countBrackets, parseSelectorToHostRule } from './utils.js';
 import { validateGeoJSON, normalizeToFeatures } from './validation.js';
 import { highlightSyntax, namedColorToHex, isNamedColor } from './syntax-highlighter.js';
 
@@ -60,7 +60,7 @@ class GeoJsonEditor extends HTMLElement {
   // ========== Model (Source of Truth) ==========
   lines: string[] = [];
   collapsedNodes: Set<string> = new Set();
-  hiddenFeatures: Set<string> = new Set();
+  hiddenFeatures: Set<number> = new Set(); // Feature indices that are hidden
 
   // ========== Node ID Management ==========
   private _nodeIdCounter: number = 0;
@@ -71,7 +71,7 @@ class GeoJsonEditor extends HTMLElement {
   // ========== Derived State (computed from model) ==========
   visibleLines: VisibleLine[] = [];
   lineMetadata: Map<number, LineMeta> = new Map();
-  featureRanges: Map<string, FeatureRange> = new Map();
+  featureRanges: Map<number, FeatureRange> = new Map(); // featureIndex -> range
 
   // ========== View State ==========
   viewportHeight: number = 0;
@@ -895,23 +895,22 @@ class GeoJsonEditor extends HTMLElement {
    */
   computeFeatureRanges() {
     this.featureRanges.clear();
-    
+
     try {
       const content = this.lines.join('\n');
       const fullValue = this.prefix + content + this.suffix;
       const parsed = JSON.parse(fullValue);
-      
+
       if (!parsed.features) return;
-      
+
       let featureIndex = 0;
       let braceDepth = 0;
       let inFeature = false;
       let featureStartLine = -1;
-      let currentFeatureKey = null;
-      
+
       for (let i = 0; i < this.lines.length; i++) {
         const line = this.lines[i];
-        
+
         if (!inFeature && RE_IS_FEATURE.test(line)) {
           // Find opening brace
           let startLine = i;
@@ -925,7 +924,7 @@ class GeoJsonEditor extends HTMLElement {
           featureStartLine = startLine;
           inFeature = true;
           braceDepth = 1;
-          
+
           // Count braces from start to current line
           for (let k = startLine; k <= i; k++) {
             const counts = countBrackets(this.lines[k], '{');
@@ -935,25 +934,19 @@ class GeoJsonEditor extends HTMLElement {
               braceDepth += counts.open - counts.close;
             }
           }
-          
-          if (featureIndex < parsed.features.length) {
-            currentFeatureKey = getFeatureKey(parsed.features[featureIndex]);
-          }
         } else if (inFeature) {
           const counts = countBrackets(line, '{');
           braceDepth += counts.open - counts.close;
-          
+
           if (braceDepth <= 0) {
-            if (currentFeatureKey) {
-              this.featureRanges.set(currentFeatureKey, {
-                startLine: featureStartLine,
-                endLine: i,
-                featureIndex
-              });
-            }
+            // Store by featureIndex instead of hash key
+            this.featureRanges.set(featureIndex, {
+              startLine: featureStartLine,
+              endLine: i,
+              featureIndex
+            });
             featureIndex++;
             inFeature = false;
-            currentFeatureKey = null;
           }
         }
       }
@@ -982,7 +975,7 @@ class GeoJsonEditor extends HTMLElement {
         visibilityButton: null,
         isHidden: false,
         isCollapsed: false,
-        featureKey: null,
+        featureIndex: null,
         hasError: errorLines.has(i)
       };
 
@@ -1025,17 +1018,17 @@ class GeoJsonEditor extends HTMLElement {
       }
 
       // Check if line belongs to a hidden feature
-      for (const [featureKey, range] of this.featureRanges) {
+      for (const [featureIndex, range] of this.featureRanges) {
         if (i >= range.startLine && i <= range.endLine) {
-          meta.featureKey = featureKey;
-          if (this.hiddenFeatures.has(featureKey)) {
+          meta.featureIndex = featureIndex;
+          if (this.hiddenFeatures.has(featureIndex)) {
             meta.isHidden = true;
           }
           // Add visibility button only on feature start line
           if (i === range.startLine) {
             meta.visibilityButton = {
-              featureKey,
-              isHidden: this.hiddenFeatures.has(featureKey)
+              featureIndex,
+              isHidden: this.hiddenFeatures.has(featureIndex)
             };
           }
           break;
@@ -1299,7 +1292,7 @@ class GeoJsonEditor extends HTMLElement {
       // Add visibility button on line (uses ::before pseudo-element)
       if (lineData.meta?.visibilityButton) {
         lineEl.classList.add('has-visibility');
-        lineEl.dataset.featureKey = lineData.meta.visibilityButton.featureKey;
+        lineEl.dataset.featureIndex = String(lineData.meta.visibilityButton.featureIndex);
         if (lineData.meta.visibilityButton.isHidden) {
           lineEl.classList.add('feature-hidden');
         }
@@ -1584,8 +1577,8 @@ class GeoJsonEditor extends HTMLElement {
       'ArrowDown': () => this._handleArrowKey(1, 0, e.shiftKey, e.ctrlKey || e.metaKey),
       'ArrowLeft': () => this._handleArrowKey(0, -1, e.shiftKey, e.ctrlKey || e.metaKey),
       'ArrowRight': () => this._handleArrowKey(0, 1, e.shiftKey, e.ctrlKey || e.metaKey),
-      'Home': () => this._handleHomeEnd('home', e.shiftKey, ctx.onClosingLine),
-      'End': () => this._handleHomeEnd('end', e.shiftKey, ctx.onClosingLine),
+      'Home': () => this._handleHomeEnd('home', e.shiftKey, e.ctrlKey || e.metaKey, ctx.onClosingLine),
+      'End': () => this._handleHomeEnd('end', e.shiftKey, e.ctrlKey || e.metaKey, ctx.onClosingLine),
       'PageUp': () => this._handlePageUpDown('up', e.shiftKey),
       'PageDown': () => this._handlePageUpDown('down', e.shiftKey),
       'Tab': () => this._handleTab(e.shiftKey, ctx),
@@ -2421,34 +2414,38 @@ class GeoJsonEditor extends HTMLElement {
 
   /**
    * Handle Home/End with optional selection
+   * @param key - 'home' or 'end'
+   * @param isShift - Shift key pressed (for selection)
+   * @param isCtrl - Ctrl/Cmd key pressed (for document start/end)
+   * @param onClosingLine - Collapsed node info if on closing line
    */
-  private _handleHomeEnd(key: string, isShift: boolean, onClosingLine: CollapsedNodeInfo | null): void {
+  private _handleHomeEnd(key: string, isShift: boolean, isCtrl: boolean, onClosingLine: CollapsedNodeInfo | null): void {
     // Start selection if shift is pressed and no selection exists
     if (isShift && !this.selectionStart) {
       this.selectionStart = { line: this.cursorLine, column: this.cursorColumn };
     }
 
     if (key === 'home') {
-      if (onClosingLine) {
+      if (isCtrl) {
+        // Ctrl+Home: go to start of document
+        this.cursorLine = 0;
+        this.cursorColumn = 0;
+      } else if (onClosingLine) {
         // On closing line of collapsed node: go to start line
         this.cursorLine = onClosingLine.startLine;
-        this.cursorColumn = 0;
-      } else if (this.cursorColumn === 0) {
-        // Already at start of line: go to start of document
-        this.cursorLine = 0;
         this.cursorColumn = 0;
       } else {
         // Go to start of line
         this.cursorColumn = 0;
       }
     } else {
-      const lineLength = this.lines[this.cursorLine]?.length || 0;
-      if (this.cursorColumn === lineLength) {
-        // Already at end of line: go to end of document
+      if (isCtrl) {
+        // Ctrl+End: go to end of document
         this.cursorLine = this.lines.length - 1;
         this.cursorColumn = this.lines[this.cursorLine]?.length || 0;
       } else {
         // Go to end of line
+        const lineLength = this.lines[this.cursorLine]?.length || 0;
         this.cursorColumn = lineLength;
       }
     }
@@ -2746,12 +2743,23 @@ class GeoJsonEditor extends HTMLElement {
     const text = e.clipboardData?.getData('text/plain');
     if (!text) return;
 
-    const wasEmpty = this.lines.length === 0;
+    // Save collapsed state of existing features before paste
+    const existingCollapsedKeys = new Set<string>();
+    for (const nodeId of this.collapsedNodes) {
+      const nodeInfo = this._nodeIdToLines.get(nodeId);
+      if (nodeInfo?.nodeKey) {
+        const featureIndex = this._getFeatureIndexForLine(nodeInfo.startLine);
+        existingCollapsedKeys.add(`${featureIndex}:${nodeInfo.nodeKey}`);
+      }
+    }
+    const existingFeatureCount = this._parseFeatures().length;
 
     // Try to parse as GeoJSON and normalize
+    let pastedFeatureCount = 0;
     try {
       const parsed = JSON.parse(text);
       const features = normalizeToFeatures(parsed);
+      pastedFeatureCount = features.length;
       // Valid GeoJSON - insert formatted features
       const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
       this.insertText(formatted);
@@ -2766,9 +2774,35 @@ class GeoJsonEditor extends HTMLElement {
       this.renderTimer = undefined;
     }
 
-    // Auto-collapse coordinates after pasting into empty editor
-    if (wasEmpty && this.lines.length > 0) {
-      this.autoCollapseCoordinates();
+    // Auto-collapse coordinates for pasted features (if valid GeoJSON was pasted)
+    // Note: We collapse even if there are errors (e.g., missing comma) because
+    // the user will fix them and we want the coordinates already collapsed
+    if (pastedFeatureCount > 0) {
+      // Restore collapsed state for existing features and collapse new features' coordinates
+      const ranges = this._findCollapsibleRanges();
+      const featureRanges = ranges.filter(r => r.isRootFeature);
+
+      for (const range of ranges) {
+        // Find which feature this range belongs to
+        const featureIndex = featureRanges.findIndex(fr =>
+          range.startLine >= fr.startLine && range.endLine <= fr.endLine
+        );
+
+        if (featureIndex < existingFeatureCount) {
+          // Existing feature - restore collapsed state
+          const key = `${featureIndex}:${range.nodeKey}`;
+          if (existingCollapsedKeys.has(key)) {
+            this.collapsedNodes.add(range.nodeId);
+          }
+        } else {
+          // New feature - collapse coordinates
+          if (range.nodeKey === 'coordinates') {
+            this.collapsedNodes.add(range.nodeId);
+          }
+        }
+      }
+
+      this.updateView();
     }
 
     // Expand any collapsed nodes that contain errors
@@ -2883,8 +2917,8 @@ class GeoJsonEditor extends HTMLElement {
 
     // Visibility button in gutter
     const visBtn = target.closest('.visibility-button') as HTMLElement | null;
-    if (visBtn) {
-      this.toggleFeatureVisibility(visBtn.dataset.featureKey);
+    if (visBtn && visBtn.dataset.featureIndex !== undefined) {
+      this.toggleFeatureVisibility(parseInt(visBtn.dataset.featureIndex, 10));
       return;
     }
 
@@ -2911,9 +2945,9 @@ class GeoJsonEditor extends HTMLElement {
       if (clickX < 14) {
         e.preventDefault();
         e.stopPropagation();
-        const featureKey = lineEl.dataset.featureKey;
-        if (featureKey) {
-          this.toggleFeatureVisibility(featureKey);
+        const featureIndexStr = lineEl.dataset.featureIndex;
+        if (featureIndexStr !== undefined) {
+          this.toggleFeatureVisibility(parseInt(featureIndexStr, 10));
         }
         return;
       }
@@ -3086,12 +3120,12 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Feature Visibility ==========
 
-  toggleFeatureVisibility(featureKey: string | undefined): void {
-    if (!featureKey) return;
-    if (this.hiddenFeatures.has(featureKey)) {
-      this.hiddenFeatures.delete(featureKey);
+  toggleFeatureVisibility(featureIndex: number | undefined): void {
+    if (featureIndex === undefined) return;
+    if (this.hiddenFeatures.has(featureIndex)) {
+      this.hiddenFeatures.delete(featureIndex);
     } else {
-      this.hiddenFeatures.add(featureKey);
+      this.hiddenFeatures.add(featureIndex);
     }
 
     // Use updateView - content didn't change, just visibility
@@ -3347,6 +3381,10 @@ class GeoJsonEditor extends HTMLElement {
     const oldCursorColumn = this.cursorColumn;
     const oldContent = this.lines.join('\n');
 
+    // Save feature count before modification (for index adjustment)
+    const oldFeatureCount = this._countFeatures(oldContent);
+    const cursorFeatureIndex = this._getFeatureIndexForLine(oldCursorLine);
+
     try {
       const wrapped = '[' + oldContent + ']';
       const parsed = JSON.parse(wrapped);
@@ -3436,6 +3474,17 @@ class GeoJsonEditor extends HTMLElement {
     this.cursorLine = Math.min(this.cursorLine, Math.max(0, this.lines.length - 1));
     this.cursorColumn = Math.min(this.cursorColumn, this.lines[this.cursorLine]?.length || 0);
 
+    // Adjust hidden feature indices if feature count changed
+    const finalContent = this.lines.join('\n');
+    const newFeatureCount = this._countFeatures(finalContent);
+    if (oldFeatureCount >= 0 && newFeatureCount >= 0 && oldFeatureCount !== newFeatureCount) {
+      const delta = newFeatureCount - oldFeatureCount;
+      // Use cursor position to determine insertion point
+      // If cursor was inside a feature, changes happened at/after that feature
+      const insertionIndex = cursorFeatureIndex >= 0 ? cursorFeatureIndex : 0;
+      this._adjustHiddenIndices(insertionIndex, delta);
+    }
+
     this.updateModel();
 
     // Expand any nodes that contain errors (prevents closing edited nodes with typos)
@@ -3458,9 +3507,8 @@ class GeoJsonEditor extends HTMLElement {
       
       // Filter hidden features
       if (this.hiddenFeatures.size > 0) {
-        parsed.features = parsed.features.filter((feature: Feature) => {
-          const key = getFeatureKey(feature);
-          return key ? !this.hiddenFeatures.has(key) : true;
+        parsed.features = parsed.features.filter((_feature: Feature, index: number) => {
+          return !this.hiddenFeatures.has(index);
         });
       }
       
@@ -3760,6 +3808,11 @@ class GeoJsonEditor extends HTMLElement {
     const features = this._parseFeatures();
     const idx = index < 0 ? features.length + index : index;
     const insertIdx = Math.max(0, Math.min(idx, features.length));
+
+    // Adjust hidden feature indices before insertion
+    // Features at or after insertIdx need to shift by newFeatures.length
+    this._adjustHiddenIndices(insertIdx, newFeatures.length);
+
     features.splice(insertIdx, 0, ...newFeatures);
     // Preserve collapsed state, apply options only to inserted features
     this._setFeaturesInternalPreserving(features, options, insertIdx, newFeatures.length);
@@ -3798,9 +3851,15 @@ class GeoJsonEditor extends HTMLElement {
       }
     }
 
+    // Save hidden features (already adjusted by caller for insert/remove)
+    const savedHiddenFeatures = new Set(this.hiddenFeatures);
+
     // Format and set content
     const formatted = features.map(f => JSON.stringify(f, null, 2)).join(',\n');
     this.setValue(formatted, false);
+
+    // Restore hidden features
+    this.hiddenFeatures = savedHiddenFeatures;
 
     // Restore collapsed state for existing features
     const ranges = this._findCollapsibleRanges();
@@ -3885,13 +3944,70 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Get feature index for a given line
    */
+  /**
+   * Count features in content (returns -1 if JSON invalid)
+   */
+  private _countFeatures(content: string): number {
+    try {
+      const wrapped = '[' + content + ']';
+      const parsed = JSON.parse(wrapped);
+      return Array.isArray(parsed) ? parsed.length : -1;
+    } catch {
+      return -1;
+    }
+  }
+
+  /**
+   * Adjust hiddenFeatures indices when features are inserted or removed
+   * @param insertionIndex - Index where features were inserted (or removed from)
+   * @param delta - Number of features added (positive) or removed (negative)
+   */
+  private _adjustHiddenIndices(insertionIndex: number, delta: number): void {
+    if (delta === 0 || this.hiddenFeatures.size === 0) return;
+
+    const newHiddenFeatures = new Set<number>();
+    for (const idx of this.hiddenFeatures) {
+      if (idx < insertionIndex) {
+        // Before insertion point - keep same index
+        newHiddenFeatures.add(idx);
+      } else {
+        // At or after insertion point - shift by delta
+        const newIdx = idx + delta;
+        if (newIdx >= 0) {
+          newHiddenFeatures.add(newIdx);
+        }
+        // If newIdx < 0, the feature was removed, so we don't add it
+      }
+    }
+    this.hiddenFeatures = newHiddenFeatures;
+  }
+
+  /**
+   * Remove a hidden index and shift all indices after it by -1
+   * Used when removing a feature via API
+   */
+  private _removeAndShiftHiddenIndex(removedIndex: number): void {
+    if (this.hiddenFeatures.size === 0) return;
+
+    const newHiddenFeatures = new Set<number>();
+    for (const idx of this.hiddenFeatures) {
+      if (idx < removedIndex) {
+        // Before removed index - keep same
+        newHiddenFeatures.add(idx);
+      } else if (idx > removedIndex) {
+        // After removed index - shift by -1
+        newHiddenFeatures.add(idx - 1);
+      }
+      // idx === removedIndex is dropped (feature was removed)
+    }
+    this.hiddenFeatures = newHiddenFeatures;
+  }
+
   private _getFeatureIndexForLine(line: number): number {
-    let index = 0;
     for (const [, range] of this.featureRanges) {
       if (line >= range.startLine && line <= range.endLine) {
         return range.featureIndex;
       }
-      index++;
     }
     return -1;
   }
@@ -3913,11 +4029,20 @@ class GeoJsonEditor extends HTMLElement {
         }
       }
 
+      // Adjust hidden feature indices: remove idx, shift indices after idx by -1
+      this._removeAndShiftHiddenIndex(idx);
+
+      // Save hidden features before setValue (which clears them)
+      const savedHiddenFeatures = new Set(this.hiddenFeatures);
+
       const removed = features.splice(idx, 1)[0];
 
       // Format and set content
       const formatted = features.map((f: Feature) => JSON.stringify(f, null, 2)).join(',\n');
       this.setValue(formatted, false);
+
+      // Restore hidden features
+      this.hiddenFeatures = savedHiddenFeatures;
 
       // Restore collapsed state for remaining features
       const ranges = this._findCollapsibleRanges();

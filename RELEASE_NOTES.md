@@ -1,5 +1,25 @@
 # Release Notes - @softwarity/geojson-editor
 
+## v1.0.23
+
+### Improvements
+
+- **Index-based visibility system** - Feature visibility state now persists when modifying feature properties or coordinates; indices automatically adjust when features are inserted/deleted
+- **Auto-collapse on paste** - Coordinates are now collapsed even when pasting with temporary JSON errors (e.g., missing comma)
+- **Home/End behavior simplified** - Home/End now only go to start/end of line; use Ctrl+Home/End for document start/end (removed double-tap behavior)
+
+### Bug Fixes
+
+- Fixed visibility state lost when modifying properties of a hidden feature
+- Fixed visibility indices not adjusting when inserting/removing features via API
+
+### Code Quality
+
+- Removed dead code (`getFeatureKey` function no longer needed)
+- 372 unit tests (8 new tests for Home/End navigation, 18 new tests for visibility index system)
+
+---
+
 ## v1.0.22
 
 ### Bug Fixes
@@ -8,10 +28,12 @@
 - Fixed `removeAt()` reopening collapsed features (collapsed state now preserved)
 - Fixed drag selection auto-scroll not continuing when mouse exits editor bounds
 - Fixed cursor position after pasting multi-line content (cursor now correctly positioned at end of pasted text)
+- Fixed pasted features not having their coordinates auto-collapsed
+- Fixed visibility toggle button missing for features with same coordinates but different properties (feature keys now include properties in hash)
 
 ### Code Quality
 
-- 346 unit tests
+- 347 unit tests
 
 ---
 
@@ -40,7 +62,7 @@
 ### New Features
 
 - **Error Navigation** - Visual error indicators in gutter with navigation buttons (◀ ▶) to jump between errors; error count displayed in suffix area
-- **Home/End Enhancement** - Double-tap Home/End to go to document start/end (single tap for line start/end)
+- **Home/End Enhancement** - Double-tap Home/End to go to document start/end (single tap for line start/end) *(Note: removed in v1.0.23, use Ctrl+Home/End instead)*
 - **PageUp/PageDown** - Page navigation with cursor movement
 - **Shift Selection** - Home, End, PageUp, PageDown all support Shift for extending selection
 - **goToNextError()/goToPrevError() API** - Programmatic error navigation

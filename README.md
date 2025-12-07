@@ -441,8 +441,10 @@ editor.goToPrevError();
 | `Shift+Enter` | Collapse innermost node containing cursor |
 | `Tab` | Navigate to next attribute (key or value) |
 | `Shift+Tab` | Navigate to previous attribute |
-| `Home` | Go to start of line; if already there, go to start of document |
-| `End` | Go to end of line; if already there, go to end of document |
+| `Home` | Go to start of line |
+| `End` | Go to end of line |
+| `Ctrl+Home` / `Cmd+Home` | Go to start of document |
+| `Ctrl+End` / `Cmd+End` | Go to end of document |
 | `PageUp` | Scroll up one page |
 | `PageDown` | Scroll down one page |
 | `Shift+Home/End/PageUp/PageDown` | Extend selection while navigating |
