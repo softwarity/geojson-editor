@@ -2027,6 +2027,69 @@ describe('GeoJsonEditor - Collapsed Option', () => {
     expect(collapsedProperties.length).to.equal(1);
   });
 
+  // DEMO SCENARIO: Existing features with collapsed coordinates must stay collapsed after add()/insertAt()
+  it('should preserve existing collapsed coordinates when add() is called (DEMO scenario)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Simulate demo: set multiple polygons - coordinates auto-collapse by default
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Verify coordinates are collapsed
+    const rangesBefore = el._findCollapsibleRanges();
+    const coordsBefore = rangesBefore.filter(r => r.nodeKey === 'coordinates');
+    expect(coordsBefore.length).to.equal(2);
+    expect(el.collapsedNodes.has(coordsBefore[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coordsBefore[1].nodeId)).to.be.true;
+
+    // Now add a new feature (like demo's add() button)
+    el.add(validPolygon);
+    await waitFor(200);
+
+    // Check that EXISTING features still have collapsed coordinates
+    const rangesAfter = el._findCollapsibleRanges();
+    const coordsAfter = rangesAfter.filter(r => r.nodeKey === 'coordinates');
+
+    expect(coordsAfter.length).to.equal(3);
+
+    // First two features (existing) must still be collapsed
+    expect(el.collapsedNodes.has(coordsAfter[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coordsAfter[1].nodeId)).to.be.true;
+    // Third feature (added) should also be collapsed (default behavior)
+    expect(el.collapsedNodes.has(coordsAfter[2].nodeId)).to.be.true;
+  });
+
+  it('should preserve existing collapsed coordinates when insertAt() is called (DEMO scenario)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Simulate demo: set multiple polygons - coordinates auto-collapse by default
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Verify coordinates are collapsed
+    const rangesBefore = el._findCollapsibleRanges();
+    const coordsBefore = rangesBefore.filter(r => r.nodeKey === 'coordinates');
+    expect(coordsBefore.length).to.equal(2);
+    expect(el.collapsedNodes.has(coordsBefore[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coordsBefore[1].nodeId)).to.be.true;
+
+    // Insert a new feature at index 1 (between existing features)
+    el.insertAt(validPolygon, 1);
+    await waitFor(200);
+
+    // Check that ALL features have collapsed coordinates
+    const rangesAfter = el._findCollapsibleRanges();
+    const coordsAfter = rangesAfter.filter(r => r.nodeKey === 'coordinates');
+    expect(coordsAfter.length).to.equal(3);
+
+    // All features must have collapsed coordinates
+    expect(el.collapsedNodes.has(coordsAfter[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coordsAfter[1].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coordsAfter[2].nodeId)).to.be.true;
+  });
+
   it('should collapse multiple attributes', async () => {
     const el = await createSizedFixture();
     await waitFor();

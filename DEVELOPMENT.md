@@ -89,7 +89,7 @@ test/api.test.js:
   ✓ GeoJsonEditor - Features API > should set features via set()
   ...
 
-Chromium: 372 passed, 0 failed
+Chromium: 374 passed, 0 failed
 Finished running tests in 36s, all tests passed! 🎉
 ```
 
@@ -405,7 +405,7 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all 372 unit tests
+- [ ] `npm test` passes all 374 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work:

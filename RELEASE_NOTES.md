@@ -12,11 +12,13 @@
 
 - Fixed visibility state lost when modifying properties of a hidden feature
 - Fixed visibility indices not adjusting when inserting/removing features via API
+- Fixed collapsed state lost when calling `add()`, `insertAt()`, or `removeAt()` (existing collapsed coordinates now preserved correctly)
 
 ### Code Quality
 
 - Removed dead code (`getFeatureKey` function no longer needed)
-- 372 unit tests (8 new tests for Home/End navigation, 18 new tests for visibility index system)
+- Fixed incorrect feature index calculation that used `isRootFeature` flag instead of proper `featureRanges` map
+- 374 unit tests (8 new tests for Home/End navigation, 18 new tests for visibility index system, 2 new tests for collapsed state preservation)
 
 ---
 

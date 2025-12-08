@@ -2780,13 +2780,11 @@ class GeoJsonEditor extends HTMLElement {
     if (pastedFeatureCount > 0) {
       // Restore collapsed state for existing features and collapse new features' coordinates
       const ranges = this._findCollapsibleRanges();
-      const featureRanges = ranges.filter(r => r.isRootFeature);
 
       for (const range of ranges) {
-        // Find which feature this range belongs to
-        const featureIndex = featureRanges.findIndex(fr =>
-          range.startLine >= fr.startLine && range.endLine <= fr.endLine
-        );
+        // Find which feature this range belongs to using the correct featureRanges map
+        const featureIndex = this._getFeatureIndexForLine(range.startLine);
+        if (featureIndex === -1) continue;
 
         if (featureIndex < existingFeatureCount) {
           // Existing feature - restore collapsed state
@@ -3078,18 +3076,15 @@ class GeoJsonEditor extends HTMLElement {
   private _applyCollapsedOption(collapsed: string[] | ((feature: Feature | null, index: number) => string[]), features: Feature[] | null = null): void {
     const ranges = this._findCollapsibleRanges();
 
-    // Group ranges by feature (root nodes)
-    const featureRanges = ranges.filter(r => r.isRootFeature);
-
     // Determine which attributes to collapse per feature
     for (const range of ranges) {
       let shouldCollapse = false;
 
       if (typeof collapsed === 'function') {
-        // Find which feature this range belongs to
-        const featureIndex = featureRanges.findIndex(fr =>
-          range.startLine >= fr.startLine && range.endLine <= fr.endLine
-        );
+        // Find which feature this range belongs to using the correct featureRanges map
+        const featureIndex = this._getFeatureIndexForLine(range.startLine);
+        if (featureIndex === -1) continue;
+
         const feature = features?.[featureIndex] || null;
         const collapsedAttrs = collapsed(feature, featureIndex);
 
@@ -3863,19 +3858,17 @@ class GeoJsonEditor extends HTMLElement {
 
     // Restore collapsed state for existing features
     const ranges = this._findCollapsibleRanges();
-    const featureRanges = ranges.filter(r => r.isRootFeature);
     const actualNewCount = newCount !== undefined ? newCount : features.length - newStartIndex;
 
     for (const range of ranges) {
-      // Find which feature this range belongs to
-      const featureIndex = featureRanges.findIndex(fr =>
-        range.startLine >= fr.startLine && range.endLine <= fr.endLine
-      );
+      // Find which feature this range belongs to using the correct featureRanges map
+      const featureIndex = this._getFeatureIndexForLine(range.startLine);
+      if (featureIndex === -1) continue;
 
       // Determine if this is an existing feature (adjust index for insertAt case)
       let originalFeatureIndex = featureIndex;
       if (featureIndex >= newStartIndex && featureIndex < newStartIndex + actualNewCount) {
-        // This is a new feature - apply options
+        // This is a new feature - apply options later
         continue;
       } else if (featureIndex >= newStartIndex + actualNewCount) {
         // Feature was shifted by insertion - adjust index
@@ -3911,13 +3904,11 @@ class GeoJsonEditor extends HTMLElement {
     if (!collapsed || (Array.isArray(collapsed) && collapsed.length === 0)) return;
 
     const ranges = this._findCollapsibleRanges();
-    const featureRanges = ranges.filter(r => r.isRootFeature);
 
     for (const range of ranges) {
-      // Find which feature this range belongs to
-      const featureIndex = featureRanges.findIndex(fr =>
-        range.startLine >= fr.startLine && range.endLine <= fr.endLine
-      );
+      // Find which feature this range belongs to using the correct featureRanges map
+      const featureIndex = this._getFeatureIndexForLine(range.startLine);
+      if (featureIndex === -1) continue;
 
       // Only process new features
       if (featureIndex < startIndex || featureIndex >= startIndex + count) continue;
@@ -4046,12 +4037,12 @@ class GeoJsonEditor extends HTMLElement {
 
       // Restore collapsed state for remaining features
       const ranges = this._findCollapsibleRanges();
-      const featureRanges = ranges.filter(r => r.isRootFeature);
 
       for (const range of ranges) {
-        const featureIndex = featureRanges.findIndex(fr =>
-          range.startLine >= fr.startLine && range.endLine <= fr.endLine
-        );
+        // Find which feature this range belongs to using the correct featureRanges map
+        const featureIndex = this._getFeatureIndexForLine(range.startLine);
+        if (featureIndex === -1) continue;
+
         const key = `${featureIndex}:${range.nodeKey}`;
         if (collapsedKeys.has(key)) {
           this.collapsedNodes.add(range.nodeId);
