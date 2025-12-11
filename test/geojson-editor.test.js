@@ -295,6 +295,109 @@ describe('GeoJsonEditor - Events', () => {
 
     expect(() => el.set([invalidFeature])).to.throw('Invalid geometry type');
   });
+
+  it('should emit current-feature event when editor is focused', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set features first
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'First' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'Second' } }
+    ]);
+    await waitFor(200);
+
+    // Listen to events
+    const events = [];
+    el.addEventListener('current-feature', (e) => events.push(e.detail));
+
+    // Focus the editor - this should emit current-feature
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Should have emitted event for first feature (cursor at line 0)
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent).to.not.be.null;
+    expect(lastEvent.type).to.equal('Feature');
+    expect(lastEvent.properties.name).to.equal('First');
+  });
+
+  it('should emit current-feature with null when cursor is outside features', async () => {
+    const el = await fixture(html`<geojson-editor></geojson-editor>`);
+    await waitFor();
+
+    // Empty editor - no features
+    let receivedEvent = undefined; // Use undefined to distinguish from null emission
+    el.addEventListener('current-feature', (e) => { receivedEvent = e.detail; });
+
+    // Focus the editor - should emit null since there are no features
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Should emit null since there are no features
+    expect(receivedEvent).to.be.null;
+  });
+
+  it('should not emit current-feature if cursor stays in same feature', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'Test' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor to enable current-feature events
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Initial state is set, now count events
+    let eventCount = 0;
+    el.addEventListener('current-feature', () => eventCount++);
+
+    // Move cursor within same feature (line 1, 2 are still in the same feature)
+    el.cursorLine = 1;
+    el.renderViewport();
+    await waitFor(50);
+
+    el.cursorLine = 2;
+    el.renderViewport();
+    await waitFor(50);
+
+    // Should not emit new events since we're still in the same feature
+    expect(eventCount).to.equal(0);
+  });
+
+  it('should emit current-feature with null on blur', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'Test' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-feature', (e) => events.push(e.detail));
+
+    // Blur the editor - should emit null
+    textarea.blur();
+    await waitFor(50);
+
+    // Should have emitted null on blur
+    expect(events.length).to.be.greaterThan(0);
+    expect(events[events.length - 1]).to.be.null;
+  });
 });
 
 describe('GeoJsonEditor - Prefix/Suffix Display', () => {
@@ -555,39 +658,8 @@ describe('GeoJsonEditor - Syntax Highlighting', () => {
   });
 });
 
-describe('GeoJsonEditor - Theme Support', () => {
-
-  it('should apply dark theme via dark-selector', async () => {
-    const el = await fixture(html`<geojson-editor dark-selector=".dark-mode"></geojson-editor>`);
-
-    const themeStyle = el.shadowRoot.getElementById('theme-styles');
-    expect(themeStyle).to.exist;
-    expect(themeStyle.textContent).to.include('.dark-mode');
-  });
-
-  it('should update theme via setTheme()', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
-    el.setTheme({
-      dark: { bgColor: '#000000' }
-    });
-
-    const themeStyle = el.shadowRoot.getElementById('theme-styles');
-    expect(themeStyle.textContent).to.include('#000000');
-  });
-
-  it('should reset theme via resetTheme()', async () => {
-    const el = await fixture(html`<geojson-editor></geojson-editor>`);
-    
-    el.setTheme({
-      dark: { bgColor: '#000000' }
-    });
-    el.resetTheme();
-
-    const themeStyle = el.shadowRoot.getElementById('theme-styles');
-    expect(themeStyle.textContent).to.include('#2b2b2b'); // Default dark bg
-  });
-});
+// Theme Support tests removed - theme now handled via CSS light-dark() function
+// The component automatically adapts to color-scheme preference without JavaScript
 
 describe('GeoJsonEditor - Color Indicators', () => {
 

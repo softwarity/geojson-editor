@@ -1,5 +1,77 @@
 # Release Notes - @softwarity/geojson-editor
 
+## v1.0.24
+
+### New Features
+
+- **`current-feature` event** - New event emitted when cursor enters/leaves a feature or editor gains/loses focus; useful for highlighting the active feature on a map
+- **Native CSS theme support** - Theme now uses CSS `light-dark()` function for automatic dark/light mode switching based on system preference or inherited `color-scheme`
+
+### Breaking Changes
+
+- **Removed `dark-selector` attribute** - No longer needed; theme automatically adapts to system color-scheme
+
+### Migration from v1.0.23
+
+The component now automatically follows the system's color scheme preference. To customize colors, override CSS custom properties:
+
+```css
+/* Force dark mode */
+geojson-editor {
+  color-scheme: dark;
+}
+
+/* Force light mode */
+geojson-editor {
+  color-scheme: light;
+}
+
+/* Customize colors */
+geojson-editor {
+  --bg-color: #fff;
+  --text-color: #000;
+  --json-key: #660e7a;
+  /* ... */
+}
+```
+
+#### Integration with CSS Frameworks
+
+For frameworks using class-based dark mode (Tailwind, Bootstrap, etc.), set `color-scheme` based on their selectors:
+
+```css
+/* Tailwind CSS */
+html.dark { color-scheme: dark; }
+html:not(.dark) { color-scheme: light; }
+
+/* Bootstrap 5 */
+[data-bs-theme="dark"] { color-scheme: dark; }
+[data-bs-theme="light"] { color-scheme: light; }
+```
+
+### New Event
+
+```javascript
+editor.addEventListener('current-feature', (e) => {
+  const feature = e.detail; // Feature object or null
+  if (feature) {
+    // Highlight this feature on your map
+    highlightLayer.setData(feature);
+  } else {
+    // No current feature (blur or outside feature)
+    highlightLayer.setData({ type: 'FeatureCollection', features: [] });
+  }
+});
+```
+
+**Triggers:**
+- Editor gains focus → emits current feature at cursor
+- Cursor moves to a different feature → emits new feature
+- Cursor moves outside any feature → emits `null`
+- Editor loses focus → emits `null`
+
+---
+
 ## v1.0.23
 
 ### Improvements
@@ -13,12 +85,14 @@
 - Fixed visibility state lost when modifying properties of a hidden feature
 - Fixed visibility indices not adjusting when inserting/removing features via API
 - Fixed collapsed state lost when calling `add()`, `insertAt()`, or `removeAt()` (existing collapsed coordinates now preserved correctly)
+- Fixed `removeAll()` not clearing selection/cursor state (caused crash on subsequent paste)
+- Fixed paste not auto-collapsing when content is in "feature, feature" format (from Ctrl+A Ctrl+C)
 
 ### Code Quality
 
 - Removed dead code (`getFeatureKey` function no longer needed)
 - Fixed incorrect feature index calculation that used `isRootFeature` flag instead of proper `featureRanges` map
-- 374 unit tests (8 new tests for Home/End navigation, 18 new tests for visibility index system, 2 new tests for collapsed state preservation)
+- 376 unit tests (8 new tests for Home/End navigation, 18 new tests for visibility index system, 3 new tests for collapsed state preservation)
 
 ---
 

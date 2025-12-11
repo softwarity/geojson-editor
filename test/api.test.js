@@ -2421,3 +2421,449 @@ describe('GeoJsonEditor - Gutter Click', () => {
     expect(el.collapsedNodes.has(coordinatesRange.nodeId)).to.be.true;
   });
 });
+
+// ==================== COMPREHENSIVE COLLAPSE SCENARIOS ====================
+// These tests cover all combinations of initial state and operations
+
+describe('GeoJsonEditor - Comprehensive Collapse Scenarios', () => {
+
+  // ========== API: set() into empty editor ==========
+
+  it('API: set() into empty editor should collapse coordinates by default', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+  });
+
+  it('API: set() multiple features into empty editor should collapse all coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon, validPolygon, validPolygon]);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== API: add() into empty editor ==========
+
+  it('API: add() into empty editor should collapse coordinates by default', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.add(validPolygon);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+  });
+
+  it('API: add() multiple features into empty editor should collapse all coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.add([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== API: insertAt() into empty editor ==========
+
+  it('API: insertAt() into empty editor should collapse coordinates by default', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.insertAt(validPolygon, 0);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+  });
+
+  // ========== API: add() with existing features ==========
+
+  it('API: add() with existing features should preserve existing collapsed state', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set initial features
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Verify initial collapse
+    let ranges = el._findCollapsibleRanges();
+    let coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coords[1].nodeId)).to.be.true;
+
+    // Add new feature
+    el.add(validPolygon);
+    await waitFor(200);
+
+    // Check all 3 are collapsed
+    ranges = el._findCollapsibleRanges();
+    coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  it('API: add() should preserve manually expanded nodes', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set initial features
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Manually expand first feature's coordinates
+    let ranges = el._findCollapsibleRanges();
+    let coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    el.toggleCollapse(coords[0].nodeId); // Expand first
+    await waitFor(50);
+
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.false; // First expanded
+    expect(el.collapsedNodes.has(coords[1].nodeId)).to.be.true;  // Second still collapsed
+
+    // Add new feature
+    el.add(validPolygon);
+    await waitFor(200);
+
+    // First should still be expanded, others collapsed
+    ranges = el._findCollapsibleRanges();
+    coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.false; // Still expanded
+    expect(el.collapsedNodes.has(coords[1].nodeId)).to.be.true;  // Still collapsed
+    expect(el.collapsedNodes.has(coords[2].nodeId)).to.be.true;  // New - collapsed
+  });
+
+  // ========== API: insertAt() with existing features ==========
+
+  it('API: insertAt() at beginning should preserve existing collapsed state', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    el.insertAt(validPolygon, 0);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  it('API: insertAt() in middle should preserve existing collapsed state', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    el.insertAt(validPolygon, 1);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  it('API: insertAt() at end should preserve existing collapsed state', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    el.insertAt(validPolygon, 2);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== PASTE: into empty editor ==========
+
+  it('PASTE: single feature into empty editor should collapse coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: { getData: () => JSON.stringify(validPolygon) }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+  });
+
+  it('PASTE: multiple features (array) into empty editor should collapse all coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: { getData: () => JSON.stringify([validPolygon, validPolygon]) }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  it('PASTE: FeatureCollection into empty editor should collapse all coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    const fc = {
+      type: 'FeatureCollection',
+      features: [validPolygon, validPolygon]
+    };
+
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: { getData: () => JSON.stringify(fc) }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== PASTE: with existing features ==========
+
+  it('PASTE: array of features into editor with existing features should collapse all', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set initial
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    // Verify initial state
+    let ranges = el._findCollapsibleRanges();
+    let coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+
+    // Clear and paste multiple features (simulates copy from elsewhere)
+    el.removeAll();
+    await waitFor(100);
+
+    // Paste an array of features
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: { getData: () => JSON.stringify([validPolygon, validPolygon]) }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    ranges = el._findCollapsibleRanges();
+    coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== PASTE: after removeAll() ==========
+
+  it('PASTE: after removeAll() should collapse coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set initial
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Remove all
+    el.removeAll();
+    await waitFor(100);
+
+    // Paste
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: { getData: () => JSON.stringify(validPolygon) }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+  });
+
+  it('PASTE: Ctrl+A Ctrl+C removeAll Ctrl+V should collapse all coordinates', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set initial
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Copy content (simulating Ctrl+A Ctrl+C)
+    const copiedContent = el.getContent();
+
+    // Remove all
+    el.removeAll();
+    await waitFor(100);
+
+    // Paste (the format is "feature, feature" not a JSON array)
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: { getData: () => copiedContent }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== API: removeAt() should preserve collapse ==========
+
+  it('API: removeAt() should preserve collapsed state of remaining features', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon, validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Remove middle feature
+    el.removeAt(1);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  // ========== Mixed scenarios ==========
+
+  it('MIXED: set then add then insertAt should maintain all collapsed', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.set([validPolygon]);
+    await waitFor(200);
+
+    el.add(validPolygon);
+    await waitFor(200);
+
+    el.insertAt(validPolygon, 1);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  it('MIXED: multiple add() calls should maintain all collapsed', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.add(validPolygon);
+    await waitFor(200);
+
+    el.add(validPolygon);
+    await waitFor(200);
+
+    el.add(validPolygon);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+
+  it('MIXED: multiple insertAt() calls should maintain all collapsed', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    el.insertAt(validPolygon, 0);
+    await waitFor(200);
+
+    el.insertAt(validPolygon, 0);
+    await waitFor(200);
+
+    el.insertAt(validPolygon, 1);
+    await waitFor(200);
+
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(3);
+    coords.forEach(c => {
+      expect(el.collapsedNodes.has(c.nodeId)).to.be.true;
+    });
+  });
+});

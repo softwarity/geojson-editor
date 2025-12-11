@@ -71,7 +71,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Feature Visibility Toggle** - Hide/show individual Features via eye icon in gutter; hidden features are grayed out and excluded from `change` events (useful for temporary filtering without deleting data)
 - **Color Picker** - Built-in color swatch for hex color properties (`#rrggbb`) displayed inline next to the value; click to open native color picker
 - **Boolean Checkbox** - Inline checkbox for boolean properties displayed next to the value; toggle to switch between `true`/`false` and emit changes (e.g., `marker: true` to show vertices)
-- **Dark/Light Color Schemes** - Automatic color scheme detection from parent page (Bootstrap, Tailwind, custom)
+- **Dark/Light Color Schemes** - Automatic color scheme based on system preference via CSS `light-dark()` function
 - **Auto-format** - Automatic JSON formatting in real-time (always enabled)
 - **Readonly Mode** - Visual indicator with diagonal stripes when editing is disabled
 - **Block Editing in Collapsed Areas** - Prevents accidental edits in collapsed sections
@@ -82,6 +82,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Save to File** - Ctrl+S to download GeoJSON as `.geojson` file; programmatic `save(filename)` method available
 - **Open from File** - Ctrl+O to open a `.geojson` or `.json` file from the client filesystem; programmatic `open()` method available
 - **Error Navigation** - Visual error indicators in gutter with navigation buttons (◀ ▶) to jump between errors; error count displayed in suffix area
+- **Current Feature Event** - `current-feature` event emitted when cursor enters/leaves a feature or editor gains/loses focus; useful for synchronizing with maps
 
 ## Installation
 
@@ -127,21 +128,18 @@ This package includes TypeScript type definitions out of the box. No additional 
 
 ```typescript
 import '@softwarity/geojson-editor';
-import type { SetOptions, ThemeSettings, CursorPosition, GeometryType } from '@softwarity/geojson-editor';
+import type { SetOptions, CursorPosition, GeometryType } from '@softwarity/geojson-editor';
 
 // Type-safe editor access
 const editor = document.querySelector('geojson-editor') as GeoJsonEditor;
 
 // Full autocompletion and type checking
 editor.set(features, { collapsed: ['coordinates'] });
-editor.setTheme({ dark: { bgColor: '#1a1a1a' } });
 ```
 
 **Exported types:**
 - `GeoJsonEditor` - The Web Component class
 - `SetOptions` - Options for `set()`, `add()`, `insertAt()`, `open()`
-- `ThemeConfig` - Theme color configuration
-- `ThemeSettings` - Dark/light color scheme settings
 - `CursorPosition` - Cursor position `{ line, column }`
 - `GeometryType` - GeoJSON geometry types union
 
@@ -164,10 +162,16 @@ editor.setTheme({ dark: { bgColor: '#1a1a1a' } });
 
 Users edit features directly (comma-separated), and the component automatically wraps them in a `{"type": "FeatureCollection", "features": [...]}` structure for validation and events.
 
-### With Theme Detection
+### With Theme Control
+
+The component automatically adapts to system color scheme. Override with CSS:
 
 ```html
-<geojson-editor dark-selector="html.dark"></geojson-editor>
+<!-- Force dark mode -->
+<geojson-editor style="color-scheme: dark;"></geojson-editor>
+
+<!-- Force light mode -->
+<geojson-editor style="color-scheme: light;"></geojson-editor>
 ```
 
 ### Listen to Changes
@@ -194,20 +198,62 @@ editor.addEventListener('error', (e) => {
 | `value` | `string` | `""` | Initial editor content (features array content) |
 | `placeholder` | `string` | `""` | Placeholder text |
 | `readonly` | `boolean` | `false` | Make editor read-only |
-| `dark-selector` | `string` | `".dark"` | CSS selector for dark color scheme detection |
 
 **Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. Use Enter to expand and Shift+Enter to collapse nodes, or click the gutter toggle. Use Tab/Shift+Tab to navigate between attributes.
 
-### Dark Selector Syntax
+### Theme Control
 
-The `dark-selector` attribute determines when the dark color scheme is active. If the selector matches, dark colors are applied; otherwise, light colors are used.
+The component uses CSS `light-dark()` function and automatically adapts to the system's `color-scheme` preference. You can control the theme in several ways:
 
-**Examples:**
+```css
+/* Force dark mode on specific editor */
+geojson-editor.dark-editor {
+  color-scheme: dark;
+}
 
-- `.dark` - Component has `dark` class: `<geojson-editor class="dark">`
-- `html.dark` - HTML element has `dark` class (Tailwind CSS): `<html class="dark">`
-- `html[data-bs-theme=dark]` - HTML has Bootstrap theme attribute: `<html data-bs-theme="dark">`
-- Empty string `""` - Uses component's `data-color-scheme` attribute as fallback
+/* Force light mode */
+geojson-editor.light-editor {
+  color-scheme: light;
+}
+
+/* Customize colors (works in both light and dark modes) */
+geojson-editor {
+  --bg-color: #fafafa;
+  --text-color: #333;
+  --json-key: #881280;
+  --json-string: #1a6b1a;
+}
+```
+
+#### Integration with CSS Frameworks
+
+The editor inherits `color-scheme` from parent elements. To integrate with frameworks that use class-based dark mode:
+
+**Tailwind CSS** (uses `html.dark`):
+```css
+html.dark { color-scheme: dark; }
+html:not(.dark) { color-scheme: light; }
+```
+
+**Bootstrap 5** (uses `[data-bs-theme]`):
+```css
+[data-bs-theme="dark"] { color-scheme: dark; }
+[data-bs-theme="light"] { color-scheme: light; }
+```
+
+**DaisyUI / Other** (any class-based theme):
+```css
+.dark-theme { color-scheme: dark; }
+.light-theme { color-scheme: light; }
+```
+
+**Available CSS custom properties:**
+- `--bg-color`, `--text-color`, `--caret-color`
+- `--gutter-bg`, `--gutter-border`, `--gutter-text`
+- `--json-key`, `--json-string`, `--json-number`, `--json-boolean`, `--json-punct`, `--json-error`
+- `--geojson-key`, `--geojson-type`, `--geojson-type-invalid`
+- `--control-bg`, `--control-border`, `--control-color`
+- `--selection-color`, `--error-color`
 
 ## API Methods
 
@@ -308,22 +354,6 @@ const features = editor.getAll();
 
 // Manually emit change event
 editor.emit();
-```
-
-### Theme API
-
-```javascript
-// Get current theme
-const themes = editor.getTheme();
-
-// Set custom theme (partial update)
-editor.setTheme({
-  dark: { background: '#000', textColor: '#fff' },
-  light: { background: '#fff', textColor: '#000' }
-});
-
-// Reset to defaults
-editor.resetTheme();
 ```
 
 ### Undo/Redo API
@@ -522,9 +552,36 @@ editor.addEventListener('error', (e) => {
 - Invalid types (e.g., `"LinearRing"`)
 - Unknown types (any `type` value not in the GeoJSON specification)
 
+### `current-feature`
+
+Fired when the current feature changes. Useful for synchronizing the editor with a map display.
+
+**Triggers:**
+- Editor gains focus → emits current feature at cursor
+- Cursor moves to a different feature → emits new feature
+- Cursor moves outside any feature → emits `null`
+- Editor loses focus → emits `null`
+
+```javascript
+editor.addEventListener('current-feature', (e) => {
+  const feature = e.detail;  // Feature object or null
+  if (feature) {
+    // Highlight this feature on your map
+    highlightLayer.setData(feature);
+  } else {
+    // No current feature
+    highlightLayer.setData({ type: 'FeatureCollection', features: [] });
+  }
+});
+```
+
+**Event detail:** The Feature object at the cursor position, or `null` if no feature is current.
+
+**Note:** The event is only fired when the feature changes, not on every cursor movement within the same feature. This prevents excessive event firing during normal editing.
+
 ## Styling
 
-The component uses Shadow DOM with CSS variables for theming. Themes can be customized via the `setTheme()` API.
+The component uses Shadow DOM with CSS variables for theming. Customize colors via CSS custom properties (see [Theme Control](#theme-control)).
 
 ## Browser Support
 

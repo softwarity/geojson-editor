@@ -305,6 +305,87 @@ describe('GeoJsonEditor - Copy/Cut/Paste', () => {
     expect(features.length).to.equal(2);
   });
 
+  it('should auto-collapse coordinates after removeAll() then paste (DEMO scenario)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // First set some features (like demo does on load)
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Verify features are loaded with collapsed coordinates
+    expect(el.getAll().length).to.equal(2);
+    expect(el.collapsedNodes.size).to.be.greaterThan(0);
+
+    // Now do removeAll (like clicking the removeAll button in demo)
+    el.removeAll();
+    await waitFor(100);
+
+    // Verify editor is empty
+    expect(el.lines.length).to.equal(0);
+    expect(el.getAll().length).to.equal(0);
+
+    // Now paste a feature
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => JSON.stringify(validPolygon)
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    // Check that coordinates were auto-collapsed
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(1);
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+  });
+
+  it('should auto-collapse after Ctrl+A Ctrl+C removeAll Ctrl+V (REAL DEMO scenario)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // First set some features (like demo does on load)
+    el.set([validPolygon, validPolygon]);
+    await waitFor(200);
+
+    // Ctrl+A - select all
+    el.cursorLine = 0;
+    el.cursorColumn = 0;
+    el.selectionStart = { line: 0, column: 0 };
+    el.selectionEnd = { line: el.lines.length - 1, column: el.lines[el.lines.length - 1].length };
+
+    // Ctrl+C - copy (get the content that would be copied)
+    const copiedContent = el.getContent();
+
+    // removeAll
+    el.removeAll();
+    await waitFor(100);
+
+    expect(el.lines.length).to.equal(0);
+
+    // Ctrl+V - paste the copied content (raw text, not JSON object)
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => copiedContent
+      }
+    };
+
+    el.handlePaste(mockEvent);
+    await waitFor(300);
+
+    // Check that coordinates were auto-collapsed
+    const ranges = el._findCollapsibleRanges();
+    const coords = ranges.filter(r => r.nodeKey === 'coordinates');
+
+    expect(coords.length).to.equal(2); // Two polygons = 2 coordinates
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coords[1].nodeId)).to.be.true;
+  });
+
   it('should auto-collapse coordinates for all pasted features', async () => {
     const el = await createSizedFixture();
     await waitFor();

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -73,6 +73,10 @@
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    /* Color scheme toggle (Tailwind pattern) */
+    html.dark { color-scheme: dark; }
+    html:not(.dark) { color-scheme: light; }
+
     /* Palette icon using CSS mask */
     .icon-palette {
       display: inline-block;
@@ -87,6 +91,34 @@
       -webkit-mask-repeat: no-repeat;
     }
     .icon-palette.large { width: 20px; height: 20px; }
+
+    /* Sun icon */
+    .icon-sun {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background-color: currentColor;
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Zm326-268Z'/%3E%3C/svg%3E");
+      mask-size: contain;
+      mask-repeat: no-repeat;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='M480-360q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Zm0 80q-83 0-141.5-58.5T280-480q0-83 58.5-141.5T480-680q83 0 141.5 58.5T680-480q0 83-58.5 141.5T480-280ZM200-440H40v-80h160v80Zm720 0H760v-80h160v80ZM440-760v-160h80v160h-80Zm0 720v-160h80v160h-80ZM256-650l-101-97 57-59 96 100-52 56Zm492 496-97-101 53-55 101 97-57 59Zm-98-550 97-101 59 57-100 96-56-52ZM154-212l101-97 55 53-97 101-59-57Zm326-268Z'/%3E%3C/svg%3E");
+      -webkit-mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+    }
+
+    /* Moon icon */
+    .icon-moon {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      background-color: currentColor;
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z'/%3E%3C/svg%3E");
+      mask-size: contain;
+      mask-repeat: no-repeat;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 -960 960 960'%3E%3Cpath d='M480-120q-150 0-255-105T120-480q0-150 105-255t255-105q14 0 27.5 1t26.5 3q-41 29-65.5 75.5T444-660q0 90 63 153t153 63q55 0 101-24.5t75-65.5q2 13 3 26.5t1 27.5q0 150-105 255T480-120Zm0-80q88 0 158-48.5T740-375q-20 5-40 8t-40 3q-123 0-209.5-86.5T364-660q0-20 3-40t8-40q-78 32-126.5 102T200-480q0 116 82 198t198 82Zm-10-270Z'/%3E%3C/svg%3E");
+      -webkit-mask-size: contain;
+      -webkit-mask-repeat: no-repeat;
+    }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -372,6 +404,27 @@
     .output pre { max-height: 400px; }
     .output.error { border-color: rgba(248, 81, 73, 0.4); }
     .output.error h3 { color: var(--accent-red); }
+
+    /* Events grid - two columns */
+    .events-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    .event-column h4 {
+      color: var(--accent-blue);
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+    }
+    .event-column p {
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+    }
+    @media (max-width: 768px) {
+      .events-grid {
+        grid-template-columns: 1fr;
+      }
+    }
 
     .code-example pre { line-height: 1.5; margin: 0; }
 
@@ -810,13 +863,6 @@
         <h4>Theme</h4>
         <div class="controls-grid">
           <div class="control-group">
-            <label for="colorSchemeSelect">Color Scheme</label>
-            <select id="colorSchemeSelect">
-              <option value="dark" selected>Dark</option>
-              <option value="light">Light</option>
-            </select>
-          </div>
-          <div class="control-group">
             <label for="themePresetMainSelect">Theme Preset</label>
             <div style="display: flex; gap: 0.5rem;">
               <select id="themePresetMainSelect" style="flex: 1;">
@@ -827,33 +873,9 @@
                 <option value="solarized">Solarized</option>
               </select>
               <button class="btn-icon btn-accent" onclick="openThemeModal()" title="Edit theme"><span class="icon-palette"></span></button>
+              <button class="btn-icon" id="colorSchemeToggle" onclick="toggleColorScheme()" title="Toggle light/dark mode"><span class="icon-sun"></span></button>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="controls-section">
-        <h4>Dark Mode Detection</h4>
-        <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
-          The <code>dark-selector</code> attribute lets you specify a CSS selector. The component watches for this selector
-          to match, and when it does, applies its dark theme. You can use any valid CSS selector.
-        </p>
-        <div class="controls-grid">
-          <div class="control-group">
-            <label for="darkSelectorExampleSelect">Examples</label>
-            <select id="darkSelectorExampleSelect">
-              <option value=".dark">Self</option>
-              <option value="html.dark">Tailwind CSS</option>
-              <option value="html[data-bs-theme=dark]">Bootstrap</option>
-            </select>
-          </div>
-          <div class="control-group">
-            <label for="selectorPreview">Attribute Value</label>
-            <input type="text" id="selectorPreview" value="dark-selector='.dark'" readonly style="font-size: 0.8rem; background: #0d1117; border-color: #30363d;">
-          </div>
-        </div>
-        <div id="selectorDescription" style="background: #0d1117; padding: 0.75rem; border-radius: 4px; margin-top: 1rem; font-size: 0.85rem; color: #8b949e; border-left: 3px solid #58a6ff;">
-          <strong>Example:</strong> <code>.dark</code> — The component watches for a <code>dark</code> class on itself. When present, dark theme is applied.
         </div>
       </div>
 
@@ -909,13 +931,23 @@ Example:
     </div>
 
     <div class="section-box output">
-      <h3>Change Events:</h3>
-      <p>
-        The component emits <code>change</code> events with <code>e.detail</code> containing the parsed GeoJSON object directly.
-      </p>
-      <div class="log-container">
-        <pre id="eventLog" class="json-highlight">Waiting for change events...</pre>
-        <button class="btn-clear" onclick="clearEventLog()" title="Clear">✕</button>
+      <h3>Events:</h3>
+      <div class="events-grid">
+        <div class="event-column">
+          <h4>change</h4>
+          <p>FeatureCollection (all visible features)</p>
+          <div class="log-container">
+            <pre id="eventLog" class="json-highlight">Waiting for change events...</pre>
+            <button class="btn-clear" onclick="clearEventLog()" title="Clear">✕</button>
+          </div>
+        </div>
+        <div class="event-column">
+          <h4>current-feature</h4>
+          <p>Feature at cursor (or null)</p>
+          <div class="log-container">
+            <pre id="currentFeatureLog" class="json-highlight">null</pre>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1103,10 +1135,6 @@ Example:
     const eventLog = document.getElementById('eventLog');
     const errorLog = document.getElementById('errorLog');
     const placeholderInput = document.getElementById('placeholderInput');
-    const darkSelectorExampleSelect = document.getElementById('darkSelectorExampleSelect');
-    const colorSchemeSelect = document.getElementById('colorSchemeSelect');
-    const selectorPreview = document.getElementById('selectorPreview');
-    const selectorDescription = document.getElementById('selectorDescription');
     const themeModal = document.getElementById('themeModal');
     const themeTextarea = document.getElementById('themeTextarea');
     const themePresetMainSelect = document.getElementById('themePresetMainSelect');
@@ -1222,6 +1250,51 @@ Example:
           'circle-opacity': ['coalesce', ['get', 'marker-opacity'], 0.9],
           'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff'
+        }
+      });
+
+      // Add highlight source for current-feature
+      map.addSource('highlight-data', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
+      // Highlight layers - rendered on top with blinking animation
+      // Polygon fill highlight
+      map.addLayer({
+        id: 'highlight-fill',
+        type: 'fill',
+        source: 'highlight-data',
+        filter: ['==', '$type', 'Polygon'],
+        paint: {
+          'fill-color': ['coalesce', ['get', 'fill-color'], '#ff6b35'],
+          'fill-opacity': 0.3
+        }
+      });
+
+      // Polygon/LineString outline highlight (wider stroke)
+      map.addLayer({
+        id: 'highlight-line',
+        type: 'line',
+        source: 'highlight-data',
+        filter: ['any', ['==', '$type', 'Polygon'], ['==', '$type', 'LineString']],
+        paint: {
+          'line-color': ['coalesce', ['get', 'stroke-color'], '#ff6b35'],
+          'line-width': ['+', ['coalesce', ['get', 'stroke-width'], 2], 2]
+        }
+      });
+
+      // Point highlight (larger circle)
+      map.addLayer({
+        id: 'highlight-point',
+        type: 'circle',
+        source: 'highlight-data',
+        filter: ['==', '$type', 'Point'],
+        paint: {
+          'circle-radius': 12,
+          'circle-color': ['coalesce', ['get', 'fill-color'], '#ff6b35'],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 3
         }
       });
 
@@ -1548,6 +1621,77 @@ Example:
       return { type: 'FeatureCollection', features: vertexFeatures };
     }
 
+    // Highlight layer animation state
+    let highlightAnimationId = null;
+    let highlightVisible = true;
+
+    // Function to update highlight layer with current feature
+    function updateHighlightLayer(feature) {
+      if (!map.getSource('highlight-data')) return;
+
+      // Stop any existing animation
+      if (highlightAnimationId) {
+        clearInterval(highlightAnimationId);
+        highlightAnimationId = null;
+      }
+
+      if (feature && feature.geometry) {
+        // Set the feature data
+        map.getSource('highlight-data').setData({
+          type: 'FeatureCollection',
+          features: [feature]
+        });
+
+        // Center map on feature (keep current zoom level)
+        const bounds = new maplibregl.LngLatBounds();
+        const addCoords = (coords) => {
+          if (Array.isArray(coords[0])) {
+            coords.forEach(addCoords);
+          } else if (coords.length >= 2) {
+            bounds.extend([coords[0], coords[1]]);
+          }
+        };
+        if (feature.geometry.coordinates) {
+          addCoords(feature.geometry.coordinates);
+          if (!bounds.isEmpty()) {
+            const center = bounds.getCenter();
+            map.flyTo({
+              center: [center.lng, center.lat],
+              duration: 500
+            });
+          }
+        }
+
+        // Start blinking animation
+        highlightVisible = true;
+        highlightAnimationId = setInterval(() => {
+          highlightVisible = !highlightVisible;
+          const opacity = highlightVisible ? 1 : 0.3;
+
+          // Animate line width between normal+2 and normal+4
+          const baseStroke = feature.properties?.['stroke-width'] || 2;
+          const lineWidth = highlightVisible ? baseStroke + 4 : baseStroke + 2;
+
+          if (map.getLayer('highlight-line')) {
+            map.setPaintProperty('highlight-line', 'line-opacity', opacity);
+            map.setPaintProperty('highlight-line', 'line-width', lineWidth);
+          }
+          if (map.getLayer('highlight-fill')) {
+            map.setPaintProperty('highlight-fill', 'fill-opacity', highlightVisible ? 0.4 : 0.2);
+          }
+          if (map.getLayer('highlight-point')) {
+            map.setPaintProperty('highlight-point', 'circle-radius', highlightVisible ? 14 : 10);
+          }
+        }, 500);
+      } else {
+        // Clear highlight
+        map.getSource('highlight-data').setData({
+          type: 'FeatureCollection',
+          features: []
+        });
+      }
+    }
+
     // Function to update map with GeoJSON data
     function updateMap(geojson) {
       if (!map.getSource('geojson-data')) {
@@ -1697,97 +1841,9 @@ Example:
     };
     const htmlCode = document.getElementById('htmlCode');
 
-    // Internal dark selector value
-    let darkSelector = '.dark';
-
-    // Selector descriptions explaining what each selector does
-    const selectorDescriptions = {
-      '.dark': '<strong>Example:</strong> <code>.dark</code> — The component watches for a <code>dark</code> class on itself. When present, dark theme is applied.',
-      'html.dark': '<strong>Example:</strong> <code>html.dark</code> — The component watches for a <code>dark</code> class on the <code>&lt;html&gt;</code> element. Useful when your page uses a global dark mode class.',
-      'html[data-bs-theme=dark]': '<strong>Example:</strong> <code>html[data-bs-theme=dark]</code> — The component watches for a <code>data-bs-theme="dark"</code> attribute on the <code>&lt;html&gt;</code> element.'
-    };
-
-    // Handle dark selector example selection
-    darkSelectorExampleSelect.addEventListener('change', (e) => {
-      darkSelector = e.target.value;
-      selectorPreview.value = `dark-selector="${darkSelector}"`;
-      selectorDescription.innerHTML = selectorDescriptions[darkSelector];
-      updateEditor();
-      applyColorScheme();
-    });
-
-    // Parse dark selector to determine target element
-    function parseSelector(selector) {
-      // Check for class on component itself (.dark)
-      if (selector.startsWith('.') && !selector.includes(' ')) {
-        return {
-          target: 'component',
-          type: 'class',
-          value: selector.substring(1) // Remove the dot
-        };
-      }
-
-      // Check for class on html (html.dark)
-      const htmlClassMatch = selector.match(/^html\.(.+)$/);
-      if (htmlClassMatch) {
-        return {
-          target: 'html',
-          type: 'class',
-          value: htmlClassMatch[1]
-        };
-      }
-
-      // Check for attribute on html (html[data-bs-theme=dark])
-      const htmlAttrMatch = selector.match(/^html\[([^=]+)=([^\]]+)\]$/);
-      if (htmlAttrMatch) {
-        return {
-          target: 'html',
-          type: 'attribute',
-          attr: htmlAttrMatch[1],
-          value: htmlAttrMatch[2]
-        };
-      }
-
-      return null;
-    }
-
-    // Apply color scheme by modifying the appropriate target
-    function applyColorScheme() {
-      const scheme = colorSchemeSelect.value;
-      const isDark = scheme === 'dark';
-
-      const target = parseSelector(darkSelector);
-      if (!target) return;
-
-      // Apply to component
-      if (target.target === 'component') {
-        if (isDark) {
-          editor.classList.add(target.value);
-        } else {
-          editor.classList.remove(target.value);
-        }
-      }
-
-      // Apply to html element
-      if (target.target === 'html') {
-        if (target.type === 'class') {
-          if (isDark) {
-            document.documentElement.classList.add(target.value);
-          } else {
-            document.documentElement.classList.remove(target.value);
-          }
-        } else if (target.type === 'attribute') {
-          // For Bootstrap: set attribute to "dark" or "light"
-          document.documentElement.setAttribute(target.attr, scheme);
-        }
-      }
-
-    }
-
     // Update editor attributes from inputs
     function updateEditor() {
       editor.setAttribute('placeholder', placeholderInput.value);
-      editor.setAttribute('dark-selector', darkSelector);
 
       const readonlyToggle = document.getElementById('readonlyToggle');
       if (readonlyToggle && readonlyToggle.checked) {
@@ -1806,40 +1862,31 @@ Example:
       const internalAddToggle = document.getElementById('internalAddToggle');
       const readonly = readonlyToggle ? readonlyToggle.checked : false;
       const internalAdd = internalAddToggle ? internalAddToggle.checked : false;
-      const scheme = colorSchemeSelect.value;
-      const isDark = scheme === 'dark';
 
-      // Parse selector to understand its type
-      const selectorTarget = parseSelector(darkSelector);
-
-      // Build component attributes (always in FeatureCollection mode)
+      // Build component attributes
       let attrs = [];
       if (placeholder) attrs.push(`placeholder="${placeholder.replace(/"/g, '&quot;')}"`);
       if (readonly) attrs.push('readonly');
       if (internalAdd) attrs.push('internal-add-shortcut');
-      if (darkSelector) attrs.push(`dark-selector="${darkSelector.replace(/"/g, '&quot;')}"`);
 
-      // Build HTML tag attributes based on selector type
-      let htmlAttrs = 'lang="en"';
-      let componentClass = '';
-
-      if (selectorTarget) {
-        if (selectorTarget.target === 'html') {
-          if (selectorTarget.type === 'class' && isDark) {
-            htmlAttrs += ` class="${selectorTarget.value}"`;
-          } else if (selectorTarget.type === 'attribute') {
-            htmlAttrs += ` ${selectorTarget.attr}="${scheme}"`;
-          }
-        } else if (selectorTarget.target === 'component' && isDark) {
-          componentClass = ` class="${selectorTarget.value}"`;
-        }
-      }
+      // Check current color scheme from html class (Tailwind pattern)
+      const isDark = document.documentElement.classList.contains('dark');
 
       let code = '<!DOCTYPE html>\n';
-      code += `<html ${htmlAttrs}>\n`;
+      code += `<html lang="en"${isDark ? ' class="dark"' : ''}>\n`;
       code += '<head>\n';
       code += '  <meta charset="UTF-8">\n';
       code += '  <title>GeoJSON Editor</title>\n';
+      code += '  <style>\n';
+      code += '    /*\n';
+      code += '     * Color scheme toggle (Tailwind pattern)\n';
+      code += '     * The editor uses CSS light-dark() and inherits color-scheme from parent.\n';
+      code += '     * Toggle html.dark class to switch themes.\n';
+      code += '     * For Bootstrap: [data-bs-theme="dark"] { color-scheme: dark; }\n';
+      code += '     */\n';
+      code += '    html.dark { color-scheme: dark; }\n';
+      code += '    html:not(.dark) { color-scheme: light; }\n';
+      code += '  </style>\n';
       code += '  <script type="module">\n';
       code += '    const editor = document.querySelector(\'geojson-editor\');\n\n';
       code += '    // Valid GeoJSON - emits parsed object directly\n';
@@ -1849,13 +1896,19 @@ Example:
       code += '    // Invalid JSON or GeoJSON validation error\n';
       code += '    editor.addEventListener(\'error\', (e) => {\n';
       code += '      console.error(\'Error:\', e.detail.error);\n';
+      code += '    });\n\n';
+      code += '    // Cursor moved to a different feature\n';
+      code += '    editor.addEventListener(\'current-feature\', (e) => {\n';
+      code += '      console.log(\'Current feature:\', e.detail);\n';
       code += '    });\n';
       code += '  <\/script>\n';
       code += '</head>\n';
       code += '<body>\n';
-      code += `  <geojson-editor${componentClass}\n`;
-      code += '    ' + attrs.join('\n    ') + '\n';
-      code += '  ></geojson-editor>\n\n';
+      code += '  <geojson-editor';
+      if (attrs.length > 0) {
+        code += '\n    ' + attrs.join('\n    ');
+      }
+      code += '\n  ></geojson-editor>\n\n';
       code += '  <script type="module" src="https://unpkg.com/@softwarity/geojson-editor"><\/script>\n';
       code += '</body>\n';
       code += '</html>';
@@ -1882,6 +1935,21 @@ Example:
       errorLog.style.color = '#f85149';
     });
 
+    // Listen to current-feature events (cursor position tracking)
+    const currentFeatureLog = document.getElementById('currentFeatureLog');
+    editor.addEventListener('current-feature', (e) => {
+      if (e.detail) {
+        const jsonStr = JSON.stringify(e.detail, null, 2);
+        currentFeatureLog.innerHTML = Prism.highlight(jsonStr, Prism.languages.json, 'json');
+        // Update highlight layer on map
+        updateHighlightLayer(e.detail);
+      } else {
+        currentFeatureLog.textContent = 'null';
+        // Clear highlight layer
+        updateHighlightLayer(null);
+      }
+    });
+
     // Clear event/error logs
     function clearEventLog() {
       eventLog.textContent = 'Waiting for change events...';
@@ -1895,12 +1963,6 @@ Example:
     // Listen to input changes
     placeholderInput.addEventListener('input', updateEditor);
 
-    // Color scheme change - applies to the selector target and updates HTML code
-    colorSchemeSelect.addEventListener('change', () => {
-      applyColorScheme();
-      updateHTMLCode(); // Update the generated HTML code to reflect the new scheme
-    });
-
     // Apply preset theme directly from main selector
     themePresetMainSelect.addEventListener('change', () => {
       const presetName = themePresetMainSelect.value;
@@ -1908,6 +1970,19 @@ Example:
         editor.setTheme(themePresets[presetName]);
       }
     });
+
+    // Toggle color scheme (light/dark) using Tailwind pattern (class on html)
+    const colorSchemeToggle = document.getElementById('colorSchemeToggle');
+    // Set initial icon based on html.dark class
+    colorSchemeToggle.querySelector('span').className = document.documentElement.classList.contains('dark') ? 'icon-moon' : 'icon-sun';
+
+    function toggleColorScheme() {
+      document.documentElement.classList.toggle('dark');
+      const isDark = document.documentElement.classList.contains('dark');
+      const iconSpan = colorSchemeToggle.querySelector('span');
+      iconSpan.className = isDark ? 'icon-moon' : 'icon-sun';
+      updateHTMLCode();
+    }
 
     // Open theme modal
     function openThemeModal() {
@@ -2287,7 +2362,6 @@ editor.setTheme(${themeTextarea.value});`;
     // Load initial sample automatically after component is ready
     customElements.whenDefined('geojson-editor').then(() => {
       updateEditor();
-      applyColorScheme();
       loadSampleData();
     });
   </script>

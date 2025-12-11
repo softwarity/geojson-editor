@@ -89,7 +89,7 @@ test/api.test.js:
   ✓ GeoJsonEditor - Features API > should set features via set()
   ...
 
-Chromium: 374 passed, 0 failed
+Chromium: 396 passed, 0 failed
 Finished running tests in 36s, all tests passed! 🎉
 ```
 
@@ -313,10 +313,9 @@ editor.shadowRoot.querySelector('.hidden-textarea')
 editor.set([{ type: 'Feature', geometry: null, properties: {} }])
 editor.getAll()
 
-// Set custom theme
-editor.setTheme({
-  dark: { bgColor: '#000000', textColor: '#ffffff' }
-})
+// Force dark/light theme
+// The component auto-adapts to system color-scheme preference
+// Override via CSS: geojson-editor { color-scheme: dark; }
 ```
 
 ### 2. Live Reload
@@ -343,8 +342,8 @@ Edit `demo/index.html` to test edge cases:
 <!-- Test with placeholder -->
 <geojson-editor placeholder="Enter GeoJSON features..."></geojson-editor>
 
-<!-- Test with dark color scheme detection (Tailwind style) -->
-<geojson-editor dark-selector="html.dark"></geojson-editor>
+<!-- Force dark mode (theme auto-adapts to system preference) -->
+<geojson-editor style="color-scheme: dark;"></geojson-editor>
 ```
 
 **Note:** Users edit features directly (comma-separated). The component wraps them in a FeatureCollection structure automatically.
@@ -405,7 +404,7 @@ If imports fail in the demo:
 
 Before submitting changes, verify:
 
-- [ ] `npm test` passes all 374 unit tests
+- [ ] `npm test` passes all 396 unit tests
 - [ ] `npm run dev` starts without errors
 - [ ] Component renders correctly in demo
 - [ ] All features work:
@@ -427,6 +426,7 @@ Before submitting changes, verify:
 - [ ] Readonly mode works (clear button hidden)
 - [ ] `change` events fire with valid GeoJSON (e.detail is the parsed object)
 - [ ] `error` events fire with invalid JSON/GeoJSON
+- [ ] `current-feature` events fire when cursor moves between features or on focus/blur
 - [ ] Virtualized rendering works for large GeoJSON
 
 ## Making Changes

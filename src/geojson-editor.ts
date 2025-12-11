@@ -42,7 +42,7 @@ import {
   RE_CLOSE_BRACKET
 } from './constants.js';
 
-import { createElement, countBrackets, parseSelectorToHostRule } from './utils.js';
+import { createElement, countBrackets } from './utils.js';
 import { validateGeoJSON, normalizeToFeatures } from './validation.js';
 import { highlightSyntax, namedColorToHex, isNamedColor } from './syntax-highlighter.js';
 
@@ -116,6 +116,7 @@ class GeoJsonEditor extends HTMLElement {
   private _contextMapFirstLine: string | undefined = undefined;
   private _contextMapLastLine: string | undefined = undefined;
   private _errorLinesCache: Set<number> | null = null;
+  private _lastCursorFeatureIndex: number | null = null; // For current-feature event deduplication
 
   // ========== Cached DOM Elements ==========
   private _viewport: HTMLElement | null = null;
@@ -440,7 +441,7 @@ class GeoJsonEditor extends HTMLElement {
 
   // ========== Observed Attributes ==========
   static get observedAttributes() {
-    return ['readonly', 'value', 'placeholder', 'dark-selector', 'internal-add-shortcut'];
+    return ['readonly', 'value', 'placeholder', 'internal-add-shortcut'];
   }
 
   // ========== Lifecycle ==========
@@ -483,9 +484,6 @@ class GeoJsonEditor extends HTMLElement {
         break;
       case 'placeholder':
         this.updatePlaceholderContent();
-        break;
-      case 'dark-selector':
-        this.updateThemeCSS();
         break;
     }
   }
@@ -697,12 +695,16 @@ class GeoJsonEditor extends HTMLElement {
       editorWrapper.classList.add('focused');
       this._invalidateRenderCache(); // Force re-render to show cursor
       this.scheduleRender();
+      // Emit current feature on focus (force to always emit on focus gain)
+      this._emitCurrentFeature(true);
     });
 
     hiddenTextarea.addEventListener('blur', () => {
       editorWrapper.classList.remove('focused');
       this._invalidateRenderCache(); // Force re-render to hide cursor
       this.scheduleRender();
+      // Emit null on blur
+      this._emitCurrentFeatureNull();
     });
 
     // Scroll handling
@@ -1324,11 +1326,16 @@ class GeoJsonEditor extends HTMLElement {
     
     linesContainer.innerHTML = '';
     linesContainer.appendChild(fragment);
-    
+
     // Render gutter with same range
     this.renderGutter(startIndex, endIndex);
+
+    // Emit current-feature event if feature changed (only when editor is focused)
+    if (this._editorWrapper?.classList.contains('focused')) {
+      this._emitCurrentFeature();
+    }
   }
-  
+
   /**
    * Insert cursor element at the specified column position
    * Uses absolute positioning to avoid affecting text layout
@@ -2757,7 +2764,14 @@ class GeoJsonEditor extends HTMLElement {
     // Try to parse as GeoJSON and normalize
     let pastedFeatureCount = 0;
     try {
-      const parsed = JSON.parse(text);
+      // First try direct parse (single Feature, Feature[], or FeatureCollection)
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // If direct parse fails, try wrapping with [] (for "feature, feature" format from editor copy)
+        parsed = JSON.parse('[' + text + ']');
+      }
       const features = normalizeToFeatures(parsed);
       pastedFeatureCount = features.length;
       // Valid GeoJSON - insert formatted features
@@ -3532,6 +3546,51 @@ class GeoJsonEditor extends HTMLElement {
     }
   }
 
+  /**
+   * Emit current-feature event when cursor moves to a different feature
+   * Only emits when the feature changes (not on every cursor move)
+   * @param force - If true, emit even if feature hasn't changed (used on focus)
+   */
+  private _emitCurrentFeature(force: boolean = false): void {
+    const featureIndex = this._getFeatureIndexForLine(this.cursorLine);
+
+    // Only emit if feature changed (unless forced)
+    if (!force && featureIndex === this._lastCursorFeatureIndex) return;
+    this._lastCursorFeatureIndex = featureIndex;
+
+    if (featureIndex === -1) {
+      // Cursor is not in a feature
+      this.dispatchEvent(new CustomEvent('current-feature', {
+        detail: null,
+        bubbles: true,
+        composed: true
+      }));
+    } else {
+      // Get the feature at cursor
+      const features = this._parseFeatures();
+      const feature = features[featureIndex] || null;
+
+      this.dispatchEvent(new CustomEvent('current-feature', {
+        detail: feature,
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
+  /**
+   * Emit current-feature with null (used on blur)
+   * Always emits to ensure map is cleared when editor loses focus
+   */
+  private _emitCurrentFeatureNull(): void {
+    this._lastCursorFeatureIndex = null;
+    this.dispatchEvent(new CustomEvent('current-feature', {
+      detail: null,
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   // ========== UI Updates ==========
 
   updateReadonly() {
@@ -3574,55 +3633,43 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   // ========== Theme ==========
-  
-  updateThemeCSS() {
-    const darkSelector = this.getAttribute('dark-selector') || '.dark';
-    const darkRule = parseSelectorToHostRule(darkSelector);
 
+  updateThemeCSS() {
     let themeStyle = this._id('theme-styles') as HTMLStyleElement;
     if (!themeStyle) {
       themeStyle = _ce('style') as HTMLStyleElement;
       themeStyle.id = 'theme-styles';
       this.shadowRoot!.insertBefore(themeStyle, this.shadowRoot!.firstChild);
     }
-    
-    const darkDefaults = {
-      bgColor: '#2b2b2b',
-      textColor: '#a9b7c6',
-      caretColor: '#bbb',
-      gutterBg: '#313335',
-      gutterBorder: '#3c3f41',
-      gutterText: '#606366',
-      jsonKey: '#9876aa',
-      jsonString: '#6a8759',
-      jsonNumber: '#6897bb',
-      jsonBoolean: '#cc7832',
-      jsonNull: '#cc7832',
-      jsonPunct: '#a9b7c6',
-      jsonError: '#ff6b68',
-      controlColor: '#cc7832',
-      controlBg: '#3c3f41',
-      controlBorder: '#5a5a5a',
-      geojsonKey: '#9876aa',
-      geojsonType: '#6a8759',
-      geojsonTypeInvalid: '#ff6b68',
-      jsonKeyInvalid: '#ff6b68'
-    };
-    
+
     RE_TO_KEBAB.lastIndex = 0;
     const toKebab = (str: string) => str.replace(RE_TO_KEBAB, '-$1').toLowerCase();
     const generateVars = (obj: Record<string, string | undefined>) => Object.entries(obj)
       .filter((entry): entry is [string, string] => entry[1] !== undefined)
       .map(([k, v]) => `--${toKebab(k)}: ${v};`)
       .join('\n        ');
-    
+
+    // Generate CSS for light theme overrides
     const lightVars = generateVars(this.themes.light as Record<string, string | undefined> || {});
-    const darkTheme = { ...darkDefaults, ...this.themes.dark };
-    const darkVars = generateVars(darkTheme as Record<string, string | undefined>);
-    
-    let css = lightVars ? `:host {\n        ${lightVars}\n      }\n` : '';
-    css += `${darkRule} {\n        ${darkVars}\n      }`;
-    
+    // Generate CSS for dark theme overrides
+    const darkVars = generateVars(this.themes.dark as Record<string, string | undefined> || {});
+
+    let css = '';
+    // Media queries first (lower priority)
+    if (lightVars) {
+      css += `@media (prefers-color-scheme: light) {\n        :host {\n          ${lightVars}\n        }\n      }\n`;
+    }
+    if (darkVars) {
+      css += `@media (prefers-color-scheme: dark) {\n        :host {\n          ${darkVars}\n        }\n      }\n`;
+    }
+    // Inline style overrides last (higher priority - these override media queries)
+    if (lightVars) {
+      css += `:host([style*="color-scheme: light"]), :host([style*="color-scheme:light"]) {\n        ${lightVars}\n      }\n`;
+    }
+    if (darkVars) {
+      css += `:host([style*="color-scheme: dark"]), :host([style*="color-scheme:dark"]) {\n        ${darkVars}\n      }`;
+    }
+
     themeStyle.textContent = css;
   }
 
@@ -4066,6 +4113,10 @@ class GeoJsonEditor extends HTMLElement {
     this.lines = [];
     this.collapsedNodes.clear();
     this.hiddenFeatures.clear();
+    this.cursorLine = 0;
+    this.cursorColumn = 0;
+    this.selectionStart = null;
+    this.selectionEnd = null;
     this.updateModel();
     this.scheduleRender();
     this.updatePlaceholderVisibility();
