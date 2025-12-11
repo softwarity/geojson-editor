@@ -349,7 +349,7 @@ function updateAnimatedIcons() {
 
   const features = [];
 
-  activeAnimations.forEach((anim, id) => {
+  activeAnimations.forEach((anim) => {
     // Update progress based on speed (speed 1 = 30 seconds for full path)
     const increment = (anim.speed / 30) * (1/60) * anim.direction; // 60fps assumed
     anim.progress += increment;
@@ -612,12 +612,12 @@ function updateMap(geojson) {
   }
 }
 
-// Theme CSS files mapping
+// Theme CSS files mapping (using CDN for GitHub Pages compatibility)
 const themeCSSFiles = {
-  vscode: '../themes/vscode.css',
-  github: '../themes/github.css',
-  monokai: '../themes/monokai.css',
-  solarized: '../themes/solarized.css'
+  vscode: 'https://unpkg.com/@softwarity/geojson-editor/themes/vscode.css',
+  github: 'https://unpkg.com/@softwarity/geojson-editor/themes/github.css',
+  monokai: 'https://unpkg.com/@softwarity/geojson-editor/themes/monokai.css',
+  solarized: 'https://unpkg.com/@softwarity/geojson-editor/themes/solarized.css'
 };
 
 // Cache for loaded theme CSS content
