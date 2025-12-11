@@ -6,33 +6,58 @@
 
 - **`current-feature` event** - New event emitted when cursor enters/leaves a feature or editor gains/loses focus; useful for highlighting the active feature on a map
 - **Native CSS theme support** - Theme now uses CSS `light-dark()` function for automatic dark/light mode switching based on system preference or inherited `color-scheme`
+- **Pre-built theme CSS files** - 4 ready-to-use themes available: VS Code, GitHub, Monokai, Solarized
 
 ### Breaking Changes
 
 - **Removed `dark-selector` attribute** - No longer needed; theme automatically adapts to system color-scheme
+- **Removed `setTheme()`, `getTheme()`, `resetTheme()` methods** - Themes are now pure CSS files. Use external CSS to customize colors.
+- **Removed `ThemeConfig` and `ThemeSettings` types** - No longer needed with CSS-based theming
 
 ### Migration from v1.0.23
 
-The component now automatically follows the system's color scheme preference. To customize colors, override CSS custom properties:
+#### Theme Migration
+
+**Before (v1.0.23):**
+```javascript
+// JavaScript-based theme
+editor.setTheme({
+  dark: { bgColor: '#1e1e1e', textColor: '#d4d4d4' },
+  light: { bgColor: '#fff', textColor: '#000' }
+});
+```
+
+**After (v1.0.24):**
+```html
+<!-- Use a pre-built theme CSS file -->
+<link rel="stylesheet" href="https://unpkg.com/@softwarity/geojson-editor/themes/vscode.css">
+```
+
+Or create custom CSS:
+```css
+/* CSS-based theme with light-dark() */
+geojson-editor {
+  --bg-color: light-dark(#fff, #1e1e1e);
+  --text-color: light-dark(#000, #d4d4d4);
+  /* ... */
+}
+```
+
+#### Available Theme Files
+
+- `themes/vscode.css` - VS Code colors
+- `themes/github.css` - GitHub styling
+- `themes/monokai.css` - Monokai palette
+- `themes/solarized.css` - Solarized scheme
+
+#### Forcing Light or Dark Mode
 
 ```css
 /* Force dark mode */
-geojson-editor {
-  color-scheme: dark;
-}
+geojson-editor { color-scheme: dark; }
 
 /* Force light mode */
-geojson-editor {
-  color-scheme: light;
-}
-
-/* Customize colors */
-geojson-editor {
-  --bg-color: #fff;
-  --text-color: #000;
-  --json-key: #660e7a;
-  /* ... */
-}
+geojson-editor { color-scheme: light; }
 ```
 
 #### Integration with CSS Frameworks

@@ -1,0 +1,43 @@
+/**
+ * Monokai Theme for @softwarity/geojson-editor
+ *
+ * Classic dark theme inspired by Monokai color scheme.
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="themes/monokai.css">
+ *   <geojson-editor></geojson-editor>
+ */
+
+:root {
+  /* Editor background and text */
+  --geojson-editor-bg-color: light-dark(#fafafa, #272822);
+  --geojson-editor-text-color: light-dark(#49483e, #f8f8f2);
+  --geojson-editor-caret-color: light-dark(#49483e, #f8f8f0);
+
+  /* Gutter (line numbers area) */
+  --geojson-editor-gutter-bg: light-dark(#f0f0f0, #3e3d32);
+  --geojson-editor-gutter-border: light-dark(#e0e0e0, #49483e);
+  --geojson-editor-gutter-text: light-dark(#999, #75715e);
+
+  /* JSON syntax highlighting */
+  --geojson-editor-json-key: light-dark(#f92672, #f92672);
+  --geojson-editor-json-string: light-dark(#718c00, #e6db74);
+  --geojson-editor-json-number: light-dark(#ae81ff, #ae81ff);
+  --geojson-editor-json-boolean: light-dark(#66d9ef, #66d9ef);
+  --geojson-editor-json-punct: light-dark(#49483e, #f8f8f2);
+  --geojson-editor-json-error: light-dark(#f92672, #f92672);
+
+  /* GeoJSON-specific */
+  --geojson-editor-geojson-key: light-dark(#f92672, #a6e22e);
+  --geojson-editor-geojson-type: light-dark(#718c00, #e6db74);
+  --geojson-editor-geojson-type-invalid: light-dark(#f92672, #f92672);
+
+  /* Controls (checkboxes, color swatches) */
+  --geojson-editor-control-color: light-dark(#66d9ef, #66d9ef);
+  --geojson-editor-control-bg: light-dark(#e8e8e8, #3e3d32);
+  --geojson-editor-control-border: light-dark(#c0c0c0, #75715e);
+
+  /* Selection and errors */
+  --geojson-editor-selection-color: light-dark(rgba(174, 129, 255, 0.2), rgba(174, 129, 255, 0.3));
+  --geojson-editor-error-color: light-dark(#f92672, #f92672);
+}

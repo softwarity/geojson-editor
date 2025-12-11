@@ -866,13 +866,13 @@
             <label for="themePresetMainSelect">Theme Preset</label>
             <div style="display: flex; gap: 0.5rem;">
               <select id="themePresetMainSelect" style="flex: 1;">
-                <option value="intellij" selected>IntelliJ (Default)</option>
-                <option value="vscode">VSCode</option>
+                <option value="" selected>Default (IntelliJ)</option>
+                <option value="vscode">VS Code</option>
                 <option value="github">GitHub</option>
-                <option value="onedark">One Dark / One Light</option>
+                <option value="monokai">Monokai</option>
                 <option value="solarized">Solarized</option>
               </select>
-              <button class="btn-icon btn-accent" onclick="openThemeModal()" title="Edit theme"><span class="icon-palette"></span></button>
+              <button class="btn-icon btn-accent" onclick="openThemeModal()" title="View theme CSS"><span class="icon-palette"></span></button>
               <button class="btn-icon" id="colorSchemeToggle" onclick="toggleColorScheme()" title="Toggle light/dark mode"><span class="icon-sun"></span></button>
             </div>
           </div>
@@ -982,23 +982,23 @@ Example:
     </footer>
   </div>
 
-  <!-- Theme Editor Modal -->
+  <!-- Theme CSS Viewer Modal -->
   <div id="themeModal" class="modal" style="display: none;">
     <div class="modal-backdrop" onclick="closeThemeModal()"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h3 style="display: flex; align-items: center; gap: 0.5rem;"><span class="icon-palette large"></span> Theme Editor</h3>
+        <h3 style="display: flex; align-items: center; gap: 0.5rem;"><span class="icon-palette large"></span> Theme CSS</h3>
         <button class="modal-close" onclick="closeThemeModal()">×</button>
       </div>
       <div class="modal-body">
         <p style="color: #666; font-size: 0.85rem; margin-bottom: 1rem;">
-          Customize the current theme. Edit the JSON below and click "Apply" to preview.<br>
-          Use "Copy Code" to get the JavaScript snippet for your implementation.
+          Themes are CSS files using <code>light-dark()</code> for automatic dark/light switching.<br>
+          Edit the CSS below and click "Apply" to preview, or "Copy" to use in your project.
         </p>
         <textarea id="themeTextarea" rows="20" spellcheck="false"></textarea>
         <div class="theme-actions">
           <button onclick="resetTheme()">Reset</button>
-          <button onclick="copyTheme()">Copy</button>
+          <button onclick="copyTheme()">Copy CSS</button>
           <button class="btn-action" onclick="applyTheme()">Apply</button>
         </div>
       </div>
@@ -1745,100 +1745,63 @@ Example:
       }
     }
 
-    // Pre-defined theme presets
-    // Keys are camelCase and will be converted to kebab-case CSS variables (e.g., bgColor → --bg-color)
-    const themePresets = {
-      intellij: {
-        dark: {
-          bgColor: '#2b2b2b', textColor: '#a9b7c6', caretColor: '#bbbbbb',
-          gutterBg: '#313335', gutterBorder: '#3c3f41',
-          jsonKey: '#9876aa', jsonString: '#6a8759', jsonNumber: '#6897bb',
-          jsonBoolean: '#cc7832', jsonNull: '#cc7832', jsonPunct: '#a9b7c6',
-          controlColor: '#cc7832', controlBg: '#3c3f41', controlBorder: '#5a5a5a',
-          geojsonKey: '#9876aa', geojsonType: '#6a8759', geojsonTypeInvalid: '#ff6b68', jsonKeyInvalid: '#ff6b68'
-        },
-        light: {
-          bgColor: '#ffffff', textColor: '#000000', caretColor: '#000000',
-          gutterBg: '#f0f0f0', gutterBorder: '#e0e0e0',
-          jsonKey: '#660e7a', jsonString: '#008000', jsonNumber: '#0000ff',
-          jsonBoolean: '#000080', jsonNull: '#000080', jsonPunct: '#000000',
-          controlColor: '#000080', controlBg: '#e8e8e8', controlBorder: '#c0c0c0',
-          geojsonKey: '#660e7a', geojsonType: '#008000', geojsonTypeInvalid: '#ff0000', jsonKeyInvalid: '#ff0000'
-        }
-      },
-      vscode: {
-        dark: {
-          bgColor: '#1e1e1e', textColor: '#d4d4d4', caretColor: '#fff',
-          gutterBg: '#252526', gutterBorder: '#3e3e42',
-          jsonKey: '#9cdcfe', jsonString: '#ce9178', jsonNumber: '#b5cea8',
-          jsonBoolean: '#569cd6', jsonNull: '#569cd6', jsonPunct: '#d4d4d4',
-          controlColor: '#c586c0', controlBg: '#3e3e42', controlBorder: '#555',
-          geojsonKey: '#c586c0', geojsonType: '#4ec9b0', geojsonTypeInvalid: '#f44747', jsonKeyInvalid: '#f44747'
-        },
-        light: {
-          bgColor: '#ffffff', textColor: '#333333', caretColor: '#000',
-          gutterBg: '#f5f5f5', gutterBorder: '#ddd',
-          jsonKey: '#0000ff', jsonString: '#a31515', jsonNumber: '#098658',
-          jsonBoolean: '#0000ff', jsonNull: '#0000ff', jsonPunct: '#333333',
-          controlColor: '#a31515', controlBg: '#e0e0e0', controlBorder: '#999',
-          geojsonKey: '#af00db', geojsonType: '#267f99', geojsonTypeInvalid: '#d32f2f', jsonKeyInvalid: '#d32f2f'
-        }
-      },
-      github: {
-        dark: {
-          bgColor: '#0d1117', textColor: '#c9d1d9', caretColor: '#c9d1d9',
-          gutterBg: '#161b22', gutterBorder: '#30363d',
-          jsonKey: '#79c0ff', jsonString: '#a5d6ff', jsonNumber: '#79c0ff',
-          jsonBoolean: '#ff7b72', jsonNull: '#ff7b72', jsonPunct: '#c9d1d9',
-          controlColor: '#d2a8ff', controlBg: '#30363d', controlBorder: '#484f58',
-          geojsonKey: '#d2a8ff', geojsonType: '#7ee787', geojsonTypeInvalid: '#f85149', jsonKeyInvalid: '#f85149'
-        },
-        light: {
-          bgColor: '#ffffff', textColor: '#24292f', caretColor: '#24292f',
-          gutterBg: '#f6f8fa', gutterBorder: '#d0d7de',
-          jsonKey: '#0550ae', jsonString: '#0a3069', jsonNumber: '#0550ae',
-          jsonBoolean: '#cf222e', jsonNull: '#cf222e', jsonPunct: '#24292f',
-          controlColor: '#8250df', controlBg: '#eaeef2', controlBorder: '#afb8c1',
-          geojsonKey: '#8250df', geojsonType: '#116329', geojsonTypeInvalid: '#cf222e', jsonKeyInvalid: '#cf222e'
-        }
-      },
-      onedark: {
-        dark: {
-          bgColor: '#282c34', textColor: '#abb2bf', caretColor: '#528bff',
-          gutterBg: '#21252b', gutterBorder: '#3e4451',
-          jsonKey: '#e06c75', jsonString: '#98c379', jsonNumber: '#d19a66',
-          jsonBoolean: '#d19a66', jsonNull: '#d19a66', jsonPunct: '#abb2bf',
-          controlColor: '#c678dd', controlBg: '#3e4451', controlBorder: '#4b5263',
-          geojsonKey: '#c678dd', geojsonType: '#56b6c2', geojsonTypeInvalid: '#e06c75', jsonKeyInvalid: '#e06c75'
-        },
-        light: {
-          bgColor: '#fafafa', textColor: '#383a42', caretColor: '#526fff',
-          gutterBg: '#f0f0f0', gutterBorder: '#e0e0e0',
-          jsonKey: '#e45649', jsonString: '#50a14f', jsonNumber: '#986801',
-          jsonBoolean: '#986801', jsonNull: '#986801', jsonPunct: '#383a42',
-          controlColor: '#a626a4', controlBg: '#e0e0e0', controlBorder: '#999',
-          geojsonKey: '#a626a4', geojsonType: '#0184bc', geojsonTypeInvalid: '#e45649', jsonKeyInvalid: '#e45649'
-        }
-      },
-      solarized: {
-        dark: {
-          bgColor: '#002b36', textColor: '#839496', caretColor: '#839496',
-          gutterBg: '#073642', gutterBorder: '#094652',
-          jsonKey: '#268bd2', jsonString: '#2aa198', jsonNumber: '#d33682',
-          jsonBoolean: '#cb4b16', jsonNull: '#cb4b16', jsonPunct: '#839496',
-          controlColor: '#6c71c4', controlBg: '#073642', controlBorder: '#586e75',
-          geojsonKey: '#6c71c4', geojsonType: '#859900', geojsonTypeInvalid: '#dc322f', jsonKeyInvalid: '#dc322f'
-        },
-        light: {
-          bgColor: '#fdf6e3', textColor: '#657b83', caretColor: '#657b83',
-          gutterBg: '#eee8d5', gutterBorder: '#e0dbc8',
-          jsonKey: '#268bd2', jsonString: '#2aa198', jsonNumber: '#d33682',
-          jsonBoolean: '#cb4b16', jsonNull: '#cb4b16', jsonPunct: '#657b83',
-          controlColor: '#6c71c4', controlBg: '#eee8d5', controlBorder: '#93a1a1',
-          geojsonKey: '#6c71c4', geojsonType: '#859900', geojsonTypeInvalid: '#dc322f', jsonKeyInvalid: '#dc322f'
-        }
-      }
+    // Theme CSS files mapping
+    const themeCSSFiles = {
+      vscode: '../themes/vscode.css',
+      github: '../themes/github.css',
+      monokai: '../themes/monokai.css',
+      solarized: '../themes/solarized.css'
     };
+
+    // Cache for loaded theme CSS content
+    const themeCache = {};
+
+    // Current theme style element
+    let currentThemeStyle = null;
+
+    // Load theme CSS file and apply it
+    async function loadThemeCSS(themeName) {
+      // Remove current theme if any
+      if (currentThemeStyle) {
+        currentThemeStyle.remove();
+        currentThemeStyle = null;
+      }
+
+      // Empty value means default theme (no external CSS)
+      if (!themeName) {
+        return '';
+      }
+
+      const cssPath = themeCSSFiles[themeName];
+      if (!cssPath) return '';
+
+      // Check cache first
+      if (themeCache[themeName]) {
+        applyThemeCSS(themeCache[themeName]);
+        return themeCache[themeName];
+      }
+
+      // Use dynamic import with ?raw to get raw CSS content (works with Vite)
+      try {
+        const module = await import(/* @vite-ignore */ cssPath + '?raw');
+        const cssContent = module.default;
+        themeCache[themeName] = cssContent;
+        applyThemeCSS(cssContent);
+        return cssContent;
+      } catch (error) {
+        console.error(`Failed to load theme ${themeName}:`, error);
+        return '';
+      }
+    }
+
+    // Apply theme CSS to document
+    function applyThemeCSS(cssContent) {
+      if (!cssContent) return;
+      currentThemeStyle = document.createElement('style');
+      currentThemeStyle.id = 'theme-override';
+      currentThemeStyle.textContent = cssContent;
+      document.head.appendChild(currentThemeStyle);
+    }
     const htmlCode = document.getElementById('htmlCode');
 
     // Update editor attributes from inputs
@@ -1862,6 +1825,7 @@ Example:
       const internalAddToggle = document.getElementById('internalAddToggle');
       const readonly = readonlyToggle ? readonlyToggle.checked : false;
       const internalAdd = internalAddToggle ? internalAddToggle.checked : false;
+      const currentTheme = themePresetMainSelect.value;
 
       // Build component attributes
       let attrs = [];
@@ -1877,6 +1841,13 @@ Example:
       code += '<head>\n';
       code += '  <meta charset="UTF-8">\n';
       code += '  <title>GeoJSON Editor</title>\n';
+
+      // Include theme CSS link if a theme is selected
+      if (currentTheme) {
+        code += `  <!-- Theme: ${currentTheme} -->\n`;
+        code += `  <link rel="stylesheet" href="https://unpkg.com/@softwarity/geojson-editor/themes/${currentTheme}.css">\n`;
+      }
+
       code += '  <style>\n';
       code += '    /*\n';
       code += '     * Color scheme toggle (Tailwind pattern)\n';
@@ -1964,11 +1935,10 @@ Example:
     placeholderInput.addEventListener('input', updateEditor);
 
     // Apply preset theme directly from main selector
-    themePresetMainSelect.addEventListener('change', () => {
+    themePresetMainSelect.addEventListener('change', async () => {
       const presetName = themePresetMainSelect.value;
-      if (presetName && themePresets[presetName]) {
-        editor.setTheme(themePresets[presetName]);
-      }
+      await loadThemeCSS(presetName);
+      updateHTMLCode();
     });
 
     // Toggle color scheme (light/dark) using Tailwind pattern (class on html)
@@ -1985,8 +1955,8 @@ Example:
     }
 
     // Open theme modal
-    function openThemeModal() {
-      loadCurrentTheme();
+    async function openThemeModal() {
+      await loadCurrentThemeCSS();
       themeModal.style.display = 'flex';
       document.body.style.overflow = 'hidden';
     }
@@ -2004,42 +1974,110 @@ Example:
       }
     });
 
-    // Load current theme preset into textarea
-    function loadCurrentTheme() {
-      const presetName = themePresetMainSelect.value || 'intellij';
-      const theme = themePresets[presetName] || themePresets.intellij;
-      themeTextarea.value = JSON.stringify(theme, null, 2);
-    }
+    // Load current theme CSS into textarea
+    async function loadCurrentThemeCSS() {
+      const presetName = themePresetMainSelect.value;
+      if (!presetName) {
+        // Default theme - show the built-in CSS variables
+        themeTextarea.value = `/* Default theme (IntelliJ) - built into the component */
+/* To customize, create a CSS file with overrides: */
 
-    // Apply theme from textarea
-    function applyTheme() {
+:root {
+  /* Editor background and text */
+  --geojson-editor-bg-color: light-dark(#fff, #2b2b2b);
+  --geojson-editor-text-color: light-dark(#000, #a9b7c6);
+  --geojson-editor-caret-color: light-dark(#000, #bbb);
+
+  /* Gutter (line numbers area) */
+  --geojson-editor-gutter-bg: light-dark(#f0f0f0, #313335);
+  --geojson-editor-gutter-border: light-dark(#e0e0e0, #3c3f41);
+  --geojson-editor-gutter-text: light-dark(#999, #606366);
+
+  /* JSON syntax highlighting */
+  --geojson-editor-json-key: light-dark(#660e7a, #9876aa);
+  --geojson-editor-json-string: light-dark(#008000, #6a8759);
+  --geojson-editor-json-number: light-dark(#00f, #6897bb);
+  --geojson-editor-json-boolean: light-dark(#000080, #cc7832);
+  --geojson-editor-json-punct: light-dark(#000, #a9b7c6);
+  --geojson-editor-json-error: light-dark(#f00, #ff6b68);
+
+  /* GeoJSON-specific */
+  --geojson-editor-geojson-key: light-dark(#660e7a, #9876aa);
+  --geojson-editor-geojson-type: light-dark(#008000, #6a8759);
+  --geojson-editor-geojson-type-invalid: light-dark(#f00, #ff6b68);
+
+  /* Controls (checkboxes, color swatches) */
+  --geojson-editor-control-color: light-dark(#000080, #cc7832);
+  --geojson-editor-control-bg: light-dark(#e8e8e8, #3c3f41);
+  --geojson-editor-control-border: light-dark(#c0c0c0, #5a5a5a);
+
+  /* Selection and errors */
+  --geojson-editor-selection-color: light-dark(rgba(51, 153, 255, 0.3), rgba(51, 153, 255, 0.4));
+  --geojson-editor-error-color: light-dark(#dc3545, #ff6b68);
+}`;
+        return;
+      }
+
+      const cssPath = themeCSSFiles[presetName];
+      if (!cssPath) return;
+
+      // Check cache first
+      if (themeCache[presetName]) {
+        themeTextarea.value = themeCache[presetName];
+        return;
+      }
+
+      // Fetch CSS file
       try {
-        const theme = JSON.parse(themeTextarea.value);
-        editor.setTheme(theme);
-        showThemeMessage('✓ Theme applied!', 'success');
-      } catch (e) {
-        showThemeMessage('✗ Invalid JSON: ' + e.message, 'error');
+        const response = await fetch(cssPath);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const cssContent = await response.text();
+        themeCache[presetName] = cssContent;
+        themeTextarea.value = cssContent;
+      } catch (error) {
+        themeTextarea.value = `/* Failed to load theme: ${error.message} */`;
       }
     }
 
-    // Reset to default theme (IntelliJ)
-    function resetTheme() {
-      themePresetMainSelect.value = 'intellij';
-      editor.setTheme(themePresets.intellij);
-      loadCurrentTheme();
-      showThemeMessage('↺ Theme reset to IntelliJ default', 'success');
+    // Apply theme from textarea (custom CSS)
+    function applyTheme() {
+      try {
+        const cssContent = themeTextarea.value;
+        // Remove current theme
+        if (currentThemeStyle) {
+          currentThemeStyle.remove();
+          currentThemeStyle = null;
+        }
+        // Apply custom CSS
+        if (cssContent.trim()) {
+          applyThemeCSS(cssContent);
+        }
+        showThemeMessage('Theme applied!', 'success');
+      } catch (e) {
+        showThemeMessage('Failed to apply: ' + e.message, 'error');
+      }
     }
 
-    // Copy theme to clipboard
-    function copyTheme() {
-      const themeCode = `// Apply custom theme to GeoJSON Editor
-const editor = document.querySelector('geojson-editor');
-editor.setTheme(${themeTextarea.value});`;
+    // Reset to default theme
+    async function resetTheme() {
+      themePresetMainSelect.value = '';
+      if (currentThemeStyle) {
+        currentThemeStyle.remove();
+        currentThemeStyle = null;
+      }
+      await loadCurrentThemeCSS();
+      updateHTMLCode();
+      showThemeMessage('Theme reset to default', 'success');
+    }
 
-      navigator.clipboard.writeText(themeCode).then(() => {
-        showThemeMessage('📋 Theme code copied to clipboard!', 'success');
+    // Copy theme CSS to clipboard
+    function copyTheme() {
+      const cssContent = themeTextarea.value;
+
+      navigator.clipboard.writeText(cssContent).then(() => {
+        showThemeMessage('CSS copied to clipboard!', 'success');
       }).catch(() => {
-        showThemeMessage('✗ Failed to copy', 'error');
+        showThemeMessage('Failed to copy', 'error');
       });
     }
 

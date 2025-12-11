@@ -201,9 +201,79 @@ editor.addEventListener('error', (e) => {
 
 **Note:** `coordinates` nodes are automatically collapsed when content is loaded to improve readability. Use Enter to expand and Shift+Enter to collapse nodes, or click the gutter toggle. Use Tab/Shift+Tab to navigate between attributes.
 
-### Theme Control
+### Themes
 
-The component uses CSS `light-dark()` function and automatically adapts to the system's `color-scheme` preference. You can control the theme in several ways:
+The component uses CSS `light-dark()` function for automatic dark/light mode switching based on the system's `color-scheme` preference.
+
+#### Pre-built Themes
+
+Ready-to-use theme CSS files are available:
+
+| Theme | Description | CDN Link |
+|-------|-------------|----------|
+| **Default (IntelliJ)** | Built-in, no extra CSS needed | - |
+| **VS Code** | Visual Studio Code inspired colors | [vscode.css](https://unpkg.com/@softwarity/geojson-editor/themes/vscode.css) |
+| **GitHub** | GitHub's code styling | [github.css](https://unpkg.com/@softwarity/geojson-editor/themes/github.css) |
+| **Monokai** | Classic dark Monokai palette | [monokai.css](https://unpkg.com/@softwarity/geojson-editor/themes/monokai.css) |
+| **Solarized** | Ethan Schoonover's precision colors | [solarized.css](https://unpkg.com/@softwarity/geojson-editor/themes/solarized.css) |
+
+**Using via CDN:**
+```html
+<!-- Include theme CSS before the component -->
+<link rel="stylesheet" href="https://unpkg.com/@softwarity/geojson-editor/themes/monokai.css">
+
+<!-- Then use the component -->
+<script type="module" src="https://unpkg.com/@softwarity/geojson-editor"></script>
+```
+
+**Using via npm:**
+```javascript
+// Import theme CSS in your build
+import '@softwarity/geojson-editor/themes/github.css';
+import '@softwarity/geojson-editor';
+```
+
+#### Custom Themes
+
+Create your own theme by overriding CSS custom properties on `:root` with the `light-dark()` function:
+
+```css
+:root {
+  /* Editor background and text */
+  --geojson-editor-bg-color: light-dark(#ffffff, #1e1e1e);
+  --geojson-editor-text-color: light-dark(#000000, #d4d4d4);
+  --geojson-editor-caret-color: light-dark(#000000, #aeafad);
+
+  /* Gutter (line numbers area) */
+  --geojson-editor-gutter-bg: light-dark(#f3f3f3, #1e1e1e);
+  --geojson-editor-gutter-border: light-dark(#e0e0e0, #333333);
+  --geojson-editor-gutter-text: light-dark(#237893, #858585);
+
+  /* JSON syntax highlighting */
+  --geojson-editor-json-key: light-dark(#0451a5, #9cdcfe);
+  --geojson-editor-json-string: light-dark(#a31515, #ce9178);
+  --geojson-editor-json-number: light-dark(#098658, #b5cea8);
+  --geojson-editor-json-boolean: light-dark(#0000ff, #569cd6);
+  --geojson-editor-json-punct: light-dark(#000000, #d4d4d4);
+  --geojson-editor-json-error: light-dark(#cd3131, #f44747);
+
+  /* GeoJSON-specific */
+  --geojson-editor-geojson-key: light-dark(#800000, #9cdcfe);
+  --geojson-editor-geojson-type: light-dark(#008000, #4ec9b0);
+  --geojson-editor-geojson-type-invalid: light-dark(#cd3131, #f44747);
+
+  /* Controls (checkboxes, color swatches) */
+  --geojson-editor-control-color: light-dark(#0000ff, #569cd6);
+  --geojson-editor-control-bg: light-dark(#f3f3f3, #3c3c3c);
+  --geojson-editor-control-border: light-dark(#c0c0c0, #6b6b6b);
+
+  /* Selection and errors */
+  --geojson-editor-selection-color: light-dark(rgba(173, 214, 255, 0.5), rgba(38, 79, 120, 0.5));
+  --geojson-editor-error-color: light-dark(#cd3131, #f44747);
+}
+```
+
+#### Forcing Light or Dark Mode
 
 ```css
 /* Force dark mode on specific editor */
@@ -214,14 +284,6 @@ geojson-editor.dark-editor {
 /* Force light mode */
 geojson-editor.light-editor {
   color-scheme: light;
-}
-
-/* Customize colors (works in both light and dark modes) */
-geojson-editor {
-  --bg-color: #fafafa;
-  --text-color: #333;
-  --json-key: #881280;
-  --json-string: #1a6b1a;
 }
 ```
 
@@ -247,13 +309,30 @@ html:not(.dark) { color-scheme: light; }
 .light-theme { color-scheme: light; }
 ```
 
-**Available CSS custom properties:**
-- `--bg-color`, `--text-color`, `--caret-color`
-- `--gutter-bg`, `--gutter-border`, `--gutter-text`
-- `--json-key`, `--json-string`, `--json-number`, `--json-boolean`, `--json-punct`, `--json-error`
-- `--geojson-key`, `--geojson-type`, `--geojson-type-invalid`
-- `--control-bg`, `--control-border`, `--control-color`
-- `--selection-color`, `--error-color`
+#### CSS Custom Properties Reference
+
+| Variable | Description |
+|----------|-------------|
+| `--geojson-editor-bg-color` | Editor background |
+| `--geojson-editor-text-color` | Default text color |
+| `--geojson-editor-caret-color` | Cursor color |
+| `--geojson-editor-gutter-bg` | Line numbers background |
+| `--geojson-editor-gutter-border` | Gutter border color |
+| `--geojson-editor-gutter-text` | Line numbers color |
+| `--geojson-editor-json-key` | JSON property keys |
+| `--geojson-editor-json-string` | String values |
+| `--geojson-editor-json-number` | Number values |
+| `--geojson-editor-json-boolean` | Boolean/null values |
+| `--geojson-editor-json-punct` | Punctuation (brackets, colons) |
+| `--geojson-editor-json-error` | Invalid JSON highlighting |
+| `--geojson-editor-geojson-key` | GeoJSON keywords (type, geometry, etc.) |
+| `--geojson-editor-geojson-type` | Valid geometry types (Point, Polygon, etc.) |
+| `--geojson-editor-geojson-type-invalid` | Invalid geometry types |
+| `--geojson-editor-control-color` | Inline controls accent color |
+| `--geojson-editor-control-bg` | Inline controls background |
+| `--geojson-editor-control-border` | Inline controls border |
+| `--geojson-editor-selection-color` | Text selection background |
+| `--geojson-editor-error-color` | Error indicators |
 
 ## API Methods
 

@@ -16,33 +16,3 @@ export interface SetOptions {
    */
   collapsed?: string[] | ((feature: Feature | null, index: number) => string[]);
 }
-
-/** Theme configuration */
-export interface ThemeConfig {
-  bgColor?: string;
-  textColor?: string;
-  caretColor?: string;
-  gutterBg?: string;
-  gutterBorder?: string;
-  gutterText?: string;
-  jsonKey?: string;
-  jsonString?: string;
-  jsonNumber?: string;
-  jsonBoolean?: string;
-  jsonNull?: string;
-  jsonPunct?: string;
-  jsonError?: string;
-  controlColor?: string;
-  controlBg?: string;
-  controlBorder?: string;
-  geojsonKey?: string;
-  geojsonType?: string;
-  geojsonTypeInvalid?: string;
-  jsonKeyInvalid?: string;
-}
-
-/** Theme settings for dark and light modes */
-export interface ThemeSettings {
-  dark?: ThemeConfig;
-  light?: ThemeConfig;
-}

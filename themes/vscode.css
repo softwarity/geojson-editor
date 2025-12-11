@@ -1,0 +1,43 @@
+/**
+ * VS Code Theme for @softwarity/geojson-editor
+ *
+ * Theme inspired by Visual Studio Code's default dark and light themes.
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="themes/vscode.css">
+ *   <geojson-editor></geojson-editor>
+ */
+
+:root {
+  /* Editor background and text */
+  --geojson-editor-bg-color: light-dark(#ffffff, #1e1e1e);
+  --geojson-editor-text-color: light-dark(#000000, #d4d4d4);
+  --geojson-editor-caret-color: light-dark(#000000, #aeafad);
+
+  /* Gutter (line numbers area) */
+  --geojson-editor-gutter-bg: light-dark(#f3f3f3, #1e1e1e);
+  --geojson-editor-gutter-border: light-dark(#e0e0e0, #333333);
+  --geojson-editor-gutter-text: light-dark(#237893, #858585);
+
+  /* JSON syntax highlighting */
+  --geojson-editor-json-key: light-dark(#0451a5, #9cdcfe);
+  --geojson-editor-json-string: light-dark(#a31515, #ce9178);
+  --geojson-editor-json-number: light-dark(#098658, #b5cea8);
+  --geojson-editor-json-boolean: light-dark(#0000ff, #569cd6);
+  --geojson-editor-json-punct: light-dark(#000000, #d4d4d4);
+  --geojson-editor-json-error: light-dark(#cd3131, #f44747);
+
+  /* GeoJSON-specific */
+  --geojson-editor-geojson-key: light-dark(#800000, #9cdcfe);
+  --geojson-editor-geojson-type: light-dark(#008000, #4ec9b0);
+  --geojson-editor-geojson-type-invalid: light-dark(#cd3131, #f44747);
+
+  /* Controls (checkboxes, color swatches) */
+  --geojson-editor-control-color: light-dark(#0000ff, #569cd6);
+  --geojson-editor-control-bg: light-dark(#f3f3f3, #3c3c3c);
+  --geojson-editor-control-border: light-dark(#c0c0c0, #6b6b6b);
+
+  /* Selection and errors */
+  --geojson-editor-selection-color: light-dark(rgba(173, 214, 255, 0.5), rgba(38, 79, 120, 0.5));
+  --geojson-editor-error-color: light-dark(#cd3131, #f44747);
+}

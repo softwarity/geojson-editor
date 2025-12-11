@@ -1,0 +1,43 @@
+/**
+ * GitHub Theme for @softwarity/geojson-editor
+ *
+ * Clean theme inspired by GitHub's code styling.
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="themes/github.css">
+ *   <geojson-editor></geojson-editor>
+ */
+
+:root {
+  /* Editor background and text */
+  --geojson-editor-bg-color: light-dark(#ffffff, #0d1117);
+  --geojson-editor-text-color: light-dark(#24292f, #c9d1d9);
+  --geojson-editor-caret-color: light-dark(#24292f, #c9d1d9);
+
+  /* Gutter (line numbers area) */
+  --geojson-editor-gutter-bg: light-dark(#f6f8fa, #161b22);
+  --geojson-editor-gutter-border: light-dark(#d0d7de, #30363d);
+  --geojson-editor-gutter-text: light-dark(#8c959f, #6e7681);
+
+  /* JSON syntax highlighting */
+  --geojson-editor-json-key: light-dark(#0550ae, #79c0ff);
+  --geojson-editor-json-string: light-dark(#0a3069, #a5d6ff);
+  --geojson-editor-json-number: light-dark(#0550ae, #79c0ff);
+  --geojson-editor-json-boolean: light-dark(#cf222e, #ff7b72);
+  --geojson-editor-json-punct: light-dark(#24292f, #c9d1d9);
+  --geojson-editor-json-error: light-dark(#cf222e, #ff7b72);
+
+  /* GeoJSON-specific */
+  --geojson-editor-geojson-key: light-dark(#8250df, #d2a8ff);
+  --geojson-editor-geojson-type: light-dark(#116329, #7ee787);
+  --geojson-editor-geojson-type-invalid: light-dark(#cf222e, #ff7b72);
+
+  /* Controls (checkboxes, color swatches) */
+  --geojson-editor-control-color: light-dark(#0550ae, #79c0ff);
+  --geojson-editor-control-bg: light-dark(#f6f8fa, #21262d);
+  --geojson-editor-control-border: light-dark(#d0d7de, #30363d);
+
+  /* Selection and errors */
+  --geojson-editor-selection-color: light-dark(rgba(5, 80, 174, 0.2), rgba(56, 139, 253, 0.3));
+  --geojson-editor-error-color: light-dark(#cf222e, #ff7b72);
+}

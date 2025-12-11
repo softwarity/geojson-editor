@@ -10,12 +10,18 @@
     ".": {
       "import": "./dist/geojson-editor.js",
       "types": "./types/geojson-editor.d.ts"
-    }
+    },
+    "./themes/*.css": "./themes/*.css",
+    "./themes/vscode.css": "./themes/vscode.css",
+    "./themes/github.css": "./themes/github.css",
+    "./themes/monokai.css": "./themes/monokai.css",
+    "./themes/solarized.css": "./themes/solarized.css"
   },
   "files": [
     "dist",
     "src",
-    "types"
+    "types",
+    "themes"
   ],
   "scripts": {
     "dev": "vite",

@@ -4,8 +4,7 @@ import type { Feature } from 'geojson';
 
 // ========== Imports from extracted modules ==========
 import type {
-  SetOptions,
-  ThemeSettings
+  SetOptions
 } from './types.js';
 
 import type {
@@ -35,7 +34,6 @@ import {
   RE_BRACKET_POS,
   RE_IS_WORD_CHAR,
   RE_ATTR_AND_BOOL_VALUE,
-  RE_TO_KEBAB,
   RE_OPEN_BRACES,
   RE_CLOSE_BRACES,
   RE_OPEN_BRACKETS,
@@ -47,7 +45,7 @@ import { validateGeoJSON, normalizeToFeatures } from './validation.js';
 import { highlightSyntax, namedColorToHex, isNamedColor } from './syntax-highlighter.js';
 
 // Re-export public types
-export type { SetOptions, ThemeConfig, ThemeSettings } from './types.js';
+export type { SetOptions } from './types.js';
 
 // Alias for minification
 const _ce = createElement;
@@ -94,8 +92,6 @@ class GeoJsonEditor extends HTMLElement {
   private renderTimer: ReturnType<typeof setTimeout> | undefined = undefined;
   private inputTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
-  // ========== Theme ==========
-  themes: ThemeSettings = { dark: {}, light: {} };
 
   // ========== Undo/Redo History ==========
   private _undoStack: EditorSnapshot[] = [];
@@ -450,7 +446,6 @@ class GeoJsonEditor extends HTMLElement {
     this._cacheElements();
     this.setupEventListeners();
     this.updatePrefixSuffix();
-    this.updateThemeCSS();
 
     if (this.value) {
       this.setValue(this.value);
@@ -3630,62 +3625,6 @@ class GeoJsonEditor extends HTMLElement {
   updatePrefixSuffix() {
     if (this._editorPrefix) this._editorPrefix.textContent = this.prefix;
     if (this._editorSuffix) this._editorSuffix.textContent = this.suffix;
-  }
-
-  // ========== Theme ==========
-
-  updateThemeCSS() {
-    let themeStyle = this._id('theme-styles') as HTMLStyleElement;
-    if (!themeStyle) {
-      themeStyle = _ce('style') as HTMLStyleElement;
-      themeStyle.id = 'theme-styles';
-      this.shadowRoot!.insertBefore(themeStyle, this.shadowRoot!.firstChild);
-    }
-
-    RE_TO_KEBAB.lastIndex = 0;
-    const toKebab = (str: string) => str.replace(RE_TO_KEBAB, '-$1').toLowerCase();
-    const generateVars = (obj: Record<string, string | undefined>) => Object.entries(obj)
-      .filter((entry): entry is [string, string] => entry[1] !== undefined)
-      .map(([k, v]) => `--${toKebab(k)}: ${v};`)
-      .join('\n        ');
-
-    // Generate CSS for light theme overrides
-    const lightVars = generateVars(this.themes.light as Record<string, string | undefined> || {});
-    // Generate CSS for dark theme overrides
-    const darkVars = generateVars(this.themes.dark as Record<string, string | undefined> || {});
-
-    let css = '';
-    // Media queries first (lower priority)
-    if (lightVars) {
-      css += `@media (prefers-color-scheme: light) {\n        :host {\n          ${lightVars}\n        }\n      }\n`;
-    }
-    if (darkVars) {
-      css += `@media (prefers-color-scheme: dark) {\n        :host {\n          ${darkVars}\n        }\n      }\n`;
-    }
-    // Inline style overrides last (higher priority - these override media queries)
-    if (lightVars) {
-      css += `:host([style*="color-scheme: light"]), :host([style*="color-scheme:light"]) {\n        ${lightVars}\n      }\n`;
-    }
-    if (darkVars) {
-      css += `:host([style*="color-scheme: dark"]), :host([style*="color-scheme:dark"]) {\n        ${darkVars}\n      }`;
-    }
-
-    themeStyle.textContent = css;
-  }
-
-  setTheme(theme: ThemeSettings): void {
-    if (theme.dark) this.themes.dark = { ...this.themes.dark, ...theme.dark };
-    if (theme.light) this.themes.light = { ...this.themes.light, ...theme.light };
-    this.updateThemeCSS();
-  }
-
-  resetTheme(): void {
-    this.themes = { dark: {}, light: {} };
-    this.updateThemeCSS();
-  }
-
-  getTheme(): ThemeSettings {
-    return { ...this.themes };
   }
 
   /**

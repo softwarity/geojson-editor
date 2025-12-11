@@ -64,9 +64,6 @@ export const RE_BRACKET_POS = /[{\[]/;
 // Word navigation
 export const RE_IS_WORD_CHAR = /[\w-]/;
 
-// Theme CSS generation
-export const RE_TO_KEBAB = /([A-Z])/g;
-
 // Bracket counting
 export const RE_OPEN_BRACES = /\{/g;
 export const RE_CLOSE_BRACES = /\}/g;

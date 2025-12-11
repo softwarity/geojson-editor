@@ -1,0 +1,44 @@
+/**
+ * Solarized Theme for @softwarity/geojson-editor
+ *
+ * Precision color scheme designed by Ethan Schoonover.
+ * Features carefully selected colors for reduced eye strain.
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="themes/solarized.css">
+ *   <geojson-editor></geojson-editor>
+ */
+
+:root {
+  /* Editor background and text */
+  --geojson-editor-bg-color: light-dark(#fdf6e3, #002b36);
+  --geojson-editor-text-color: light-dark(#657b83, #839496);
+  --geojson-editor-caret-color: light-dark(#657b83, #93a1a1);
+
+  /* Gutter (line numbers area) */
+  --geojson-editor-gutter-bg: light-dark(#eee8d5, #073642);
+  --geojson-editor-gutter-border: light-dark(#ddd6c1, #094553);
+  --geojson-editor-gutter-text: light-dark(#93a1a1, #586e75);
+
+  /* JSON syntax highlighting */
+  --geojson-editor-json-key: light-dark(#268bd2, #268bd2);
+  --geojson-editor-json-string: light-dark(#2aa198, #2aa198);
+  --geojson-editor-json-number: light-dark(#d33682, #d33682);
+  --geojson-editor-json-boolean: light-dark(#cb4b16, #cb4b16);
+  --geojson-editor-json-punct: light-dark(#657b83, #839496);
+  --geojson-editor-json-error: light-dark(#dc322f, #dc322f);
+
+  /* GeoJSON-specific */
+  --geojson-editor-geojson-key: light-dark(#6c71c4, #6c71c4);
+  --geojson-editor-geojson-type: light-dark(#859900, #859900);
+  --geojson-editor-geojson-type-invalid: light-dark(#dc322f, #dc322f);
+
+  /* Controls (checkboxes, color swatches) */
+  --geojson-editor-control-color: light-dark(#268bd2, #268bd2);
+  --geojson-editor-control-bg: light-dark(#eee8d5, #073642);
+  --geojson-editor-control-border: light-dark(#93a1a1, #586e75);
+
+  /* Selection and errors */
+  --geojson-editor-selection-color: light-dark(rgba(38, 139, 210, 0.2), rgba(38, 139, 210, 0.3));
+  --geojson-editor-error-color: light-dark(#dc322f, #dc322f);
+}

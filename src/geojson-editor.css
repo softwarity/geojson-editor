@@ -14,33 +14,11 @@
   /* Color scheme - inherits from parent, falls back to system preference if not set */
   color-scheme: inherit;
 
-  /* Layout variables */
+  /* Layout variables (internal only) */
   --line-height: 19.5px;
   --gutter-width: 50px;
   --editor-padding-y: 8px;
   --editor-padding-x: 12px;
-
-  /* Theme colors using light-dark() for automatic switching */
-  --bg-color: light-dark(#fff, #2b2b2b);
-  --text-color: light-dark(#000, #a9b7c6);
-  --caret-color: light-dark(#000, #bbb);
-  --gutter-bg: light-dark(#f0f0f0, #313335);
-  --gutter-border: light-dark(#e0e0e0, #3c3f41);
-  --gutter-text: light-dark(#999, #606366);
-  --json-key: light-dark(#660e7a, #9876aa);
-  --json-string: light-dark(#008000, #6a8759);
-  --json-number: light-dark(#00f, #6897bb);
-  --json-boolean: light-dark(#000080, #cc7832);
-  --json-punct: light-dark(#000, #a9b7c6);
-  --json-error: light-dark(#f00, #ff6b68);
-  --geojson-key: light-dark(#660e7a, #9876aa);
-  --geojson-type: light-dark(#008000, #6a8759);
-  --geojson-type-invalid: light-dark(#f00, #ff6b68);
-  --control-color: light-dark(#000080, #cc7832);
-  --control-bg: light-dark(#e8e8e8, #3c3f41);
-  --control-border: light-dark(#c0c0c0, #5a5a5a);
-  --selection-color: light-dark(rgba(51, 153, 255, 0.3), rgba(51, 153, 255, 0.4));
-  --error-color: light-dark(#dc3545, #ff6b68);
 
   display: flex;
   flex-direction: column;
@@ -66,7 +44,7 @@
   position: relative;
   width: 100%;
   flex: 1;
-  background: var(--bg-color);
+  background: var(--geojson-editor-bg-color, light-dark(#fff, #2b2b2b));
   display: flex;
   overflow: hidden;
 }
@@ -74,8 +52,8 @@
 /* ========== Gutter ========== */
 .gutter {
   width: var(--gutter-width);
-  background: var(--gutter-bg);
-  border-right: 1px solid var(--gutter-border);
+  background: var(--geojson-editor-gutter-bg, light-dark(#f0f0f0, #313335));
+  border-right: 1px solid var(--geojson-editor-gutter-border, light-dark(#e0e0e0, #3c3f41));
   overflow: hidden;
   flex-shrink: 0;
   position: relative;
@@ -117,12 +95,12 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--error-color);
+  background: var(--geojson-editor-error-color, light-dark(#dc3545, #ff6b68));
 }
 
 .line-number {
   font-size: 11px;
-  color: var(--gutter-text);
+  color: var(--geojson-editor-gutter-text, light-dark(#999, #606366));
   user-select: none;
   min-width: 20px;
   text-align: right;
@@ -145,7 +123,7 @@
   flex-shrink: 0;
   background: transparent;
   border: none;
-  color: var(--json-punct);
+  color: var(--geojson-editor-json-punct, light-dark(#000, #a9b7c6));
   font-size: 10px;
   display: flex;
   align-items: center;
@@ -205,7 +183,7 @@
   padding: var(--editor-padding-y) var(--editor-padding-x);
   overscroll-behavior: contain; /* Prevent scroll chaining to parent */
   scrollbar-width: thin;
-  scrollbar-color: var(--control-border) var(--control-bg);
+  scrollbar-color: var(--geojson-editor-control-border, light-dark(#c0c0c0, #5a5a5a)) var(--geojson-editor-control-bg, light-dark(#e8e8e8, #3c3f41));
 }
 
 /* Scroll content - defines total scrollable height */
@@ -236,7 +214,7 @@
   position: absolute;
   width: 2px;
   height: 1em;
-  background: var(--caret-color);
+  background: var(--geojson-editor-caret-color, light-dark(#000, #bbb));
   top: 0.15em;
   pointer-events: none;
   animation: cursor-blink 1s step-end infinite;
@@ -264,7 +242,7 @@
   position: absolute;
   height: 100%;
   top: 0;
-  background: var(--selection-color);
+  background: var(--geojson-editor-selection-color, light-dark(rgba(51, 153, 255, 0.3), rgba(51, 153, 255, 0.4)));
   pointer-events: none;
   z-index: 0;
 }
@@ -286,47 +264,47 @@
 }
 
 /* ========== Syntax Highlighting ========== */
-.json-key { color: var(--json-key); }
-.json-string { color: var(--json-string); }
-.json-number { color: var(--json-number); }
-.json-boolean, .json-null { color: var(--json-boolean); }
-.json-punctuation { color: var(--json-punct); }
-.json-error { color: var(--json-error); }
+.json-key { color: var(--geojson-editor-json-key, light-dark(#660e7a, #9876aa)); }
+.json-string { color: var(--geojson-editor-json-string, light-dark(#008000, #6a8759)); }
+.json-number { color: var(--geojson-editor-json-number, light-dark(#00f, #6897bb)); }
+.json-boolean, .json-null { color: var(--geojson-editor-json-boolean, light-dark(#000080, #cc7832)); }
+.json-punctuation { color: var(--geojson-editor-json-punct, light-dark(#000, #a9b7c6)); }
+.json-error { color: var(--geojson-editor-json-error, light-dark(#f00, #ff6b68)); }
 
-.geojson-key { color: var(--geojson-key); font-weight: 600; }
-.geojson-type { color: var(--geojson-type); font-weight: 600; }
-.geojson-type-invalid { color: var(--geojson-type-invalid); font-weight: 600; }
+.geojson-key { color: var(--geojson-editor-geojson-key, light-dark(#660e7a, #9876aa)); font-weight: 600; }
+.geojson-type { color: var(--geojson-editor-geojson-type, light-dark(#008000, #6a8759)); font-weight: 600; }
+.geojson-type-invalid { color: var(--geojson-editor-geojson-type-invalid, light-dark(#f00, #ff6b68)); font-weight: 600; }
 
 /* Collapsed node styling */
 .collapsed-bracket-array,
 .collapsed-bracket-object {
-  color: var(--json-punct);
+  color: var(--geojson-editor-json-punct, light-dark(#000, #a9b7c6));
 }
 .collapsed-bracket-array::after,
 .collapsed-bracket-object::after {
   content: '…';
-  color: var(--json-punct);
+  color: var(--geojson-editor-json-punct, light-dark(#000, #a9b7c6));
 }
 
 /* ========== Prefix/Suffix ========== */
 .prefix-wrapper, .suffix-wrapper {
   display: flex;
   flex-shrink: 0;
-  background: var(--bg-color);
+  background: var(--geojson-editor-bg-color, light-dark(#fff, #2b2b2b));
 }
 
 .prefix-gutter, .suffix-gutter {
   width: var(--gutter-width);
-  background: var(--gutter-bg);
-  border-right: 1px solid var(--gutter-border);
+  background: var(--geojson-editor-gutter-bg, light-dark(#f0f0f0, #313335));
+  border-right: 1px solid var(--geojson-editor-gutter-border, light-dark(#e0e0e0, #3c3f41));
   flex-shrink: 0;
 }
 
 .editor-prefix, .editor-suffix {
   flex: 1;
   padding: 4px 12px;
-  color: var(--text-color);
-  background: var(--bg-color);
+  color: var(--geojson-editor-text-color, light-dark(#000, #a9b7c6));
+  background: var(--geojson-editor-bg-color, light-dark(#fff, #2b2b2b));
   user-select: none;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -343,7 +321,7 @@
   transform: translateY(-50%);
   background: transparent;
   border: none;
-  color: var(--text-color);
+  color: var(--geojson-editor-text-color, light-dark(#000, #a9b7c6));
   opacity: 0.15;
   cursor: pointer;
   font-size: 0.7rem;
@@ -366,8 +344,8 @@
   top: 2rem;
   right: 0.5rem;
   z-index: 1000;
-  background: var(--bg-color);
-  border: 1px solid var(--gutter-border);
+  background: var(--geojson-editor-bg-color, light-dark(#fff, #2b2b2b));
+  border: 1px solid var(--geojson-editor-gutter-border, light-dark(#e0e0e0, #3c3f41));
   border-radius: 6px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   padding: 12px 16px;
@@ -383,13 +361,13 @@
 .info-popup-title {
   font-weight: bold;
   font-size: 13px;
-  color: var(--text-color);
+  color: var(--geojson-editor-text-color, light-dark(#000, #a9b7c6));
   margin-bottom: 4px;
 }
 .info-popup-version {
   display: block;
   font-size: 11px;
-  color: var(--text-color);
+  color: var(--geojson-editor-text-color, light-dark(#000, #a9b7c6));
   opacity: 0.6;
   margin-bottom: 8px;
   text-decoration: none;
@@ -400,7 +378,7 @@
 }
 .info-popup-copyright {
   font-size: 10px;
-  color: var(--text-color);
+  color: var(--geojson-editor-text-color, light-dark(#000, #a9b7c6));
   opacity: 0.5;
 }
 
@@ -411,7 +389,7 @@
   transform: translateY(-50%);
   background: transparent;
   border: none;
-  color: var(--text-color);
+  color: var(--geojson-editor-text-color, light-dark(#000, #a9b7c6));
   opacity: 0.3;
   cursor: pointer;
   font-size: 0.65rem;
@@ -440,7 +418,7 @@
 .error-nav-btn {
   background: transparent;
   border: none;
-  color: var(--error-color);
+  color: var(--geojson-editor-error-color, light-dark(#dc3545, #ff6b68));
   cursor: pointer;
   font-size: 8px;
   width: 16px;
@@ -456,7 +434,7 @@
   opacity: 1;
 }
 .error-count {
-  color: var(--error-color);
+  color: var(--geojson-editor-error-color, light-dark(#dc3545, #ff6b68));
   font-size: 11px;
   min-width: 20px;
   text-align: center;
@@ -464,9 +442,9 @@
 
 /* ========== Scrollbar ========== */
 .viewport::-webkit-scrollbar { width: 10px; height: 10px; }
-.viewport::-webkit-scrollbar-track { background: var(--control-bg); }
-.viewport::-webkit-scrollbar-thumb { background: var(--control-border); border-radius: 5px; }
-.viewport::-webkit-scrollbar-thumb:hover { background: var(--control-color); }
+.viewport::-webkit-scrollbar-track { background: var(--geojson-editor-control-bg, light-dark(#e8e8e8, #3c3f41)); }
+.viewport::-webkit-scrollbar-thumb { background: var(--geojson-editor-control-border, light-dark(#c0c0c0, #5a5a5a)); border-radius: 5px; }
+.viewport::-webkit-scrollbar-thumb:hover { background: var(--geojson-editor-control-color, light-dark(#000080, #cc7832)); }
 
 /* ========== Inline Controls (using ::before pseudo-elements) ========== */
 
@@ -491,24 +469,24 @@
 .json-color:hover::before,
 .json-boolean:hover::before {
   transform: translateY(-50%) scale(1.2);
-  border-color: var(--control-color);
+  border-color: var(--geojson-editor-control-color, light-dark(#000080, #cc7832));
 }
 
 /* Color swatch specific styles */
 .json-color::before {
   background-color: var(--swatch-color);
-  border: 1px solid var(--json-punct);
+  border: 1px solid var(--geojson-editor-json-punct, light-dark(#000, #a9b7c6));
 }
 
 /* Boolean checkbox specific styles */
 .json-boolean::before {
-  border: 1.5px solid var(--control-border);
+  border: 1.5px solid var(--geojson-editor-control-border, light-dark(#c0c0c0, #5a5a5a));
   background: transparent;
 }
 .json-bool-true::before {
   content: '✔';
-  border-color: var(--control-color);
-  color: var(--control-color);
+  border-color: var(--geojson-editor-control-color, light-dark(#000080, #cc7832));
+  color: var(--geojson-editor-control-color, light-dark(#000080, #cc7832));
   font-size: 8px;
   display: flex;
   align-items: center;
@@ -523,7 +501,7 @@
   left: 0;
   top: 3px;
   font-size: 10px;
-  color: var(--control-color);
+  color: var(--geojson-editor-control-color, light-dark(#000080, #cc7832));
   opacity: 0.6;
   cursor: pointer;
   z-index: 1;
