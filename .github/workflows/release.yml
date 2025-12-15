@@ -30,7 +30,7 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-          sed -i "s/^# Release Notes$/# Release Notes\n\n## $NEXT_VERSION\n\n---/" RELEASE_NOTES.md
+          sed -i "s/^# Release Notes$/# Release Notes\n\n## v$NEXT_VERSION\n\n---/" RELEASE_NOTES.md
           git add RELEASE_NOTES.md
           git commit --amend --no-edit
           git push --all
