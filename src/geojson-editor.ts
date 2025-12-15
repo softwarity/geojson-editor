@@ -2239,7 +2239,7 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
-   * Scroll viewport to ensure cursor is visible
+   * Scroll viewport to ensure cursor is visible with comfortable margin
    * @param center - if true, center the cursor line in the viewport
    */
   private _scrollToCursor(center = false) {
@@ -2252,6 +2252,8 @@ class GeoJsonEditor extends HTMLElement {
 
     const cursorY = visibleIndex * this.lineHeight;
     const viewportHeight = viewport.clientHeight;
+    // Add margin of 2 lines for comfortable visibility
+    const scrollMargin = this.lineHeight * 2;
 
     if (center) {
       // Center the cursor line in the viewport
@@ -2260,13 +2262,13 @@ class GeoJsonEditor extends HTMLElement {
       const viewportTop = viewport.scrollTop;
       const viewportBottom = viewportTop + viewportHeight;
 
-      // Scroll up if cursor is above viewport
-      if (cursorY < viewportTop) {
-        viewport.scrollTop = cursorY;
+      // Scroll up if cursor is above viewport (with margin)
+      if (cursorY < viewportTop + scrollMargin) {
+        viewport.scrollTop = Math.max(0, cursorY - scrollMargin);
       }
-      // Scroll down if cursor is below viewport
-      else if (cursorY + this.lineHeight > viewportBottom) {
-        viewport.scrollTop = cursorY + this.lineHeight - viewportHeight;
+      // Scroll down if cursor is below viewport (with margin)
+      else if (cursorY + this.lineHeight > viewportBottom - scrollMargin) {
+        viewport.scrollTop = cursorY + this.lineHeight + scrollMargin - viewportHeight;
       }
     }
   }
@@ -2817,6 +2819,12 @@ class GeoJsonEditor extends HTMLElement {
 
     // Force immediate render (not via RAF) to ensure content displays instantly
     this.renderViewport();
+
+    // Ensure cursor is visible in viewport after paste
+    // Use RAF to ensure layout is updated before scrolling
+    requestAnimationFrame(() => {
+      this._scrollToCursor();
+    });
   }
 
   handleCopy(e: ClipboardEvent): void {
@@ -4084,6 +4092,11 @@ class GeoJsonEditor extends HTMLElement {
       this.updateView();
       this.scheduleRender();
       this.emitChange();
+      // Invalidate current-features cache and emit if focused (feature removal changes context)
+      this._lastCurrentFeatureIndices = null;
+      if (this._editorWrapper?.classList.contains('focused')) {
+        this._emitCurrentFeature(true);
+      }
       return removed;
     }
     return undefined;
@@ -4105,6 +4118,11 @@ class GeoJsonEditor extends HTMLElement {
     this.scheduleRender();
     this.updatePlaceholderVisibility();
     this.emitChange();
+    // Invalidate current-features cache and emit empty if focused (all features removed)
+    this._lastCurrentFeatureIndices = null;
+    if (this._editorWrapper?.classList.contains('focused')) {
+      this._emitCurrentFeature(true);
+    }
     return removed;
   }
 

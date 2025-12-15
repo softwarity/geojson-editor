@@ -537,6 +537,80 @@ describe('GeoJsonEditor - Events', () => {
     expect(lastEvent.features.length).to.equal(1);
     expect(lastEvent.features[0].properties.name).to.equal('Second');
   });
+
+  it('should emit current-features when focused feature is deleted via API', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set two features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'First' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'Second' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Move cursor to first feature
+    const ranges = Array.from(el.featureRanges.values());
+    el.cursorLine = ranges[0].startLine + 1; // Inside first feature
+    el._lastCurrentFeatureIndices = null;
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    // Delete the first feature (which has focus)
+    el.removeAt(0);
+    await waitFor(100);
+
+    // Should have emitted an event (either with remaining feature or empty)
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).to.equal('FeatureCollection');
+  });
+
+  it('should emit empty FeatureCollection when all features are deleted', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set one feature
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'Only' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Move cursor inside the feature
+    el.cursorLine = 1;
+    el._lastCurrentFeatureIndices = null;
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    // Delete all features
+    el.removeAll();
+    await waitFor(100);
+
+    // Should have emitted empty FeatureCollection
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).to.equal('FeatureCollection');
+    expect(lastEvent.features).to.be.an('array');
+    expect(lastEvent.features.length).to.equal(0);
+  });
 });
 
 describe('GeoJsonEditor - Prefix/Suffix Display', () => {

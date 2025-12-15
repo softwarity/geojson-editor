@@ -15,9 +15,14 @@ editor.addEventListener('current-features', (e) => {
 });
 ```
 
+### Bug Fixes
+
+- **Fixed `current-features` event not emitted on feature deletion** - The event is now correctly emitted when a feature is deleted via `removeAt()` or `removeAll()` API methods while the editor is focused
+- **Fixed viewport not scrolling to cursor after paste** - When pasting content that moves the cursor beyond the visible area, the viewport now automatically scrolls to keep the cursor visible with a comfortable 2-line margin from the edge
+
 ### Tests
 
-- 400 unit tests (4 tests updated for new event format, 3 new tests for selection-based multi-feature detection)
+- 405 unit tests (4 tests updated for new event format, 3 new tests for selection-based multi-feature detection, 2 new tests for feature deletion event, 3 new tests for viewport scroll stability)
 
 ---
 

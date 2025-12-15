@@ -405,4 +405,151 @@ describe('GeoJsonEditor - Scroll and Viewport', () => {
     expect(el.cursorLine).to.equal(lastVisible.index);
     expect(el.cursorColumn).to.equal(lastVisible.content?.length || 0);
   });
+
+  it('should not scroll viewport when typing character that invalidates JSON', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Suppress error events (expected when JSON becomes invalid)
+    el.addEventListener('error', (e) => e.stopPropagation());
+
+    // Set valid features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'First' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'Second' } }
+    ]);
+    await waitFor(200);
+
+    // Focus editor and move cursor to end of last feature (after closing brace)
+    await focusEditor(el);
+    const lastLine = el.lines.length - 1;
+    el.cursorLine = lastLine;
+    el.cursorColumn = el.lines[lastLine].length;
+    el.renderViewport();
+    await waitFor(50);
+
+    // Record scroll position before typing
+    const viewport = el.shadowRoot.getElementById('viewport');
+    const scrollTopBefore = viewport.scrollTop;
+
+    // Type a comma at the end (this will invalidate JSON as it expects another feature)
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.value = ',';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await waitFor(200);
+
+    // Scroll position should not have changed significantly (allow small tolerance)
+    const scrollTopAfter = viewport.scrollTop;
+    const scrollDiff = Math.abs(scrollTopAfter - scrollTopBefore);
+
+    // Viewport should not scroll more than one line height
+    expect(scrollDiff).to.be.lessThan(el.lineHeight * 2,
+      `Viewport scrolled unexpectedly by ${scrollDiff}px when typing comma`);
+  });
+
+  it('should keep cursor visible without excessive scrolling when typing at end', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Suppress error events (expected when JSON becomes invalid)
+    el.addEventListener('error', (e) => e.stopPropagation());
+
+    // Set a feature
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: {} }
+    ]);
+    await waitFor(200);
+
+    await focusEditor(el);
+
+    // Move cursor to end
+    const lastLine = el.lines.length - 1;
+    el.cursorLine = lastLine;
+    el.cursorColumn = el.lines[lastLine].length;
+    el.renderViewport();
+    await waitFor(50);
+
+    // Get cursor line position in viewport
+    const viewport = el.shadowRoot.getElementById('viewport');
+    const cursorYBefore = el.cursorLine * el.lineHeight - viewport.scrollTop;
+
+    // Type a character
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.value = ',';
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    await waitFor(200);
+
+    // Cursor should still be in similar position relative to viewport
+    const cursorYAfter = el.cursorLine * el.lineHeight - viewport.scrollTop;
+    const positionDiff = Math.abs(cursorYAfter - cursorYBefore);
+
+    // Cursor relative position should not change dramatically
+    expect(positionDiff).to.be.lessThan(el.lineHeight * 3,
+      `Cursor position in viewport changed by ${positionDiff}px`);
+  });
+
+  it('should scroll to keep cursor visible after pasting a feature', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set an initial feature
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'Initial' } }
+    ]);
+    await waitFor(200);
+
+    await focusEditor(el);
+
+    // Move cursor to end of content (after the closing brace)
+    const lastLine = el.lines.length - 1;
+    el.cursorLine = lastLine;
+    el.cursorColumn = el.lines[lastLine].length;
+    el.renderViewport();
+    await waitFor(50);
+
+    const viewport = el.shadowRoot.getElementById('viewport');
+
+    // Create a paste event with a new feature
+    const newFeature = { type: 'Feature', geometry: { type: 'Polygon', coordinates: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] }, properties: { name: 'Pasted' } };
+    const pasteText = ',\n' + JSON.stringify(newFeature, null, 2);
+
+    const pasteEvent = new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: new DataTransfer()
+    });
+    pasteEvent.clipboardData.setData('text/plain', pasteText);
+
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.dispatchEvent(pasteEvent);
+    await waitFor(400); // Wait for paste + RAF for scroll adjustment
+
+    // After paste, cursor should be at end of pasted content
+    // and cursor should be visible in viewport with comfortable margin
+    // Use visibleIndex like _scrollToCursor does (accounts for collapsed lines)
+    const visibleIndex = el.visibleLines.findIndex(vl => vl.index === el.cursorLine);
+    expect(visibleIndex).to.be.greaterThan(-1, 'Cursor line should be in visibleLines');
+
+    const cursorY = visibleIndex * el.lineHeight;
+    const viewportTop = viewport.scrollTop;
+    const viewportBottom = viewportTop + viewport.clientHeight;
+    // _scrollToCursor uses a margin of 2 lines for comfortable visibility
+    const scrollMargin = el.lineHeight * 2;
+
+    // Cursor should be comfortably within visible viewport (not at edge)
+    expect(cursorY).to.be.at.least(viewportTop,
+      `Cursor is above viewport after paste (cursorY=${cursorY}, viewportTop=${viewportTop})`);
+    expect(cursorY + el.lineHeight).to.be.at.most(viewportBottom,
+      `Cursor is below viewport after paste (cursorY=${cursorY}, lineHeight=${el.lineHeight}, viewportBottom=${viewportBottom})`);
+
+    // Verify cursor is not at the very edge - should have margin space
+    // Either there's space above (cursor not at top edge) or cursor is near top of document
+    const hasMarginAbove = cursorY >= viewportTop + scrollMargin || cursorY < scrollMargin;
+    // Either there's space below (cursor not at bottom edge) or cursor is near end of document
+    const totalContentHeight = el.visibleLines.length * el.lineHeight;
+    const hasMarginBelow = cursorY + el.lineHeight <= viewportBottom - scrollMargin || cursorY + el.lineHeight >= totalContentHeight - scrollMargin;
+
+    expect(hasMarginAbove || hasMarginBelow).to.be.true,
+      'Cursor should have comfortable margin from viewport edge after paste';
+  });
 });

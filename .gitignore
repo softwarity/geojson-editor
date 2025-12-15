@@ -6,3 +6,4 @@ dist/
 .idea/
 CLAUDE.md
 coverage/
+report/
