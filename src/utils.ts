@@ -26,13 +26,3 @@ export function countBrackets(line: string, openBracket: string): BracketCount {
   return { open, close };
 }
 
-/**
- * Parse a CSS selector to a :host rule for shadow DOM
- */
-export function parseSelectorToHostRule(selector: string | null): string {
-  if (!selector) return ':host([data-color-scheme="dark"])';
-  if (selector.startsWith('.') && !selector.includes(' ')) {
-    return `:host(${selector})`;
-  }
-  return `:host-context(${selector})`;
-}
