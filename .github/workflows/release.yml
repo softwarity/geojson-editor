@@ -24,10 +24,14 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email ""
 
-      - name: Bump version (patch)
-        run: npm version patch
-
-      - name: Push changes and tags
+      - name: Version, prepare next release notes, and push
         run: |
+          npm version patch
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/^# Release Notes$/# Release Notes\n\n## $NEXT_VERSION\n\n---/" RELEASE_NOTES.md
+          git add RELEASE_NOTES.md
+          git commit --amend --no-edit
           git push --all
           git push --tags

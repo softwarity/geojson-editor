@@ -82,7 +82,7 @@ A feature-rich, framework-agnostic **Web Component** for editing GeoJSON feature
 - **Save to File** - Ctrl+S to download GeoJSON as `.geojson` file; programmatic `save(filename)` method available
 - **Open from File** - Ctrl+O to open a `.geojson` or `.json` file from the client filesystem; programmatic `open()` method available
 - **Error Navigation** - Visual error indicators in gutter with navigation buttons (◀ ▶) to jump between errors; error count displayed in suffix area
-- **Current Feature Event** - `current-feature` event emitted when cursor enters/leaves a feature or editor gains/loses focus; useful for synchronizing with maps
+- **Current Features Event** - `current-features` event emitted as a FeatureCollection when cursor/selection changes; includes all features overlapping with selection; useful for synchronizing with maps
 
 ## Installation
 
@@ -631,32 +631,36 @@ editor.addEventListener('error', (e) => {
 - Invalid types (e.g., `"LinearRing"`)
 - Unknown types (any `type` value not in the GeoJSON specification)
 
-### `current-feature`
+### `current-features`
 
-Fired when the current feature changes. Useful for synchronizing the editor with a map display.
+Fired when the current feature(s) change. Useful for synchronizing the editor with a map display. Emits a FeatureCollection containing all features that overlap with the cursor position or selection.
 
 **Triggers:**
-- Editor gains focus → emits current feature at cursor
-- Cursor moves to a different feature → emits new feature
-- Cursor moves outside any feature → emits `null`
-- Editor loses focus → emits `null`
+- Editor gains focus → emits FeatureCollection with feature at cursor
+- Cursor moves to a different feature → emits FeatureCollection with new feature(s)
+- Selection spans multiple features → emits FeatureCollection with all overlapping features
+- Cursor moves outside any feature → emits empty FeatureCollection
+- Editor loses focus → emits empty FeatureCollection
 
 ```javascript
-editor.addEventListener('current-feature', (e) => {
-  const feature = e.detail;  // Feature object or null
-  if (feature) {
-    // Highlight this feature on your map
-    highlightLayer.setData(feature);
+editor.addEventListener('current-features', (e) => {
+  const featureCollection = e.detail;  // Always a FeatureCollection
+  if (featureCollection.features.length > 0) {
+    // Highlight these features on your map
+    highlightLayer.setData(featureCollection);
   } else {
-    // No current feature
+    // No current features
     highlightLayer.setData({ type: 'FeatureCollection', features: [] });
   }
 });
 ```
 
-**Event detail:** The Feature object at the cursor position, or `null` if no feature is current.
+**Event detail:** A FeatureCollection object containing:
+- All features overlapping with the current selection (if selection exists)
+- The single feature at cursor position (if no selection)
+- Empty features array if cursor is outside any feature or editor loses focus
 
-**Note:** The event is only fired when the feature changes, not on every cursor movement within the same feature. This prevents excessive event firing during normal editing.
+**Note:** The event is only fired when the set of features changes, not on every cursor movement within the same feature. This prevents excessive event firing during normal editing.
 
 ## Styling
 

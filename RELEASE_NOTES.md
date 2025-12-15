@@ -1,5 +1,26 @@
 # Release Notes - @softwarity/geojson-editor
 
+## v1.0.25
+
+### Breaking Changes
+
+- **Renamed `current-feature` event to `current-features`** - The event now emits a `FeatureCollection` instead of a single `Feature` or `null`
+- **Selection-aware feature detection** - The event now includes all features that overlap with the current selection, not just the cursor position
+
+**Example with selection:**
+```javascript
+// If user selects text spanning 3 features:
+editor.addEventListener('current-features', (e) => {
+  console.log(e.detail.features.length); // → 3
+});
+```
+
+### Tests
+
+- 400 unit tests (4 tests updated for new event format, 3 new tests for selection-based multi-feature detection)
+
+---
+
 ## v1.0.24
 
 ### New Features

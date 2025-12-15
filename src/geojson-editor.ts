@@ -112,7 +112,7 @@ class GeoJsonEditor extends HTMLElement {
   private _contextMapFirstLine: string | undefined = undefined;
   private _contextMapLastLine: string | undefined = undefined;
   private _errorLinesCache: Set<number> | null = null;
-  private _lastCursorFeatureIndex: number | null = null; // For current-feature event deduplication
+  private _lastCurrentFeatureIndices: string | null = null; // For current-features event deduplication (JSON stringified indices)
 
   // ========== Cached DOM Elements ==========
   private _viewport: HTMLElement | null = null;
@@ -1325,7 +1325,7 @@ class GeoJsonEditor extends HTMLElement {
     // Render gutter with same range
     this.renderGutter(startIndex, endIndex);
 
-    // Emit current-feature event if feature changed (only when editor is focused)
+    // Emit current-features event if feature changed (only when editor is focused)
     if (this._editorWrapper?.classList.contains('focused')) {
       this._emitCurrentFeature();
     }
@@ -3542,31 +3542,43 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
-   * Emit current-feature event when cursor moves to a different feature
-   * Only emits when the feature changes (not on every cursor move)
-   * @param force - If true, emit even if feature hasn't changed (used on focus)
+   * Emit current-features event when cursor/selection changes
+   * Includes all features that overlap with the selection (or just cursor position if no selection)
+   * Only emits when the set of features changes (not on every cursor move)
+   * @param force - If true, emit even if features haven't changed (used on focus)
    */
   private _emitCurrentFeature(force: boolean = false): void {
-    const featureIndex = this._getFeatureIndexForLine(this.cursorLine);
+    // Collect feature indices based on cursor or selection
+    const featureIndices = this._getFeatureIndicesForCurrentSelection();
 
-    // Only emit if feature changed (unless forced)
-    if (!force && featureIndex === this._lastCursorFeatureIndex) return;
-    this._lastCursorFeatureIndex = featureIndex;
+    // Stringify for comparison (deduplication)
+    const indicesKey = JSON.stringify(featureIndices);
 
-    if (featureIndex === -1) {
-      // Cursor is not in a feature
-      this.dispatchEvent(new CustomEvent('current-feature', {
-        detail: null,
+    // Only emit if features changed (unless forced)
+    if (!force && indicesKey === this._lastCurrentFeatureIndices) return;
+    this._lastCurrentFeatureIndices = indicesKey;
+
+    if (featureIndices.length === 0) {
+      // Cursor/selection is not in any feature - emit empty FeatureCollection
+      this.dispatchEvent(new CustomEvent('current-features', {
+        detail: { type: 'FeatureCollection', features: [] },
         bubbles: true,
         composed: true
       }));
     } else {
-      // Get the feature at cursor
-      const features = this._parseFeatures();
-      const feature = features[featureIndex] || null;
+      // Get all features that overlap with cursor/selection
+      const allFeatures = this._parseFeatures();
+      const selectedFeatures = featureIndices
+        .map(idx => allFeatures[idx])
+        .filter(f => f != null);
 
-      this.dispatchEvent(new CustomEvent('current-feature', {
-        detail: feature,
+      const featureCollection = {
+        type: 'FeatureCollection',
+        features: selectedFeatures
+      };
+
+      this.dispatchEvent(new CustomEvent('current-features', {
+        detail: featureCollection,
         bubbles: true,
         composed: true
       }));
@@ -3574,13 +3586,46 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
-   * Emit current-feature with null (used on blur)
+   * Get all feature indices that overlap with the current cursor position or selection
+   * Returns sorted unique indices
+   */
+  private _getFeatureIndicesForCurrentSelection(): number[] {
+    const indices = new Set<number>();
+
+    // Determine the line range to check
+    let startLine: number;
+    let endLine: number;
+
+    if (this.selectionStart && this.selectionEnd) {
+      // Selection exists - get all features overlapping the selection
+      startLine = Math.min(this.selectionStart.line, this.selectionEnd.line);
+      endLine = Math.max(this.selectionStart.line, this.selectionEnd.line);
+    } else {
+      // No selection - just use cursor position
+      startLine = this.cursorLine;
+      endLine = this.cursorLine;
+    }
+
+    // Find all features that overlap with the line range
+    for (const [, range] of this.featureRanges) {
+      // Check if feature range overlaps with selection range
+      if (range.startLine <= endLine && range.endLine >= startLine) {
+        indices.add(range.featureIndex);
+      }
+    }
+
+    // Return sorted array for consistent comparison
+    return Array.from(indices).sort((a, b) => a - b);
+  }
+
+  /**
+   * Emit current-features with empty FeatureCollection (used on blur)
    * Always emits to ensure map is cleared when editor loses focus
    */
   private _emitCurrentFeatureNull(): void {
-    this._lastCursorFeatureIndex = null;
-    this.dispatchEvent(new CustomEvent('current-feature', {
-      detail: null,
+    this._lastCurrentFeatureIndices = null;
+    this.dispatchEvent(new CustomEvent('current-features', {
+      detail: { type: 'FeatureCollection', features: [] },
       bubbles: true,
       composed: true
     }));

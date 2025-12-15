@@ -296,7 +296,7 @@ describe('GeoJsonEditor - Events', () => {
     expect(() => el.set([invalidFeature])).to.throw('Invalid geometry type');
   });
 
-  it('should emit current-feature event when editor is focused', async () => {
+  it('should emit current-features event with FeatureCollection when editor is focused', async () => {
     const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
     await waitFor();
 
@@ -309,39 +309,44 @@ describe('GeoJsonEditor - Events', () => {
 
     // Listen to events
     const events = [];
-    el.addEventListener('current-feature', (e) => events.push(e.detail));
+    el.addEventListener('current-features', (e) => events.push(e.detail));
 
-    // Focus the editor - this should emit current-feature
+    // Focus the editor - this should emit current-features
     const textarea = el.shadowRoot.querySelector('.hidden-textarea');
     textarea.focus();
     await waitFor(50);
 
-    // Should have emitted event for first feature (cursor at line 0)
+    // Should have emitted event with FeatureCollection containing first feature (cursor at line 0)
     expect(events.length).to.be.greaterThan(0);
     const lastEvent = events[events.length - 1];
     expect(lastEvent).to.not.be.null;
-    expect(lastEvent.type).to.equal('Feature');
-    expect(lastEvent.properties.name).to.equal('First');
+    expect(lastEvent.type).to.equal('FeatureCollection');
+    expect(lastEvent.features).to.be.an('array');
+    expect(lastEvent.features.length).to.equal(1);
+    expect(lastEvent.features[0].properties.name).to.equal('First');
   });
 
-  it('should emit current-feature with null when cursor is outside features', async () => {
+  it('should emit current-features with empty FeatureCollection when cursor is outside features', async () => {
     const el = await fixture(html`<geojson-editor></geojson-editor>`);
     await waitFor();
 
     // Empty editor - no features
-    let receivedEvent = undefined; // Use undefined to distinguish from null emission
-    el.addEventListener('current-feature', (e) => { receivedEvent = e.detail; });
+    let receivedEvent = undefined; // Use undefined to distinguish from emission
+    el.addEventListener('current-features', (e) => { receivedEvent = e.detail; });
 
-    // Focus the editor - should emit null since there are no features
+    // Focus the editor - should emit empty FeatureCollection since there are no features
     const textarea = el.shadowRoot.querySelector('.hidden-textarea');
     textarea.focus();
     await waitFor(50);
 
-    // Should emit null since there are no features
-    expect(receivedEvent).to.be.null;
+    // Should emit FeatureCollection with empty features array
+    expect(receivedEvent).to.not.be.null;
+    expect(receivedEvent.type).to.equal('FeatureCollection');
+    expect(receivedEvent.features).to.be.an('array');
+    expect(receivedEvent.features.length).to.equal(0);
   });
 
-  it('should not emit current-feature if cursor stays in same feature', async () => {
+  it('should not emit current-features if cursor stays in same feature', async () => {
     const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
     await waitFor();
 
@@ -350,14 +355,14 @@ describe('GeoJsonEditor - Events', () => {
     ]);
     await waitFor(200);
 
-    // Focus the editor to enable current-feature events
+    // Focus the editor to enable current-features events
     const textarea = el.shadowRoot.querySelector('.hidden-textarea');
     textarea.focus();
     await waitFor(50);
 
     // Initial state is set, now count events
     let eventCount = 0;
-    el.addEventListener('current-feature', () => eventCount++);
+    el.addEventListener('current-features', () => eventCount++);
 
     // Move cursor within same feature (line 1, 2 are still in the same feature)
     el.cursorLine = 1;
@@ -372,7 +377,7 @@ describe('GeoJsonEditor - Events', () => {
     expect(eventCount).to.equal(0);
   });
 
-  it('should emit current-feature with null on blur', async () => {
+  it('should emit current-features with empty FeatureCollection on blur', async () => {
     const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
     await waitFor();
 
@@ -388,15 +393,149 @@ describe('GeoJsonEditor - Events', () => {
 
     // Track events
     const events = [];
-    el.addEventListener('current-feature', (e) => events.push(e.detail));
+    el.addEventListener('current-features', (e) => events.push(e.detail));
 
-    // Blur the editor - should emit null
+    // Blur the editor - should emit empty FeatureCollection
     textarea.blur();
     await waitFor(50);
 
-    // Should have emitted null on blur
+    // Should have emitted empty FeatureCollection on blur
     expect(events.length).to.be.greaterThan(0);
-    expect(events[events.length - 1]).to.be.null;
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).to.equal('FeatureCollection');
+    expect(lastEvent.features).to.be.an('array');
+    expect(lastEvent.features.length).to.equal(0);
+  });
+
+  it('should emit current-features with multiple features when selection spans multiple features', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set multiple features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'First' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'Second' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { name: 'Third' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Get feature ranges to know exact lines
+    const ranges = Array.from(el.featureRanges.values());
+    expect(ranges.length).to.equal(3);
+
+    // Track events - start tracking AFTER getting initial state
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    // Create a selection spanning from first feature to third feature
+    // This should emit because we go from 1 feature to 3 features
+    el.selectionStart = { line: ranges[0].startLine, column: 0 };
+    el.selectionEnd = { line: ranges[2].endLine, column: 0 };
+    el.cursorLine = ranges[2].endLine;
+    // Reset deduplication cache and emit event directly
+    el._lastCurrentFeatureIndices = null;
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Should have emitted event with all 3 features
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).to.equal('FeatureCollection');
+    expect(lastEvent.features).to.be.an('array');
+    expect(lastEvent.features.length).to.equal(3);
+    expect(lastEvent.features[0].properties.name).to.equal('First');
+    expect(lastEvent.features[1].properties.name).to.equal('Second');
+    expect(lastEvent.features[2].properties.name).to.equal('Third');
+  });
+
+  it('should emit current-features with subset of features when selection spans partial range', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set multiple features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'First' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'Second' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { name: 'Third' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Get feature ranges
+    const ranges = Array.from(el.featureRanges.values());
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    // Set selection spanning only first and second features
+    el.selectionStart = { line: ranges[0].startLine, column: 0 };
+    el.selectionEnd = { line: ranges[1].endLine, column: 0 };
+    el.cursorLine = ranges[1].endLine;
+    // Reset deduplication cache and emit event directly
+    el._lastCurrentFeatureIndices = null;
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Should have emitted event with only first 2 features
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).to.equal('FeatureCollection');
+    expect(lastEvent.features.length).to.equal(2);
+    expect(lastEvent.features[0].properties.name).to.equal('First');
+    expect(lastEvent.features[1].properties.name).to.equal('Second');
+  });
+
+  it('should emit single feature when selection is cleared', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'First' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'Second' } }
+    ]);
+    await waitFor(200);
+
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    const ranges = Array.from(el.featureRanges.values());
+
+    // First create a selection spanning both features
+    el.selectionStart = { line: ranges[0].startLine, column: 0 };
+    el.selectionEnd = { line: ranges[1].endLine, column: 0 };
+    el.cursorLine = ranges[1].endLine;
+    el._lastCurrentFeatureIndices = null; // Reset cache
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Track events after selection is set
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    // Clear selection, cursor stays at second feature
+    el.selectionStart = null;
+    el.selectionEnd = null;
+    el.cursorLine = ranges[1].startLine;
+    el._lastCurrentFeatureIndices = null; // Reset cache to force emit
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Should emit only the second feature (where cursor is)
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.features.length).to.equal(1);
+    expect(lastEvent.features[0].properties.name).to.equal('Second');
   });
 });
 

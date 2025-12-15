@@ -120,7 +120,7 @@ map.on('load', () => {
     }
   });
 
-  // Add highlight source for current-feature
+  // Add highlight source for current-features
   map.addSource('highlight-data', {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] }
@@ -492,8 +492,8 @@ function extractVertices(featureCollection) {
 let highlightAnimationId = null;
 let highlightVisible = true;
 
-// Function to update highlight layer with current feature
-function updateHighlightLayer(feature) {
+// Function to update highlight layer with current features (FeatureCollection)
+function updateHighlightLayer(featureCollection) {
   if (!map.getSource('highlight-data')) return;
 
   // Stop any existing animation
@@ -502,14 +502,11 @@ function updateHighlightLayer(feature) {
     highlightAnimationId = null;
   }
 
-  if (feature && feature.geometry) {
-    // Set the feature data
-    map.getSource('highlight-data').setData({
-      type: 'FeatureCollection',
-      features: [feature]
-    });
+  if (featureCollection && featureCollection.features && featureCollection.features.length > 0) {
+    // Set the FeatureCollection data directly
+    map.getSource('highlight-data').setData(featureCollection);
 
-    // Center map on feature (keep current zoom level)
+    // Center map on all features bounds
     const bounds = new maplibregl.LngLatBounds();
     const addCoords = (coords) => {
       if (Array.isArray(coords[0])) {
@@ -518,15 +515,19 @@ function updateHighlightLayer(feature) {
         bounds.extend([coords[0], coords[1]]);
       }
     };
-    if (feature.geometry.coordinates) {
-      addCoords(feature.geometry.coordinates);
-      if (!bounds.isEmpty()) {
-        const center = bounds.getCenter();
-        map.flyTo({
-          center: [center.lng, center.lat],
-          duration: 500
-        });
+
+    featureCollection.features.forEach(feature => {
+      if (feature.geometry && feature.geometry.coordinates) {
+        addCoords(feature.geometry.coordinates);
       }
+    });
+
+    if (!bounds.isEmpty()) {
+      const center = bounds.getCenter();
+      map.flyTo({
+        center: [center.lng, center.lat],
+        duration: 500
+      });
     }
 
     // Start blinking animation
@@ -536,7 +537,8 @@ function updateHighlightLayer(feature) {
       const opacity = highlightVisible ? 1 : 0.3;
 
       // Animate line width between normal+2 and normal+4
-      const baseStroke = feature.properties?.['stroke-width'] || 2;
+      const firstFeature = featureCollection.features[0];
+      const baseStroke = firstFeature?.properties?.['stroke-width'] || 2;
       const lineWidth = highlightVisible ? baseStroke + 4 : baseStroke + 2;
 
       if (map.getLayer('highlight-line')) {
@@ -735,9 +737,9 @@ function updateHTMLCode() {
   code += '    editor.addEventListener(\'error\', (e) => {\n';
   code += '      console.error(\'Error:\', e.detail.error);\n';
   code += '    });\n\n';
-  code += '    // Cursor moved to a different feature\n';
-  code += '    editor.addEventListener(\'current-feature\', (e) => {\n';
-  code += '      console.log(\'Current feature:\', e.detail);\n';
+  code += '    // Cursor moved to different feature(s)\n';
+  code += '    editor.addEventListener(\'current-features\', (e) => {\n';
+  code += '      console.log(\'Current features:\', e.detail); // FeatureCollection\n';
   code += '    });\n';
   code += '  <\/script>\n';
   code += '</head>\n';
@@ -773,16 +775,17 @@ editor.addEventListener('error', (e) => {
   errorLog.style.color = '#f85149';
 });
 
-// Listen to current-feature events (cursor position tracking)
+// Listen to current-features events (cursor position tracking)
 const currentFeatureLog = document.getElementById('currentFeatureLog');
-editor.addEventListener('current-feature', (e) => {
-  if (e.detail) {
-    const jsonStr = JSON.stringify(e.detail, null, 2);
+editor.addEventListener('current-features', (e) => {
+  const featureCollection = e.detail;
+  if (featureCollection && featureCollection.features && featureCollection.features.length > 0) {
+    const jsonStr = JSON.stringify(featureCollection, null, 2);
     currentFeatureLog.innerHTML = Prism.highlight(jsonStr, Prism.languages.json, 'json');
-    // Update highlight layer on map
-    updateHighlightLayer(e.detail);
+    // Update highlight layer on map with FeatureCollection
+    updateHighlightLayer(featureCollection);
   } else {
-    currentFeatureLog.textContent = 'null';
+    currentFeatureLog.textContent = '{ "type": "FeatureCollection", "features": [] }';
     // Clear highlight layer
     updateHighlightLayer(null);
   }
