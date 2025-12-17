@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.0.28
+
+---
+
 ## v1.0.27
 
 ### New Features
