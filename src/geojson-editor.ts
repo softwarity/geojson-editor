@@ -155,11 +155,19 @@ class GeoJsonEditor extends HTMLElement {
    * @returns {Object} State snapshot
    */
   private _createSnapshot() {
+    // Collect uniqueKeys of collapsed nodes
+    const collapsedUniqueKeys: string[] = [];
+    for (const nodeId of this.collapsedNodes) {
+      const info = this._nodeIdToLines.get(nodeId);
+      if (info?.uniqueKey) collapsedUniqueKeys.push(info.uniqueKey);
+    }
+
     return {
       lines: [...this.lines],
       cursorLine: this.cursorLine,
       cursorColumn: this.cursorColumn,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      collapsedUniqueKeys
     };
   }
 
@@ -171,6 +179,24 @@ class GeoJsonEditor extends HTMLElement {
     this.cursorLine = snapshot.cursorLine;
     this.cursorColumn = snapshot.cursorColumn;
     this.updateModel();
+
+    // Restore collapsed state from snapshot
+    if (snapshot.collapsedUniqueKeys !== undefined) {
+      // Snapshot has collapsed state info - restore it (even if empty array = nothing collapsed)
+      this.collapsedNodes.clear();
+      const uniqueKeysToCollapse = new Set(snapshot.collapsedUniqueKeys);
+
+      for (const [nodeId, info] of this._nodeIdToLines) {
+        if (info.uniqueKey && uniqueKeysToCollapse.has(info.uniqueKey)) {
+          this.collapsedNodes.add(nodeId);
+        }
+      }
+    } else {
+      // Old snapshot without collapsed state - apply default (collapse coordinates)
+      this.collapsedNodes.clear();
+      this._applyCollapsedOption(['coordinates']);
+    }
+
     this._invalidateRenderCache();
     this.scheduleRender();
     this.updatePlaceholderVisibility();
@@ -3552,17 +3578,53 @@ class GeoJsonEditor extends HTMLElement {
   /**
    * Emit current-features event when cursor/selection changes
    * Includes all features that overlap with the selection (or just cursor position if no selection)
+   * If cursor is inside an expanded coordinates block, emits Point features for each coordinate line
    * Only emits when the set of features changes (not on every cursor move)
    * @param force - If true, emit even if features haven't changed (used on focus)
    */
   private _emitCurrentFeature(force: boolean = false): void {
-    // Collect feature indices based on cursor or selection
-    const featureIndices = this._getFeatureIndicesForCurrentSelection();
+    // Determine the line range to check
+    let startLine: number;
+    let endLine: number;
 
-    // Stringify for comparison (deduplication)
+    if (this.selectionStart && this.selectionEnd) {
+      startLine = Math.min(this.selectionStart.line, this.selectionEnd.line);
+      endLine = Math.max(this.selectionStart.line, this.selectionEnd.line);
+    } else {
+      startLine = this.cursorLine;
+      endLine = this.cursorLine;
+    }
+
+    // Check if we're inside an expanded coordinates block
+    const coordinatePoints = this._getCoordinatePointsInRange(startLine, endLine);
+
+    if (coordinatePoints.length > 0) {
+      // We're inside coordinates - emit Points
+      const pointsKey = 'coords:' + JSON.stringify(coordinatePoints);
+      if (!force && pointsKey === this._lastCurrentFeatureIndices) return;
+      this._lastCurrentFeatureIndices = pointsKey;
+
+      const features = coordinatePoints.map(coord => ({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: coord
+        },
+        properties: {}
+      }));
+
+      this.dispatchEvent(new CustomEvent('current-features', {
+        detail: { type: 'FeatureCollection', features },
+        bubbles: true,
+        composed: true
+      }));
+      return;
+    }
+
+    // Not in coordinates - use normal feature detection
+    const featureIndices = this._getFeatureIndicesForCurrentSelection();
     const indicesKey = JSON.stringify(featureIndices);
 
-    // Only emit if features changed (unless forced)
     if (!force && indicesKey === this._lastCurrentFeatureIndices) return;
     this._lastCurrentFeatureIndices = indicesKey;
 
@@ -3580,17 +3642,163 @@ class GeoJsonEditor extends HTMLElement {
         .map(idx => allFeatures[idx])
         .filter(f => f != null);
 
-      const featureCollection = {
-        type: 'FeatureCollection',
-        features: selectedFeatures
-      };
-
       this.dispatchEvent(new CustomEvent('current-features', {
-        detail: featureCollection,
+        detail: { type: 'FeatureCollection', features: selectedFeatures },
         bubbles: true,
         composed: true
       }));
     }
+  }
+
+  /**
+   * Get coordinate points from lines in the given range if inside an expanded coordinates block
+   * Returns array of [lng, lat] or [lng, lat, alt] coordinates
+   * Handles both compact format ([lng, lat] on one line) and expanded format (multiline)
+   */
+  private _getCoordinatePointsInRange(startLine: number, endLine: number): number[][] {
+    const points: number[][] = [];
+    const ranges = this._findCollapsibleRanges();
+
+    // Find coordinates blocks that contain our line range
+    const coordsRanges = ranges.filter(r =>
+      r.nodeKey === 'coordinates' &&
+      !this.collapsedNodes.has(r.nodeId) && // Only if expanded
+      startLine >= r.startLine &&
+      startLine <= r.endLine
+    );
+
+    if (coordsRanges.length === 0) return points;
+
+    // Get the coordinates block content and parse it
+    const coordsRange = coordsRanges[0];
+    const coordsContent = this.lines.slice(coordsRange.startLine, coordsRange.endLine + 1).join('\n');
+
+    // Extract the array part after "coordinates":
+    const arrayMatch = coordsContent.match(/"coordinates"\s*:\s*(\[[\s\S]*)/);
+    if (!arrayMatch) return points;
+
+    // Try to parse the coordinates array
+    try {
+      // Find the matching closing bracket for the coordinates array
+      let depth = 0;
+      let arrayStr = '';
+      let started = false;
+      for (const char of arrayMatch[1]) {
+        if (char === '[') { depth++; started = true; }
+        if (started) arrayStr += char;
+        if (char === ']') { depth--; if (depth === 0) break; }
+      }
+
+      const coordsArray = JSON.parse(arrayStr);
+
+      // Flatten to get all coordinate pairs (handles Point, LineString, Polygon, MultiPolygon)
+      const flatCoords = this._flattenCoordinates(coordsArray);
+
+      // Map each coordinate to its approximate line range and check if cursor is in it
+      // We'll compute which coordinates the cursor/selection overlaps with
+      const selectedCoords = this._findCoordinatesAtLines(
+        coordsRange.startLine,
+        coordsRange.endLine,
+        startLine,
+        endLine,
+        flatCoords
+      );
+
+      for (const coord of selectedCoords) {
+        // Validate it looks like a real coordinate (lng: -180 to 180, lat: -90 to 90)
+        if (coord.length >= 2 && Math.abs(coord[0]) <= 180 && Math.abs(coord[1]) <= 90) {
+          points.push(coord);
+        }
+      }
+    } catch {
+      // If parsing fails, fall back to simple line matching
+      for (let i = startLine; i <= endLine; i++) {
+        const line = this.lines[i];
+        if (!line) continue;
+
+        // Match compact coordinate patterns: [lng, lat] or [lng, lat, alt]
+        const coordMatch = line.match(/\[\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)(?:\s*,\s*(-?\d+\.?\d*))?\s*\]/);
+        if (coordMatch) {
+          const coord = [parseFloat(coordMatch[1]), parseFloat(coordMatch[2])];
+          if (coordMatch[3] !== undefined) {
+            coord.push(parseFloat(coordMatch[3]));
+          }
+          if (Math.abs(coord[0]) <= 180 && Math.abs(coord[1]) <= 90) {
+            points.push(coord);
+          }
+        }
+      }
+    }
+
+    return points;
+  }
+
+  /**
+   * Flatten nested coordinate arrays to get all [lng, lat] pairs
+   */
+  private _flattenCoordinates(coords: unknown): number[][] {
+    const result: number[][] = [];
+
+    const flatten = (arr: unknown): void => {
+      if (!Array.isArray(arr)) return;
+      // Check if this is a coordinate pair (array of 2-3 numbers)
+      if (arr.length >= 2 && arr.length <= 3 && arr.every(n => typeof n === 'number')) {
+        result.push(arr as number[]);
+      } else {
+        // Recurse into nested arrays
+        for (const item of arr) {
+          flatten(item);
+        }
+      }
+    };
+
+    flatten(coords);
+    return result;
+  }
+
+  /**
+   * Find which coordinates from flatCoords are at the given cursor/selection lines
+   * Uses a simple heuristic based on line distribution
+   */
+  private _findCoordinatesAtLines(
+    blockStart: number,
+    blockEnd: number,
+    cursorStart: number,
+    cursorEnd: number,
+    flatCoords: number[][]
+  ): number[][] {
+    if (flatCoords.length === 0) return [];
+
+    // Calculate total lines in the coordinates block (excluding the "coordinates": line itself)
+    const totalLines = blockEnd - blockStart;
+    if (totalLines <= 0) return flatCoords.length === 1 ? flatCoords : [];
+
+    // Estimate lines per coordinate (approximate)
+    const linesPerCoord = totalLines / flatCoords.length;
+
+    // Find which coordinates the cursor/selection overlaps with
+    const result: number[][] = [];
+    const relativeStart = cursorStart - blockStart;
+    const relativeEnd = cursorEnd - blockStart;
+
+    for (let i = 0; i < flatCoords.length; i++) {
+      const coordLineStart = Math.floor(i * linesPerCoord);
+      const coordLineEnd = Math.floor((i + 1) * linesPerCoord);
+
+      // Check if this coordinate's line range overlaps with cursor/selection
+      if (coordLineStart <= relativeEnd && coordLineEnd >= relativeStart) {
+        result.push(flatCoords[i]);
+      }
+    }
+
+    // If no match found but we're in the block, return the closest coordinate
+    if (result.length === 0 && flatCoords.length > 0) {
+      const relativePos = (cursorStart - blockStart) / totalLines;
+      const coordIndex = Math.min(Math.floor(relativePos * flatCoords.length), flatCoords.length - 1);
+      result.push(flatCoords[Math.max(0, coordIndex)]);
+    }
+
+    return result;
   }
 
   /**

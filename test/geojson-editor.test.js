@@ -611,6 +611,149 @@ describe('GeoJsonEditor - Events', () => {
     expect(lastEvent.features).to.be.an('array');
     expect(lastEvent.features.length).to.equal(0);
   });
+
+  it('should emit Point features when cursor is on a coordinate line (expanded)', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set a LineString feature with coordinates expanded (simpler structure)
+    el.set([
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [[0, 0], [10, 0], [10, 10]]
+        },
+        properties: {}
+      }
+    ], { collapsed: [] }); // No auto-collapse so coordinates are expanded
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Find the coordinates block range
+    const ranges = el._findCollapsibleRanges();
+    const coordsRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRange).to.not.be.undefined;
+
+    // Move cursor inside the coordinates block (middle of the block)
+    const middleLine = Math.floor((coordsRange.startLine + coordsRange.endLine) / 2);
+    el.cursorLine = middleLine;
+    el.cursorColumn = 0;
+    el._lastCurrentFeatureIndices = null;
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Should have emitted a FeatureCollection with a Point
+    expect(events.length).to.equal(1);
+    const event = events[0];
+    expect(event.type).to.equal('FeatureCollection');
+    expect(event.features.length).to.be.at.least(1);
+    expect(event.features[0].geometry.type).to.equal('Point');
+    // The coordinate should be one of the LineString coordinates
+    const coord = event.features[0].geometry.coordinates;
+    expect(coord).to.be.an('array');
+    expect(coord.length).to.be.at.least(2);
+  });
+
+  it('should emit multiple Points when selection spans multiple coordinate lines', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set a LineString feature with coordinates expanded
+    el.set([
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [[0, 0], [5, 5], [10, 10]]
+        },
+        properties: {}
+      }
+    ], { collapsed: [] }); // No auto-collapse
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Find the coordinates block range
+    const ranges = el._findCollapsibleRanges();
+    const coordsRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRange).to.not.be.undefined;
+
+    // Select across the entire coordinates block (should include multiple coordinates)
+    el.selectionStart = { line: coordsRange.startLine + 1, column: 0 };
+    el.selectionEnd = { line: coordsRange.endLine - 1, column: 0 };
+    el._lastCurrentFeatureIndices = null;
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Should have emitted a FeatureCollection with multiple Points
+    expect(events.length).to.equal(1);
+    const event = events[0];
+    expect(event.type).to.equal('FeatureCollection');
+    expect(event.features.length).to.be.at.least(2);
+    expect(event.features[0].geometry.type).to.equal('Point');
+    expect(event.features[1].geometry.type).to.equal('Point');
+  });
+
+  it('should emit full feature when coordinates are collapsed', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set a feature with coordinates collapsed (default)
+    el.set([
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [5, 5]
+        },
+        properties: { name: 'Test' }
+      }
+    ]); // Default collapsed: ['coordinates']
+    await waitFor(200);
+
+    // Focus the editor
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    await waitFor(50);
+
+    // Move cursor inside the feature
+    el.cursorLine = 2;
+    el.cursorColumn = 0;
+    el._lastCurrentFeatureIndices = null;
+
+    // Track events
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    el._emitCurrentFeature(true);
+    await waitFor(50);
+
+    // Should emit the full feature (not a Point from coordinates)
+    expect(events.length).to.equal(1);
+    const event = events[0];
+    expect(event.type).to.equal('FeatureCollection');
+    expect(event.features.length).to.equal(1);
+    // Should be the original feature with properties
+    expect(event.features[0].properties.name).to.equal('Test');
+  });
 });
 
 describe('GeoJsonEditor - Prefix/Suffix Display', () => {

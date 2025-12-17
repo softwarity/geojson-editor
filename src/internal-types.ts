@@ -79,6 +79,8 @@ export interface EditorSnapshot {
   cursorLine: number;
   cursorColumn: number;
   timestamp: number;
+  /** Collapsed node unique keys (nodeKey:occurrence) for restoring collapsed state */
+  collapsedUniqueKeys?: string[];
 }
 
 /** Bracket count result */

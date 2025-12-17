@@ -190,6 +190,103 @@ describe('GeoJsonEditor - Undo/Redo Shortcuts', () => {
 
     expect(el.lines[0]).to.equal(modifiedLine);
   });
+
+  it('should restore collapsed state on undo after removing feature', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set feature with coordinates expanded
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [5, 5] }, properties: { name: 'Test' } }
+    ], { collapsed: [] }); // No auto-collapse - everything expanded
+    await waitFor(200);
+
+    // Verify coordinates are expanded (collapsedNodes should be empty for coordinates)
+    const rangesBefore = el._findCollapsibleRanges();
+    const coordsRangeBefore = rangesBefore.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRangeBefore).to.not.be.undefined;
+    const coordsCollapsedBefore = el.collapsedNodes.has(coordsRangeBefore.nodeId);
+    expect(coordsCollapsedBefore).to.be.false; // Should be expanded
+
+    // Delete all features using API (this triggers history save)
+    el.removeAll();
+    await waitFor(200);
+
+    // Undo
+    el.undo();
+    await waitFor(200);
+
+    // Verify coordinates are still expanded after undo
+    const rangesAfter = el._findCollapsibleRanges();
+    const coordsRangeAfter = rangesAfter.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRangeAfter).to.not.be.undefined;
+    const coordsCollapsedAfter = el.collapsedNodes.has(coordsRangeAfter.nodeId);
+    expect(coordsCollapsedAfter).to.be.false; // Should still be expanded
+  });
+
+  it('should restore collapsed state on undo (coordinates collapsed)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set feature with coordinates collapsed (default)
+    el.set([
+      { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1]] }, properties: {} }
+    ]); // Default: coordinates collapsed
+    await waitFor(200);
+
+    // Verify coordinates are collapsed
+    const rangesBefore = el._findCollapsibleRanges();
+    const coordsRangeBefore = rangesBefore.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRangeBefore).to.not.be.undefined;
+    expect(el.collapsedNodes.has(coordsRangeBefore.nodeId)).to.be.true;
+
+    // Delete all features using API
+    el.removeAll();
+    await waitFor(200);
+
+    // Undo
+    el.undo();
+    await waitFor(200);
+
+    // Verify coordinates are still collapsed after undo
+    const rangesAfter = el._findCollapsibleRanges();
+    const coordsRangeAfter = rangesAfter.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRangeAfter).to.not.be.undefined;
+    expect(el.collapsedNodes.has(coordsRangeAfter.nodeId)).to.be.true; // Should still be collapsed
+  });
+
+  it('should restore collapsed state on redo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set feature with coordinates expanded
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [5, 5] }, properties: {} }
+    ], { collapsed: [] }); // No auto-collapse
+    await waitFor(200);
+
+    // Delete all features using API
+    el.removeAll();
+    await waitFor(200);
+
+    // Undo (restore expanded)
+    el.undo();
+    await waitFor(200);
+
+    // Redo (delete again)
+    el.redo();
+    await waitFor(200);
+
+    // Undo again (should restore expanded state again)
+    el.undo();
+    await waitFor(200);
+
+    // Verify coordinates are expanded
+    const ranges = el._findCollapsibleRanges();
+    const coordsRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRange).to.not.be.undefined;
+    expect(el.collapsedNodes.has(coordsRange.nodeId)).to.be.false;
+  });
 });
 
 describe('GeoJsonEditor - Save Shortcuts', () => {

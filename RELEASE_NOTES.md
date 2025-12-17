@@ -2,6 +2,18 @@
 
 ## v1.0.27
 
+### New Features
+
+- **Coordinate-level `current-features` event** - When cursor is inside an expanded `coordinates` block, the event now emits `Point` features for each coordinate under the cursor/selection instead of the full parent feature. This enables precise coordinate highlighting on maps when editing complex geometries (Polygons, LineStrings, etc.)
+
+### Bug Fixes
+
+- **Undo/Redo now preserves collapsed node state** - When undoing or redoing, the editor now restores the exact collapsed/expanded state of all nodes (coordinates, geometry, properties, etc.). Previously, undo would reset all coordinates to expanded state.
+
+### Tests
+
+- 411 unit tests (3 new tests for coordinate-level event detection, 3 new tests for undo/redo collapsed state preservation)
+
 ---
 
 ## v1.0.26
