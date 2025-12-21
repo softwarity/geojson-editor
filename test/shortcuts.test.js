@@ -91,8 +91,9 @@ describe('GeoJsonEditor - Undo/Redo Shortcuts', () => {
     el.undo();
     await waitFor(100);
 
+    // Note: With Shift pressed, browsers send uppercase 'Z'
     const event = new KeyboardEvent('keydown', {
-      key: 'z',
+      key: 'Z',
       ctrlKey: true,
       shiftKey: true,
       bubbles: true
@@ -121,8 +122,9 @@ describe('GeoJsonEditor - Undo/Redo Shortcuts', () => {
     el.undo();
     await waitFor(100);
 
+    // Note: With Shift pressed, browsers send uppercase 'Z'
     const event = new KeyboardEvent('keydown', {
-      key: 'z',
+      key: 'Z',
       metaKey: true,
       shiftKey: true,
       bubbles: true

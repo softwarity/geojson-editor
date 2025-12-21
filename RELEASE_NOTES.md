@@ -2,6 +2,16 @@
 
 ## v1.0.28
 
+### Bug Fixes
+
+- **Fixed syntax highlighting corruption after paste** - Pasting text after a quoted value no longer causes visual artifacts (`"` and `>` characters appearing incorrectly). The issue was caused by the JSON key detection regex incorrectly matching text that was part of the previous value.
+
+- **Fixed Ctrl+Shift+Z not working for redo** - The redo shortcut was not responding because the key handler was case-sensitive and Shift changes the key to uppercase. Now properly normalized to lowercase.
+
+### Tests
+
+- 414 unit tests (2 new tests for `highlightSyntax` function, 1 new test for paste after quoted value, 2 tests fixed for Ctrl+Shift+Z with realistic uppercase key)
+
 ---
 
 ## v1.0.27

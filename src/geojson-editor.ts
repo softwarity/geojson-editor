@@ -1631,11 +1631,12 @@ class GeoJsonEditor extends HTMLElement {
       return;
     }
 
-    // Check for modifier key combinations
-    if ((e.ctrlKey || e.metaKey) && modifierHandlers[e.key]) {
+    // Check for modifier key combinations (use lowercase key for consistency)
+    const lowerKey = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && modifierHandlers[lowerKey]) {
       e.preventDefault();
       e.stopPropagation();
-      modifierHandlers[e.key]();
+      modifierHandlers[lowerKey]();
     }
   }
 
