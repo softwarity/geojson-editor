@@ -110,11 +110,11 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
   // JSON keys - match "key" followed by :
   // In properties context, all keys are treated as regular JSON keys
   RE_JSON_KEYS.lastIndex = 0;
-  result = result.replace(RE_JSON_KEYS, (_match, key, colon) => {
+  result = result.replace(RE_JSON_KEYS, (_match, prefix, key, colon) => {
     if (context !== 'properties' && GEOJSON_KEYS.includes(key)) {
-      return `<span class="geojson-key">"${key}"</span>${colon}`;
+      return `${prefix}<span class="geojson-key">"${key}"</span>${colon}`;
     }
-    return `<span class="json-key">"${key}"</span>${colon}`;
+    return `${prefix}<span class="json-key">"${key}"</span>${colon}`;
   });
 
   // Type values - "type": "Value" - but NOT inside properties context

@@ -27,7 +27,8 @@ export const RE_ESCAPE_GT = />/g;
 
 // Syntax highlighting
 export const RE_PUNCTUATION = /([{}[\],:])/g;
-export const RE_JSON_KEYS = /"([^"]+)"(<span class="json-punctuation">:<\/span>)/g;
+// JSON keys must be preceded by: start of line, whitespace, { or , (after punctuation span)
+export const RE_JSON_KEYS = /(^|<\/span>|\s)"([^"]+)"(<span class="json-punctuation">:<\/span>)/g;
 export const RE_TYPE_VALUES = /<span class="geojson-key">"type"<\/span><span class="json-punctuation">:<\/span>(\s*)"([^"]*)"/g;
 export const RE_STRING_VALUES = /(<span class="json-punctuation">:<\/span>)(\s*)"([^"]*)"/g;
 export const RE_NUMBERS_COLON = /(<span class="json-punctuation">:<\/span>)(\s*)(-?\d+\.?\d*(?:e[+-]?\d+)?)/gi;

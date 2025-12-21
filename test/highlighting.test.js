@@ -1,5 +1,6 @@
 import { expect, fixture, html } from '@open-wc/testing';
 import GeoJsonEditor from '../src/geojson-editor.ts';
+import { highlightSyntax } from '../src/syntax-highlighter.ts';
 
 // Helper to wait for component to stabilize
 const waitFor = (ms = 100) => new Promise(r => setTimeout(r, ms));
@@ -285,6 +286,67 @@ describe('GeoJsonEditor - Color Indicators', () => {
     expect(capturedInputValue).to.equal('#ff5733');
 
     document.createElement = originalCreateElement;
+  });
+});
+
+describe('GeoJsonEditor - highlightSyntax function', () => {
+
+  it('should correctly highlight text pasted after color value', () => {
+    // This tests the bug where pasting text after a color value shows extra " and >
+    const line = '      "stroke-color": "#061ed0"-color": "#061ed0"';
+    const context = 'properties';
+    const meta = {
+      colors: [{ attributeName: 'stroke-color', color: '#061ed0' }],
+      booleans: [],
+      collapseButton: null,
+      visibilityButton: null,
+      isHidden: false,
+      isCollapsed: false,
+      featureIndex: null,
+      hasError: true
+    };
+
+    const html = highlightSyntax(line, context, meta);
+
+    // Check HTML structure is valid (no unclosed spans, no broken attributes)
+    expect(html).to.not.include('<span class="</span>', 'Should not have broken span tags');
+    expect(html).to.not.include('class="</span>', 'Should not have broken class attributes');
+
+    // Create a temp element to extract text content
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    const textContent = tempDiv.textContent;
+
+    // The text content should match the original line exactly
+    expect(textContent).to.equal(line, 'Text content should match input line');
+
+    // Should not contain escaped HTML entities that would display as visible text
+    expect(textContent).to.not.include('&gt;', 'Should not contain visible &gt;');
+    expect(textContent).to.not.include('&lt;', 'Should not contain visible &lt;');
+  });
+
+  it('should correctly highlight line with color at end', () => {
+    // Normal case: line ending with a color value
+    const line = '      "stroke-color": "#061ed0"';
+    const context = 'properties';
+    const meta = {
+      colors: [{ attributeName: 'stroke-color', color: '#061ed0' }],
+      booleans: [],
+      collapseButton: null,
+      visibilityButton: null,
+      isHidden: false,
+      isCollapsed: false,
+      featureIndex: null,
+      hasError: false
+    };
+
+    const html = highlightSyntax(line, context, meta);
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    const textContent = tempDiv.textContent;
+
+    expect(textContent).to.equal(line, 'Text content should match input line');
   });
 });
 

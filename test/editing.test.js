@@ -444,6 +444,78 @@ describe('GeoJsonEditor - Copy/Cut/Paste', () => {
     }
   });
 
+  it('should paste text after color value without HTML artifacts', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Suppress error events during test
+    el.addEventListener('error', (e) => e.stopPropagation());
+
+    // Set a feature with stroke-color property
+    const feature = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [[17.88, 45.27], [18.45, 44.57]]
+      },
+      properties: {
+        'stroke-color': '#061ed0'
+      }
+    };
+    el.set([feature], { collapsed: ['coordinates'] });
+    await waitFor(200);
+
+    // Find the line with stroke-color
+    let strokeColorLine = -1;
+    for (let i = 0; i < el.lines.length; i++) {
+      if (el.lines[i].includes('stroke-color')) {
+        strokeColorLine = i;
+        break;
+      }
+    }
+    expect(strokeColorLine).to.be.greaterThan(-1, 'Should find stroke-color line');
+
+    const originalLine = el.lines[strokeColorLine];
+
+    // Focus and place cursor at end of the stroke-color line
+    await focusEditor(el);
+    el.cursorLine = strokeColorLine;
+    el.cursorColumn = el.lines[strokeColorLine].length;
+    el._clearSelection();
+
+    // Paste text that looks like a color value snippet
+    const pasteText = '-color": "#061ed0"';
+    const mockEvent = {
+      preventDefault: () => {},
+      clipboardData: {
+        getData: () => pasteText
+      }
+    };
+    el.handlePaste(mockEvent);
+    await waitFor(200);
+
+    // Find the line with stroke-color after paste
+    let newStrokeColorLine = -1;
+    for (let i = 0; i < el.lines.length; i++) {
+      if (el.lines[i].includes('stroke-color')) {
+        newStrokeColorLine = i;
+        break;
+      }
+    }
+
+    // Get the modified line content
+    const lineContent = el.lines[newStrokeColorLine];
+    const expectedContent = originalLine + pasteText;
+
+    // The line content in the model should be exactly what we expect
+    expect(lineContent).to.equal(expectedContent, 'Model should have correct content');
+
+    // Check rendered HTML does not leak into the model
+    expect(lineContent).to.not.include('&gt;', 'Line should not contain &gt; HTML entity');
+    expect(lineContent).to.not.include('&lt;', 'Line should not contain &lt; HTML entity');
+    expect(lineContent).to.not.include('&amp;', 'Line should not contain &amp; HTML entity');
+  });
+
   it('should fallback to raw text when pasting invalid GeoJSON', async () => {
     const el = await createSizedFixture();
     await waitFor();
