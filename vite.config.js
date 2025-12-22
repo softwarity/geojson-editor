@@ -5,10 +5,13 @@ import { minifyHTMLLiterals } from 'minify-literals';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
+const buildDate = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+
 const banner = `/**
  * @license MIT
  * @name ${pkg.name}
  * @version ${pkg.version}
+ * @date ${buildDate}
  * @author Softwarity (https://www.softwarity.io/)
  * @copyright ${new Date().getFullYear()} Softwarity
  * @see https://github.com/softwarity/geojson-editor
