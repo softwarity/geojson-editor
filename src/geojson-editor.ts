@@ -3524,6 +3524,13 @@ class GeoJsonEditor extends HTMLElement {
       this._adjustHiddenIndices(insertionIndex, delta);
     }
 
+    // Clean up invalid hidden feature indices (indices >= feature count)
+    // This handles edge cases like delete+paste where delta might be 0
+    // but features were actually replaced
+    if (newFeatureCount >= 0 && this.hiddenFeatures.size > 0) {
+      this._cleanupInvalidHiddenIndices(newFeatureCount);
+    }
+
     this.updateModel();
 
     // Expand any nodes that contain errors (prevents closing edited nodes with typos)
@@ -4240,6 +4247,23 @@ class GeoJsonEditor extends HTMLElement {
       // idx === removedIndex is dropped (feature was removed)
     }
     this.hiddenFeatures = newHiddenFeatures;
+  }
+
+  /**
+   * Remove hidden feature indices that are out of bounds
+   * This handles cases where features were deleted and new ones pasted
+   * @param featureCount - Current number of features
+   */
+  private _cleanupInvalidHiddenIndices(featureCount: number): void {
+    if (this.hiddenFeatures.size === 0) return;
+
+    const validHiddenFeatures = new Set<number>();
+    for (const idx of this.hiddenFeatures) {
+      if (idx >= 0 && idx < featureCount) {
+        validHiddenFeatures.add(idx);
+      }
+    }
+    this.hiddenFeatures = validHiddenFeatures;
   }
 
   private _getFeatureIndexForLine(line: number): number {

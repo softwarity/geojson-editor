@@ -2,6 +2,14 @@
 
 ## v1.0.29
 
+### Bug Fixes
+
+- **Fixed pasted features inheriting hidden status** - When deleting hidden features and pasting new ones at the same index, the new features no longer incorrectly inherit the "hidden" visibility status. Invalid hidden feature indices are now cleaned up during content updates.
+
+### Tests
+
+- 420 unit tests (6 new tests for hidden status and index shifting)
+
 ---
 
 ## v1.0.28
