@@ -184,6 +184,7 @@
   overscroll-behavior: contain; /* Prevent scroll chaining to parent */
   scrollbar-width: thin;
   scrollbar-color: var(--geojson-editor-control-border, light-dark(#c0c0c0, #5a5a5a)) var(--geojson-editor-control-bg, light-dark(#e8e8e8, #3c3f41));
+  user-select: none; /* Prevent native text selection - editor handles selection internally */
 }
 
 /* Scroll content - defines total scrollable height */

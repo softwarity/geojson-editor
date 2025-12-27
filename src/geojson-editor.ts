@@ -569,6 +569,11 @@ class GeoJsonEditor extends HTMLElement {
     // Mouse selection state
     this._isSelecting = false;
 
+    // Prevent native text selection in viewport - editor handles selection internally
+    viewport.addEventListener('selectstart', (e) => {
+      e.preventDefault();
+    });
+
     // Focus hidden textarea when clicking viewport
     // Editor inline control clicks (color swatches, checkboxes, visibility icons)
     // Use capture phase to intercept before mousedown
@@ -3075,6 +3080,33 @@ class GeoJsonEditor extends HTMLElement {
   }
 
   /**
+   * Auto-collapse coordinates for features that don't already have a collapsed state.
+   * Called when transitioning from error state to valid state.
+   * This ensures that newly added features get their coordinates collapsed
+   * while preserving the user's collapsed/expanded state for existing features.
+   */
+  private _autoCollapseNewFeatureCoordinates(): void {
+    const ranges = this._findCollapsibleRanges();
+
+    for (const range of ranges) {
+      if (range.nodeKey === 'coordinates') {
+        // Get the uniqueKey from the node mapping
+        const nodeInfo = this._nodeIdToLines.get(range.nodeId);
+        const uniqueKey = nodeInfo?.uniqueKey;
+
+        // If this coordinates node is not already collapsed and not user-expanded,
+        // it's a new feature's coordinates that should be collapsed
+        // _openedNodeKeys tracks nodes that user explicitly opened (via toggleCollapse)
+        if (!this.collapsedNodes.has(range.nodeId) && (!uniqueKey || !this._openedNodeKeys.has(uniqueKey))) {
+          this.collapsedNodes.add(range.nodeId);
+        }
+      }
+    }
+
+    this.updateView();
+  }
+
+  /**
    * Check if current content has any errors (JSON parse errors or syntax highlighting errors)
    */
   private _hasErrors(): boolean {
@@ -3535,6 +3567,14 @@ class GeoJsonEditor extends HTMLElement {
 
     // Expand any nodes that contain errors (prevents closing edited nodes with typos)
     this._expandErrorNodes();
+
+    // Auto-collapse coordinates when JSON becomes valid
+    // This handles the case where user adds a feature with invalid JSON (e.g., missing comma)
+    // and then fixes the error - the new feature's coordinates should be collapsed
+    // We check _hasErrors() after updateModel to get the current error state
+    if (!this._hasErrors()) {
+      this._autoCollapseNewFeatureCoordinates();
+    }
 
     this.scheduleRender();
     this.updatePlaceholderVisibility();

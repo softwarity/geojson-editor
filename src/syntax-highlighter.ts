@@ -104,8 +104,22 @@ export function highlightSyntax(text: string, context: string, meta: LineMeta | 
     .replace(RE_ESCAPE_LT, '&lt;')
     .replace(RE_ESCAPE_GT, '&gt;');
 
-  // Punctuation FIRST (before other replacements can interfere)
+  // Protect string values BEFORE punctuation replacement
+  // This prevents colons inside strings from being treated as JSON punctuation
+  const stringPlaceholders: string[] = [];
+  result = result.replace(/"([^"\\]|\\.)*"/g, (match) => {
+    const index = stringPlaceholders.length;
+    stringPlaceholders.push(match);
+    return `__STRING_${index}__`;
+  });
+
+  // Punctuation (after strings are protected)
   result = result.replace(RE_PUNCTUATION, '<span class="json-punctuation">$1</span>');
+
+  // Restore string placeholders
+  result = result.replace(/__STRING_(\d+)__/g, (_match, index) => {
+    return stringPlaceholders[parseInt(index, 10)];
+  });
 
   // JSON keys - match "key" followed by :
   // In properties context, all keys are treated as regular JSON keys

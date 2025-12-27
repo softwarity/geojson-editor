@@ -2481,6 +2481,72 @@ describe('GeoJsonEditor - Collapsed Option', () => {
     // Should have collapsed coordinates
     expect(el.collapsedNodes.size).to.be.greaterThan(0);
   });
+
+  it('should auto-collapse coordinates of new feature when fixing JSON error (missing comma)', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Suppress error events during test (temporary JSON errors during edit)
+    el.addEventListener('error', (e) => e.stopPropagation());
+
+    // Start with invalid JSON content - two features but missing comma between them
+    // This simulates what happens when user types a new feature but forgets the comma
+    el.lines = [
+      '{',
+      '  "type": "Feature",',
+      '  "geometry": {',
+      '    "type": "Polygon",',
+      '    "coordinates": [',
+      '      [',
+      '        [0, 0],',
+      '        [1, 0],',
+      '        [1, 1],',
+      '        [0, 0]',
+      '      ]',
+      '    ]',
+      '  },',
+      '  "properties": {}',
+      '}',  // <-- Missing comma here
+      '{',
+      '  "type": "Feature",',
+      '  "geometry": {',
+      '    "type": "Point",',
+      '    "coordinates": [1, 2]',
+      '  },',
+      '  "properties": {}',
+      '}'
+    ];
+    el.updateModel();
+    await waitFor(100);
+
+    // Verify we have errors (missing comma between features)
+    expect(el._hasErrors()).to.be.true;
+
+    // Coordinates should NOT be collapsed while there are errors
+    let ranges = el._findCollapsibleRanges();
+    let coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    // There should be coordinates nodes but they shouldn't be collapsed (due to errors)
+    expect(coords.length).to.be.greaterThan(0);
+
+    // Now fix the error by inserting comma at end of line 14
+    // Use insertText to simulate user typing, which triggers formatAndUpdate properly
+    el.cursorLine = 14;
+    el.cursorColumn = el.lines[14].length;  // Position at end of '}'
+    el.insertText(',');
+    await waitFor(200);
+
+    // Verify JSON is now valid
+    expect(el._hasErrors()).to.be.false;
+
+    // Now JSON is valid, both features' coordinates should be collapsed
+    ranges = el._findCollapsibleRanges();
+    coords = ranges.filter(r => r.nodeKey === 'coordinates');
+    expect(coords.length).to.equal(2);
+
+    // Both features' coordinates should now be collapsed
+    expect(el.collapsedNodes.has(coords[0].nodeId)).to.be.true;
+    expect(el.collapsedNodes.has(coords[1].nodeId)).to.be.true;
+  });
 });
 
 describe('GeoJsonEditor - Inline Controls', () => {

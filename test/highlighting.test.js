@@ -348,6 +348,55 @@ describe('GeoJsonEditor - highlightSyntax function', () => {
 
     expect(textContent).to.equal(line, 'Text content should match input line');
   });
+
+  it('should not mark colon inside string value as error', () => {
+    // Bug: colon inside string value was being detected as error
+    const line = '      "label": "Buffer Too many points: 146",';
+    const context = 'properties';
+    const meta = {
+      colors: [],
+      booleans: [],
+      collapseButton: null,
+      visibilityButton: null,
+      isHidden: false,
+      isCollapsed: false,
+      featureIndex: null,
+      hasError: false
+    };
+
+    const html = highlightSyntax(line, context, meta);
+
+    // Should NOT contain json-error class - the colon is inside a valid string
+    expect(html).to.not.include('json-error', 'Colon inside string should not be marked as error');
+
+    // The string value should be properly wrapped
+    expect(html).to.include('json-string', 'Should have json-string class');
+
+    // Text content should match
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    expect(tempDiv.textContent).to.equal(line, 'Text content should match input');
+  });
+
+  it('should handle multiple colons inside string value', () => {
+    const line = '      "time": "12:30:45",';
+    const context = 'properties';
+    const meta = {
+      colors: [],
+      booleans: [],
+      collapseButton: null,
+      visibilityButton: null,
+      isHidden: false,
+      isCollapsed: false,
+      featureIndex: null,
+      hasError: false
+    };
+
+    const html = highlightSyntax(line, context, meta);
+
+    expect(html).to.not.include('json-error', 'Multiple colons inside string should not be marked as error');
+    expect(html).to.include('json-string', 'Should have json-string class');
+  });
 });
 
 describe('GeoJsonEditor - Boolean Checkboxes', () => {

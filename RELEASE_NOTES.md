@@ -2,6 +2,18 @@
 
 ## v1.0.30
 
+### Bug Fixes
+
+- **Fixed colon inside string values marked as error** - String values containing colons (e.g., `"label": "Buffer Too many points: 146"` or `"time": "12:30:45"`) were incorrectly showing syntax errors. String values are now protected before punctuation highlighting to preserve their content.
+
+- **Fixed auto-collapse of coordinates after fixing JSON error** - When adding a feature with invalid JSON (e.g., missing comma between features) and then fixing the error, the new feature's `coordinates` node now properly auto-collapses instead of staying expanded.
+
+- **Fixed native browser selection sometimes triggering instead of editor selection** - When selecting text with the mouse, the browser's native selection could sometimes activate (showing system selection color and blocking editor actions). Added `user-select: none` CSS and `selectstart` event prevention to ensure the editor's custom selection always works.
+
+### Tests
+
+- 423 unit tests (2 new tests for colon-in-string handling, 1 new test for auto-collapse after error fix)
+
 ---
 
 ## v1.0.29
