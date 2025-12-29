@@ -2693,6 +2693,11 @@ class GeoJsonEditor extends HTMLElement {
     if (!sel) return false;
     const { start, end } = sel;
 
+    // Capture feature count before deletion for hidden index adjustment
+    const contentBefore = this.lines.join('\n');
+    const featureCountBefore = this._countFeatures(contentBefore);
+    const cursorFeatureIndex = this._getFeatureIndexForLine(start.line);
+
     this._saveToHistory('delete');
 
     if (start.line === end.line) {
@@ -2711,6 +2716,17 @@ class GeoJsonEditor extends HTMLElement {
     this.cursorColumn = start.column;
     this.selectionStart = null;
     this.selectionEnd = null;
+
+    // Adjust hidden feature indices if features were deleted
+    if (this.hiddenFeatures.size > 0 && featureCountBefore >= 0) {
+      const contentAfter = this.lines.join('\n');
+      const featureCountAfter = this._countFeatures(contentAfter);
+      if (featureCountAfter >= 0 && featureCountAfter < featureCountBefore) {
+        const delta = featureCountAfter - featureCountBefore; // Negative
+        const insertionIndex = cursorFeatureIndex >= 0 ? cursorFeatureIndex : 0;
+        this._adjustHiddenIndices(insertionIndex, delta);
+      }
+    }
 
     return true;
   }
@@ -4254,15 +4270,21 @@ class GeoJsonEditor extends HTMLElement {
     const newHiddenFeatures = new Set<number>();
     for (const idx of this.hiddenFeatures) {
       if (idx < insertionIndex) {
-        // Before insertion point - keep same index
+        // Before insertion/deletion point - keep same index
         newHiddenFeatures.add(idx);
+      } else if (delta > 0) {
+        // Insertion: shift all indices at or after insertion point by delta
+        newHiddenFeatures.add(idx + delta);
       } else {
-        // At or after insertion point - shift by delta
-        const newIdx = idx + delta;
-        if (newIdx >= 0) {
-          newHiddenFeatures.add(newIdx);
+        // Deletion: delta is negative
+        // Features from insertionIndex to insertionIndex + |delta| - 1 are removed
+        const deletionEnd = insertionIndex - delta - 1; // -delta because delta is negative
+        if (idx <= deletionEnd) {
+          // This feature was deleted - don't add it
+        } else {
+          // After deletion zone - shift by delta
+          newHiddenFeatures.add(idx + delta);
         }
-        // If newIdx < 0, the feature was removed, so we don't add it
       }
     }
     this.hiddenFeatures = newHiddenFeatures;

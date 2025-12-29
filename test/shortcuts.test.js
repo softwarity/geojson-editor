@@ -289,6 +289,122 @@ describe('GeoJsonEditor - Undo/Redo Shortcuts', () => {
     expect(coordsRange).to.not.be.undefined;
     expect(el.collapsedNodes.has(coordsRange.nodeId)).to.be.false;
   });
+
+  it('should restore hidden features state on undo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    // Set 2 features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'F0' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'F1' } }
+    ]);
+    await waitFor(200);
+
+    // Hide feature 0
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Make an edit that creates a history entry
+    el.cursorLine = 0;
+    el.cursorColumn = 1;
+    el._saveToHistory('edit');
+    el.lines[0] = el.lines[0].substring(0, 1) + 'X' + el.lines[0].substring(2);
+    el.updateModel();
+    await waitFor(100);
+
+    // Undo
+    el.undo();
+    await waitFor(200);
+
+    // Hidden state should be preserved (feature 0 still hidden)
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+  });
+
+  it('should restore hidden features state on redo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    stubEditorMethods(el);
+
+    // Set 2 features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'F0' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'F1' } }
+    ]);
+    await waitFor(200);
+
+    // Hide feature 1
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+
+    // Make an edit
+    el.cursorLine = 0;
+    el.cursorColumn = 1;
+    el._saveToHistory('edit');
+    el.lines[0] = el.lines[0].substring(0, 1) + 'X' + el.lines[0].substring(2);
+    el.updateModel();
+    await waitFor(100);
+
+    // Undo
+    el.undo();
+    await waitFor(200);
+
+    // Redo
+    el.redo();
+    await waitFor(200);
+
+    // Hidden state should be preserved
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+  });
+
+  it('should preserve collapsed state when toggling during editing and using undo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set feature with coordinates collapsed (default)
+    el.set([
+      { type: 'Feature', geometry: { type: 'LineString', coordinates: [[0, 0], [1, 1], [2, 2]] }, properties: {} }
+    ]);
+    await waitFor(200);
+
+    // Verify coordinates are collapsed
+    let ranges = el._findCollapsibleRanges();
+    let coordsRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRange).to.exist;
+    expect(el.collapsedNodes.has(coordsRange.nodeId)).to.be.true;
+
+    // Expand coordinates using toggleCollapse
+    el.toggleCollapse(coordsRange.nodeId);
+    await waitFor(100);
+
+    // Verify now expanded
+    ranges = el._findCollapsibleRanges();
+    coordsRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(el.collapsedNodes.has(coordsRange.nodeId)).to.be.false;
+
+    // Add another feature (this creates a history entry via API)
+    el.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [5, 5] }, properties: {} });
+    await waitFor(200);
+
+    // Verify first feature coordinates still expanded after adding second feature
+    ranges = el._findCollapsibleRanges();
+    const firstCoords = ranges.filter(r => r.nodeKey === 'coordinates')[0];
+    expect(firstCoords).to.exist;
+    expect(el.collapsedNodes.has(firstCoords.nodeId)).to.be.false;
+
+    // Undo (remove the second feature)
+    el.undo();
+    await waitFor(200);
+
+    // After undo, first feature coordinates should still be expanded
+    ranges = el._findCollapsibleRanges();
+    coordsRange = ranges.find(r => r.nodeKey === 'coordinates');
+    expect(coordsRange).to.exist;
+    expect(el.collapsedNodes.has(coordsRange.nodeId)).to.be.false;
+  });
 });
 
 describe('GeoJsonEditor - Save Shortcuts', () => {

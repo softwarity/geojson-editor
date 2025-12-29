@@ -1377,6 +1377,85 @@ describe('GeoJsonEditor - Visibility Index System', () => {
     expect(el.hiddenFeatures.has(1)).to.be.false;
     expect(el.hiddenFeatures.size).to.equal(1);
   });
+
+  it('should not inherit hidden status when deleting hidden feature via API (3 features scenario)', async () => {
+    // Scenario: 3 features, hide feature 2, select and delete it, feature 3 becomes feature 2 and should NOT be hidden
+    const el = await fixture(html`<geojson-editor style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    // Create 3 features
+    const feature0 = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'F0' } };
+    const feature1 = { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'F1' } };
+    const feature2 = { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { name: 'F2' } };
+    el.set([feature0, feature1, feature2]);
+    await waitFor(200);
+
+    expect(el.getAll().length).to.equal(3);
+
+    // Hide feature 1 (the middle one)
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+    expect(el.hiddenFeatures.size).to.equal(1);
+
+    // Delete hidden feature 1 via API
+    el.removeAt(1);
+    await waitFor(200);
+
+    // Now we have 2 features: F0 at index 0, F2 at index 1
+    expect(el.getAll().length).to.equal(2);
+    expect(el.getAll()[0].properties.name).to.equal('F0');
+    expect(el.getAll()[1].properties.name).to.equal('F2');
+
+    // F2 (now at index 1) should NOT be hidden - the hidden state was for F1 which is deleted
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    expect(el.hiddenFeatures.has(0)).to.be.false;
+    expect(el.hiddenFeatures.size).to.equal(0);
+  });
+
+  it('should not inherit hidden status when deleting hidden feature via keyboard selection', async () => {
+    // Scenario: 3 features, hide feature 2, select it with cursor and delete, feature 3 should NOT be hidden
+    const el = await fixture(html`<geojson-editor style="height: 400px; width: 600px;"></geojson-editor>`);
+    await waitFor();
+
+    // Create 3 features
+    const feature0 = { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'F0' } };
+    const feature1 = { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'F1' } };
+    const feature2 = { type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { name: 'F2' } };
+    el.set([feature0, feature1, feature2]);
+    await waitFor(200);
+
+    expect(el.getAll().length).to.equal(3);
+
+    // Hide feature 1 (the middle one)
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+
+    // Find the line range for feature 1
+    const featureRanges = Array.from(el.featureRanges.entries());
+    const feature1Range = featureRanges.find(([key, range]) => range.featureIndex === 1);
+    expect(feature1Range).to.exist;
+    const [, range] = feature1Range;
+
+    // Select entire feature 1 (from start to end line)
+    el.cursorLine = range.startLine;
+    el.cursorColumn = 0;
+    el.selectionStart = { line: range.startLine, column: 0 };
+    el.selectionEnd = { line: range.endLine, column: el.lines[range.endLine].length };
+
+    // Delete selection via Backspace key event
+    const hiddenTextarea = el.shadowRoot.getElementById('hiddenTextarea');
+    const backspaceEvent = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    hiddenTextarea.dispatchEvent(backspaceEvent);
+    await waitFor(200);
+
+    // After deletion, we should have 2 features
+    expect(el.getAll().length).to.equal(2);
+
+    // F2 (which was at index 2) should now be at index 1 and NOT hidden
+    // The hidden status should have been removed because F1 (the hidden feature) was deleted
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    expect(el.hiddenFeatures.size).to.equal(0);
+  });
 });
 
 describe('GeoJsonEditor - Clear Button', () => {
