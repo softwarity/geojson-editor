@@ -1,5 +1,9 @@
 # Release Notes
 
+## v1.0.32
+
+---
+
 ## v1.0.31
 
 ### Bug Fixes
