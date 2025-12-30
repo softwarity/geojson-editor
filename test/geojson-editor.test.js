@@ -407,6 +407,42 @@ describe('GeoJsonEditor - Events', () => {
     expect(lastEvent.features.length).to.equal(0);
   });
 
+  it('should emit current-features when feature is replaced at cursor position', async () => {
+    const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
+    await waitFor();
+
+    // Set initial feature
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'Original' } }
+    ]);
+    await waitFor(200);
+
+    // Focus the editor and position cursor on the feature
+    const textarea = el.shadowRoot.querySelector('.hidden-textarea');
+    textarea.focus();
+    el.cursorLine = 1; // Inside the feature
+    el.cursorColumn = 0;
+    await waitFor(50);
+
+    // Track events - reset after initial focus event
+    const events = [];
+    el.addEventListener('current-features', (e) => events.push(e.detail));
+
+    // Replace the feature with a new one using set() - cursor stays at same position
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [5, 5] }, properties: { name: 'Replaced' } }
+    ]);
+    await waitFor(200);
+
+    // Should emit current-features with the new feature
+    expect(events.length).to.be.greaterThan(0);
+    const lastEvent = events[events.length - 1];
+    expect(lastEvent.type).to.equal('FeatureCollection');
+    expect(lastEvent.features).to.be.an('array');
+    expect(lastEvent.features.length).to.equal(1);
+    expect(lastEvent.features[0].properties.name).to.equal('Replaced');
+  });
+
   it('should emit current-features with multiple features when selection spans multiple features', async () => {
     const el = await fixture(html`<geojson-editor style="height: 400px;"></geojson-editor>`);
     await waitFor();

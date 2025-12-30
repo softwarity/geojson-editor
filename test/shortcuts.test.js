@@ -405,6 +405,99 @@ describe('GeoJsonEditor - Undo/Redo Shortcuts', () => {
     expect(coordsRange).to.exist;
     expect(el.collapsedNodes.has(coordsRange.nodeId)).to.be.false;
   });
+
+  it('should restore correct hidden features after add/remove and undo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set 2 features: F0, F1
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'F0' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'F1' } }
+    ]);
+    await waitFor(200);
+
+    // Hide feature 1 (F1)
+    el.toggleFeatureVisibility(1);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+    expect(el.hiddenFeatures.size).to.equal(1);
+
+    // Add feature F2 - this creates a snapshot with hiddenFeatures = {1}
+    el.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { name: 'F2' } });
+    await waitFor(200);
+
+    // After adding F2, we have F0, F1(hidden), F2
+    expect(el.getAll().length).to.equal(3);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+    expect(el.hiddenFeatures.size).to.equal(1);
+
+    // Undo the add (remove F2)
+    el.undo();
+    await waitFor(200);
+
+    // After undo, we should have 2 features again: F0, F1
+    // F1 should still be hidden (snapshot had hiddenFeatures = {1})
+    expect(el.getAll().length).to.equal(2);
+    expect(el.hiddenFeatures.has(1)).to.be.true;
+    expect(el.hiddenFeatures.has(0)).to.be.false;
+    expect(el.hiddenFeatures.size).to.equal(1);
+  });
+
+  it('should restore correct hidden features after multiple operations and undo/redo', async () => {
+    const el = await createSizedFixture();
+    await waitFor();
+
+    // Set 2 features
+    el.set([
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [0, 0] }, properties: { name: 'F0' } },
+      { type: 'Feature', geometry: { type: 'Point', coordinates: [1, 1] }, properties: { name: 'F1' } }
+    ]);
+    await waitFor(200);
+
+    // Initial: no hidden features
+    expect(el.hiddenFeatures.size).to.equal(0);
+
+    // Hide F0
+    el.toggleFeatureVisibility(0);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+
+    // Add F2
+    el.add({ type: 'Feature', geometry: { type: 'Point', coordinates: [2, 2] }, properties: { name: 'F2' } });
+    await waitFor(200);
+
+    // Now we have F0(hidden), F1, F2
+    expect(el.getAll().length).to.equal(3);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.size).to.equal(1);
+
+    // Hide F2 (index 2)
+    el.toggleFeatureVisibility(2);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+    expect(el.hiddenFeatures.size).to.equal(2);
+
+    // Undo (remove F2)
+    el.undo();
+    await waitFor(200);
+
+    // After undo: F0(hidden), F1 - only F0 should be hidden
+    expect(el.getAll().length).to.equal(2);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    expect(el.hiddenFeatures.has(2)).to.be.false;
+    expect(el.hiddenFeatures.size).to.equal(1);
+
+    // Redo (add F2 back)
+    el.redo();
+    await waitFor(200);
+
+    // After redo: F0(hidden), F1, F2(hidden) - should restore both hidden states
+    expect(el.getAll().length).to.equal(3);
+    expect(el.hiddenFeatures.has(0)).to.be.true;
+    expect(el.hiddenFeatures.has(2)).to.be.true;
+    expect(el.hiddenFeatures.has(1)).to.be.false;
+    expect(el.hiddenFeatures.size).to.equal(2);
+  });
 });
 
 describe('GeoJsonEditor - Save Shortcuts', () => {

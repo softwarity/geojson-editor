@@ -2,6 +2,18 @@
 
 ## v1.0.31
 
+### Bug Fixes
+
+- **Fixed hidden features state not preserved in undo/redo history** - When using Ctrl+Z / Ctrl+Shift+Z (undo/redo), the hidden features visibility state is now properly saved and restored. Previously, `hiddenFeatures` was not included in history snapshots, which could cause incorrect features to be hidden after undo/redo operations involving feature additions/deletions.
+
+- **Fixed hidden feature indices after keyboard selection deletion** - When deleting a hidden feature via keyboard selection (select + Backspace/Delete), the following feature no longer incorrectly inherits the hidden status. The `_deleteSelection()` method now properly adjusts `hiddenFeatures` indices when features are removed.
+
+- **Fixed `current-features` event not emitted when feature is replaced** - When replacing features using `set()` while the cursor is positioned on a feature, the `current-features` event is now correctly emitted with the new feature. Previously, the event was not emitted because the content change did not invalidate the current-features cache.
+
+### Tests
+
+- 431 unit tests (5 new tests for undo/redo with hidden features, 2 new tests for keyboard deletion of hidden features, 1 new test for current-features after set)
+
 ---
 
 ## v1.0.30

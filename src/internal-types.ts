@@ -81,6 +81,8 @@ export interface EditorSnapshot {
   timestamp: number;
   /** Collapsed node unique keys (nodeKey:occurrence) for restoring collapsed state */
   collapsedUniqueKeys?: string[];
+  /** Hidden feature indices for restoring visibility state */
+  hiddenFeatures?: number[];
 }
 
 /** Bracket count result */

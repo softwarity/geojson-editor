@@ -167,7 +167,8 @@ class GeoJsonEditor extends HTMLElement {
       cursorLine: this.cursorLine,
       cursorColumn: this.cursorColumn,
       timestamp: Date.now(),
-      collapsedUniqueKeys
+      collapsedUniqueKeys,
+      hiddenFeatures: [...this.hiddenFeatures]
     };
   }
 
@@ -196,6 +197,12 @@ class GeoJsonEditor extends HTMLElement {
       this.collapsedNodes.clear();
       this._applyCollapsedOption(['coordinates']);
     }
+
+    // Restore hidden features state from snapshot
+    if (snapshot.hiddenFeatures !== undefined) {
+      this.hiddenFeatures = new Set(snapshot.hiddenFeatures);
+    }
+    // If no hiddenFeatures in snapshot (old snapshot), keep current state (backward compatibility)
 
     this._invalidateRenderCache();
     this.scheduleRender();
@@ -883,6 +890,12 @@ class GeoJsonEditor extends HTMLElement {
     }
 
     this.emitChange();
+
+    // Invalidate current-features cache and emit if focused (content replaced)
+    this._lastCurrentFeatureIndices = null;
+    if (this._editorWrapper?.classList.contains('focused')) {
+      this._emitCurrentFeature(true);
+    }
   }
 
   /**
