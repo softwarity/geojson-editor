@@ -614,62 +614,80 @@ function updateMap(geojson) {
   }
 }
 
-// Theme CSS files mapping (using CDN for GitHub Pages compatibility)
-const themeCSSFiles = {
+// Detect if running in development mode (localhost)
+const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// Theme CSS files mapping - local in dev, CDN in production
+const themeCSSFiles = isDev ? {
+  vscode: '../themes/vscode.css',
+  github: '../themes/github.css',
+  monokai: '../themes/monokai.css',
+  solarized: '../themes/solarized.css'
+} : {
   vscode: 'https://unpkg.com/@softwarity/geojson-editor/themes/vscode.css',
   github: 'https://unpkg.com/@softwarity/geojson-editor/themes/github.css',
   monokai: 'https://unpkg.com/@softwarity/geojson-editor/themes/monokai.css',
   solarized: 'https://unpkg.com/@softwarity/geojson-editor/themes/solarized.css'
 };
 
-// Cache for loaded theme CSS content
+// Theme link element ID and custom style ID
+const THEME_LINK_ID = 'geojson-editor-theme-link';
+const THEME_STYLE_ID = 'geojson-editor-theme-custom';
+
+// Cache for loaded theme CSS content (used by modal to display CSS)
 const themeCache = {};
 
-// Current theme style element
-let currentThemeStyle = null;
+// Load theme CSS file via <link> element (simulates real user integration)
+function loadThemeCSS(themeName) {
+  // Remove current theme link if any
+  const existingLink = document.getElementById(THEME_LINK_ID);
+  if (existingLink) {
+    existingLink.remove();
+  }
 
-// Load theme CSS file and apply it
-async function loadThemeCSS(themeName) {
-  // Remove current theme if any
-  if (currentThemeStyle) {
-    currentThemeStyle.remove();
-    currentThemeStyle = null;
+  // Also remove any custom style from modal editing
+  const existingStyle = document.getElementById(THEME_STYLE_ID);
+  if (existingStyle) {
+    existingStyle.remove();
   }
 
   // Empty value means default theme (no external CSS)
   if (!themeName) {
-    return '';
+    return;
   }
 
   const cssPath = themeCSSFiles[themeName];
-  if (!cssPath) return '';
+  if (!cssPath) return;
 
-  // Check cache first
-  if (themeCache[themeName]) {
-    applyThemeCSS(themeCache[themeName]);
-    return themeCache[themeName];
-  }
-
-  // Use dynamic import with ?raw to get raw CSS content (works with Vite)
-  try {
-    const module = await import(/* @vite-ignore */ cssPath + '?raw');
-    const cssContent = module.default;
-    themeCache[themeName] = cssContent;
-    applyThemeCSS(cssContent);
-    return cssContent;
-  } catch (error) {
-    console.error(`Failed to load theme ${themeName}:`, error);
-    return '';
-  }
+  // Add <link> element like a real user would do
+  const link = document.createElement('link');
+  link.id = THEME_LINK_ID;
+  link.rel = 'stylesheet';
+  link.href = cssPath;
+  document.head.appendChild(link);
 }
 
-// Apply theme CSS to document
-function applyThemeCSS(cssContent) {
-  if (!cssContent) return;
-  currentThemeStyle = document.createElement('style');
-  currentThemeStyle.id = 'theme-override';
-  currentThemeStyle.textContent = cssContent;
-  document.head.appendChild(currentThemeStyle);
+// Apply custom CSS from modal textarea (for theme editing/preview)
+function applyCustomThemeCSS(cssContent) {
+  // Remove any existing custom style
+  const existingStyle = document.getElementById(THEME_STYLE_ID);
+  if (existingStyle) {
+    existingStyle.remove();
+  }
+
+  // Also remove the theme link since we're applying custom CSS
+  const existingLink = document.getElementById(THEME_LINK_ID);
+  if (existingLink) {
+    existingLink.remove();
+  }
+
+  if (!cssContent || !cssContent.trim()) return;
+
+  // Create style element with custom CSS
+  const style = document.createElement('style');
+  style.id = THEME_STYLE_ID;
+  style.textContent = cssContent;
+  document.head.appendChild(style);
 }
 const htmlCode = document.getElementById('htmlCode');
 
@@ -805,9 +823,9 @@ function clearErrorLog() {
 placeholderInput.addEventListener('input', updateEditor);
 
 // Apply preset theme directly from main selector
-themePresetMainSelect.addEventListener('change', async () => {
+themePresetMainSelect.addEventListener('change', () => {
   const presetName = themePresetMainSelect.value;
-  await loadThemeCSS(presetName);
+  loadThemeCSS(presetName);
   updateHTMLCode();
 });
 
@@ -913,15 +931,8 @@ async function loadCurrentThemeCSS() {
 function applyTheme() {
   try {
     const cssContent = themeTextarea.value;
-    // Remove current theme
-    if (currentThemeStyle) {
-      currentThemeStyle.remove();
-      currentThemeStyle = null;
-    }
-    // Apply custom CSS
-    if (cssContent.trim()) {
-      applyThemeCSS(cssContent);
-    }
+    // Apply custom CSS (this also removes any existing theme link/style)
+    applyCustomThemeCSS(cssContent);
     showThemeMessage('Theme applied!', 'success');
   } catch (e) {
     showThemeMessage('Failed to apply: ' + e.message, 'error');
@@ -931,10 +942,8 @@ function applyTheme() {
 // Reset to default theme
 async function resetTheme() {
   themePresetMainSelect.value = '';
-  if (currentThemeStyle) {
-    currentThemeStyle.remove();
-    currentThemeStyle = null;
-  }
+  // Remove theme link and custom style (loadThemeCSS with empty name does this)
+  loadThemeCSS('');
   await loadCurrentThemeCSS();
   updateHTMLCode();
   showThemeMessage('Theme reset to default', 'success');
