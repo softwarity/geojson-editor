@@ -216,6 +216,7 @@ Ready-to-use theme CSS files are available:
 | **GitHub** | GitHub's code styling | [github.css](https://unpkg.com/@softwarity/geojson-editor/themes/github.css) |
 | **Monokai** | Classic dark Monokai palette | [monokai.css](https://unpkg.com/@softwarity/geojson-editor/themes/monokai.css) |
 | **Solarized** | Ethan Schoonover's precision colors | [solarized.css](https://unpkg.com/@softwarity/geojson-editor/themes/solarized.css) |
+| **Catppuccin** | Soothing pastel theme (Latte/Mocha) | [catppuccin.css](https://unpkg.com/@softwarity/geojson-editor/themes/catppuccin.css) |
 
 **Using via CDN:**
 ```html

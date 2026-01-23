@@ -2,6 +2,10 @@
 
 ## v1.0.32
 
+### New Features
+
+- **Added Catppuccin theme** - New soothing pastel color theme inspired by [Catppuccin](https://github.com/catppuccin/catppuccin). Uses Latte palette for light mode and Mocha palette for dark mode. Available at `themes/catppuccin.css`.
+
 ---
 
 ## v1.0.31
