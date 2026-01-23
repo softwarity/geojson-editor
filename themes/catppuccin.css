@@ -1,0 +1,60 @@
+/**
+ * Catppuccin Theme for @softwarity/geojson-editor
+ *
+ * Soothing pastel theme inspired by Catppuccin color palette.
+ * Uses Latte for light mode and Mocha for dark mode.
+ * https://github.com/catppuccin/catppuccin
+ *
+ * Usage:
+ *   <link rel="stylesheet" href="themes/catppuccin.css">
+ *   <geojson-editor></geojson-editor>
+ */
+
+:root {
+  /* Editor background and text */
+  /* Latte: Base #eff1f5, Text #4c4f69 | Mocha: Base #1e1e2e, Text #cdd6f4 */
+  --geojson-editor-bg-color: light-dark(#eff1f5, #1e1e2e);
+  --geojson-editor-text-color: light-dark(#4c4f69, #cdd6f4);
+  --geojson-editor-caret-color: light-dark(#4c4f69, #f5e0dc);
+
+  /* Gutter (line numbers area) */
+  /* Latte: Mantle #e6e9ef, Subtext0 #6c6f85 | Mocha: Mantle #181825, Overlay0 #6c7086 */
+  --geojson-editor-gutter-bg: light-dark(#e6e9ef, #181825);
+  --geojson-editor-gutter-border: light-dark(#ccd0da, #313244);
+  --geojson-editor-gutter-text: light-dark(#6c6f85, #6c7086);
+
+  /* JSON syntax highlighting */
+  /* Keys: Latte Blue #1e66f5 | Mocha Blue #89b4fa */
+  --geojson-editor-json-key: light-dark(#1e66f5, #89b4fa);
+  /* Strings: Latte Green #40a02b | Mocha Green #a6e3a1 */
+  --geojson-editor-json-string: light-dark(#40a02b, #a6e3a1);
+  /* Numbers: Latte Peach #fe640b | Mocha Peach #fab387 */
+  --geojson-editor-json-number: light-dark(#fe640b, #fab387);
+  /* Booleans: Latte Mauve #8839ef | Mocha Mauve #cba6f7 */
+  --geojson-editor-json-boolean: light-dark(#8839ef, #cba6f7);
+  /* Punctuation: Latte Subtext1 #5c5f77 | Mocha Subtext1 #bac2de */
+  --geojson-editor-json-punct: light-dark(#5c5f77, #bac2de);
+  /* Errors: Latte Red #d20f39 | Mocha Red #f38ba8 */
+  --geojson-editor-json-error: light-dark(#d20f39, #f38ba8);
+
+  /* GeoJSON-specific */
+  /* GeoJSON keys: Latte Sapphire #209fb5 | Mocha Sapphire #74c7ec */
+  --geojson-editor-geojson-key: light-dark(#209fb5, #74c7ec);
+  /* GeoJSON types: Latte Teal #179299 | Mocha Teal #94e2d5 */
+  --geojson-editor-geojson-type: light-dark(#179299, #94e2d5);
+  /* Invalid types: Latte Red #d20f39 | Mocha Red #f38ba8 */
+  --geojson-editor-geojson-type-invalid: light-dark(#d20f39, #f38ba8);
+
+  /* Controls (checkboxes, color swatches) */
+  /* Latte Mauve #8839ef | Mocha Mauve #cba6f7 */
+  --geojson-editor-control-color: light-dark(#8839ef, #cba6f7);
+  /* Latte Surface0 #ccd0da | Mocha Surface0 #313244 */
+  --geojson-editor-control-bg: light-dark(#ccd0da, #313244);
+  /* Latte Surface1 #bcc0cc | Mocha Surface1 #45475a */
+  --geojson-editor-control-border: light-dark(#bcc0cc, #45475a);
+
+  /* Selection and errors */
+  /* Latte Lavender #7287fd | Mocha Lavender #b4befe */
+  --geojson-editor-selection-color: light-dark(rgba(114, 135, 253, 0.3), rgba(180, 190, 254, 0.3));
+  --geojson-editor-error-color: light-dark(#d20f39, #f38ba8);
+}

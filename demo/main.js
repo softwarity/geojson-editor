@@ -622,12 +622,14 @@ const themeCSSFiles = isDev ? {
   vscode: '../themes/vscode.css',
   github: '../themes/github.css',
   monokai: '../themes/monokai.css',
-  solarized: '../themes/solarized.css'
+  solarized: '../themes/solarized.css',
+  catppuccin: '../themes/catppuccin.css'
 } : {
   vscode: 'https://unpkg.com/@softwarity/geojson-editor/themes/vscode.css',
   github: 'https://unpkg.com/@softwarity/geojson-editor/themes/github.css',
   monokai: 'https://unpkg.com/@softwarity/geojson-editor/themes/monokai.css',
-  solarized: 'https://unpkg.com/@softwarity/geojson-editor/themes/solarized.css'
+  solarized: 'https://unpkg.com/@softwarity/geojson-editor/themes/solarized.css',
+  catppuccin: 'https://unpkg.com/@softwarity/geojson-editor/themes/catppuccin.css'
 };
 
 // Theme link element ID and custom style ID
