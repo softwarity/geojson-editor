@@ -2958,6 +2958,11 @@ class GeoJsonEditor extends HTMLElement {
         const lineLength = lineData.content?.length || 0;
         column = Math.max(0, Math.min(rawColumn, lineLength));
       }
+    } else if (this.visibleLines.length > 0) {
+      // Click below content: position cursor at end of last line
+      const lastVisible = this.visibleLines[this.visibleLines.length - 1];
+      line = lastVisible.index;
+      column = lastVisible.content?.length || 0;
     }
 
     return { line, column };
