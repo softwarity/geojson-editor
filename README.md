@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/bundlephobia/minzip/@softwarity/geojson-editor?label=size" alt="bundle size">
   </a>
   <a href="https://github.com/softwarity/geojson-editor/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/license-MIT-blue" alt="license">
+    <img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="license">
   </a>
   <a href="https://codecov.io/gh/softwarity/geojson-editor">
     <img src="https://codecov.io/gh/softwarity/geojson-editor/graph/badge.svg" alt="codecov">
@@ -691,4 +691,4 @@ npm run build
 
 ## License
 
-MIT
+Apache-2.0

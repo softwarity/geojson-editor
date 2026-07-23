@@ -50,7 +50,7 @@
     "json-editor"
   ],
   "author": "Softwarity",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "devDependencies": {
     "@esm-bundle/chai": "^4.3.4-fix.0",
     "@open-wc/testing": "^4.0.0",
