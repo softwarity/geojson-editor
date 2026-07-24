@@ -279,7 +279,7 @@ geojson-editor/
 ├── README.md                   # User documentation
 ├── DEVELOPMENT.md              # This file
 ├── RELEASE.md                  # Release process guide
-└── LICENSE                     # MIT License
+└── LICENSE                     # Apache-2.0 License
 ```
 
 ### Architecture Notes

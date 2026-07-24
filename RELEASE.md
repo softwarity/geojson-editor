@@ -218,7 +218,7 @@ Before publishing v1.0.0 for the first time:
 - [ ] Update `package.json` with correct name, version, author, license
 - [ ] Verify package name is available on npm: `npm search @softwarity/geojson-editor`
 - [ ] Write comprehensive README.md
-- [ ] Add LICENSE file (MIT)
+- [ ] Add LICENSE file (Apache-2.0)
 - [ ] Test the component locally in `demo/index.html`
 - [ ] Verify `npm run build` produces valid output in `dist/`
 - [ ] Set up `NPM_TOKEN` in GitHub Secrets
