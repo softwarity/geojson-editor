@@ -18,9 +18,15 @@
 
 ## v1.0.34
 
+*Maintenance release — no library changes.*
+
 ---
 
 ## v1.0.33
+
+### New Features
+
+- **Click below content places cursor at end** - Clicking in the empty area below the last line now places the cursor at the end of the last visible line instead of ignoring the click.
 
 ---
 
