@@ -1,3 +1,7 @@
+// MapLibre GL JS v6 is ESM-only (no UMD build, no default export) — vendored
+// locally from the npm devDependency via `npm run demo:vendor`
+import * as maplibregl from './vendor/maplibre-gl.mjs';
+
 const editor = document.getElementById('editor');
 const eventLog = document.getElementById('eventLog');
 const errorLog = document.getElementById('errorLog');

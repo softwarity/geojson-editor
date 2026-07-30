@@ -25,6 +25,8 @@
     "themes"
   ],
   "scripts": {
+    "demo:vendor": "mkdir -p demo/vendor && cp node_modules/maplibre-gl/dist/maplibre-gl.mjs node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs node_modules/maplibre-gl/dist/maplibre-gl.css demo/vendor/",
+    "predev": "npm run demo:vendor",
     "dev": "vite",
     "build": "vite build && npm run build:types",
     "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir types && cp src/geojson-editor.d.ts types/ && rm -f types/constants.d.ts types/utils.d.ts types/validation.d.ts types/syntax-highlighter.d.ts types/geojson-editor.template.d.ts types/internal-types.d.ts",
@@ -58,6 +60,7 @@
     "@web/dev-server-esbuild": "^1.0.4",
     "@web/test-runner": "^0.20.2",
     "@web/test-runner-playwright": "^0.11.1",
+    "maplibre-gl": "^6.0.0",
     "minify-literals": "^1.0.10",
     "typescript": "^5.9.3",
     "vite": "^7.2.4"

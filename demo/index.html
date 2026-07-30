@@ -51,9 +51,9 @@
   }
   </script>
 
-  <!-- MapLibre GL JS - Latest version with globe support -->
-  <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
-  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+  <!-- MapLibre GL JS - vendored locally from the npm dependency (npm run demo:vendor);
+       the JS is imported as an ES module in main.js (v6 dropped the UMD build) -->
+  <link href="vendor/maplibre-gl.css" rel="stylesheet" />
 
   <!-- Material Symbols (only icons used, alphabetical order) -->
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=dark_mode,description,language,light_mode,menu_book,palette" rel="stylesheet">
