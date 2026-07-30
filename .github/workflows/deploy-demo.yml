@@ -32,16 +32,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build package
         run: npm run build
 
       - name: Prepare demo for GitHub Pages
         run: |
+          # Copy maplibre-gl from node_modules into demo/vendor (local dependency,
+          # not a CDN — unpkg broke when maplibre-gl@6 dropped the UMD build)
+          npm run demo:vendor
           mkdir -p gh-pages
           cp -r demo/* gh-pages/
           # Update script src in demo to use CDN

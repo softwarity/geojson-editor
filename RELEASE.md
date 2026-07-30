@@ -40,23 +40,23 @@ This project uses 3 automated workflows:
 
 ### 1. **main.yml** - Continuous Build
 
-- **Trigger**: Every push to any branch
-- **Purpose**: Validates that the code builds successfully
+- **Trigger**: Every push to any branch (and PRs to `main`)
+- **Purpose**: Validates that the code builds and tests pass
 - **Actions**:
   - Checkout code
-  - Install dependencies
+  - Install dependencies (`npm ci`, Node 22)
   - Build package
-  - Verify build output
+  - Run tests (Playwright Chromium) and upload coverage to Codecov
 
-### 2. **release.yml** - Create Tag/Release
+### 2. **release.yml** - Release (softwarity/release-flow)
 
-- **Trigger**: Manual (workflow_dispatch)
-- **Purpose**: Bump version and create git tag
-- **Actions**:
-  - Increment patch version (`npm version patch`)
-  - Commit the version change
-  - Push changes and tags
-  - Triggers `tag.yml` automatically
+- **Trigger**: Manual (workflow_dispatch) with a `bump` input (`patch`, `minor`, `major`)
+- **Purpose**: Bump version, resolve release notes, create git tag and GitHub Release
+- **Actions** (via `softwarity/release-flow@v1`):
+  - Bumps the version in `package.json` (patch/minor/major)
+  - Resolves the `## NEXT RELEASE` section of `RELEASE_NOTES.md` to the new version
+  - Commits, tags `v<version>`, and pushes (triggers `tag.yml` automatically)
+  - Publishes the GitHub Release with the notes from that section
 
 ### 3. **tag.yml** - Publish to npm
 
@@ -72,22 +72,22 @@ This project uses 3 automated workflows:
 
 The easiest way to release is using the GitHub Actions UI:
 
-1. Go to your repository on GitHub
-2. Click on "Actions" tab
-3. Select "Create Tag/Release" workflow from the left sidebar
+1. Make sure the changes are documented under `## NEXT RELEASE` in `RELEASE_NOTES.md`
+2. Go to your repository on GitHub, click on "Actions" tab
+3. Select "Release" workflow from the left sidebar
 4. Click "Run workflow" button
-5. Select the branch (usually `main`)
+5. Select the branch (`main`) and the version part to bump (`patch`, `minor`, or `major`)
 6. Click "Run workflow"
 
 This will:
-- Automatically bump the patch version (e.g., 1.0.0 → 1.0.1)
-- Create a git tag
-- Trigger the publish workflow
-- Publish to npm
+- Bump the version accordingly (e.g., 1.0.0 → 1.0.1)
+- Resolve the `## NEXT RELEASE` section of `RELEASE_NOTES.md` to the new version
+- Create a git tag and publish the GitHub Release with those notes
+- Trigger the publish workflow (npm)
 
 ### Manual Release (Advanced)
 
-If you need to bump a specific version type or want manual control:
+Not recommended: this bypasses `RELEASE_NOTES.md` resolution and the GitHub Release creation. If you really need manual control:
 
 ```bash
 # 1. Checkout main branch
@@ -130,7 +130,7 @@ Monitor the release process:
 
 1. Go to "Actions" tab in your repository
 2. Watch the workflows:
-   - "Create Tag/Release" - should complete in ~30s
+   - "Release" - should complete in ~30s
    - "Publish softwarity/geojson-editor to NPM" - should start automatically after tag creation
 
 ### NPM Registry
@@ -223,7 +223,7 @@ Before publishing v1.0.0 for the first time:
 - [ ] Verify `npm run build` produces valid output in `dist/`
 - [ ] Set up `NPM_TOKEN` in GitHub Secrets
 - [ ] Set up `PAT_TOKEN` in GitHub Secrets
-- [ ] Run "Create Tag/Release" workflow
+- [ ] Run "Release" workflow
 - [ ] Monitor GitHub Actions for success
 - [ ] Verify package appears on npmjs.com
 - [ ] Test installation: `npm install @softwarity/geojson-editor`
@@ -238,7 +238,7 @@ npm run build        # Build for production
 npm run preview      # Preview production build
 
 # Release via GitHub UI
-# → Go to Actions → Create Tag/Release → Run workflow
+# → Go to Actions → Release → Run workflow (choose patch/minor/major)
 
 # Manual release
 npm version patch    # Bump version
