@@ -2,6 +2,10 @@
 
 ## NEXT RELEASE
 
+---
+
+## 1.0.35
+
 ### Licensing
 
 - **Relicensed under Apache-2.0** - The project switched from MIT to Apache-2.0 for the explicit patent grant, which eases adoption by companies whose legal teams pre-approve Apache over MIT.
