@@ -1,6 +1,18 @@
 # Release Notes
 
-## v1.0.35
+## NEXT RELEASE
+
+### Licensing
+
+- **Relicensed under Apache-2.0** - The project switched from MIT to Apache-2.0 for the explicit patent grant, which eases adoption by companies whose legal teams pre-approve Apache over MIT.
+
+### Demo
+
+- **MapLibre GL JS vendored locally** - The demo no longer loads maplibre-gl from unpkg (`@latest` now resolves to v6.0.0, which dropped the UMD build `dist/maplibre-gl.js`, breaking the page with a 404). maplibre-gl is now a local devDependency (v6, ESM) copied into `demo/vendor/` via `npm run demo:vendor` (run automatically before `npm run dev` and during the GitHub Pages deploy).
+
+### Tooling
+
+- **Release process migrated to softwarity/release-flow** - The Release workflow now uses the shared `softwarity/release-flow@v1` action (bump patch/minor/major, resolves this NEXT RELEASE section, tags `v<version>`, and publishes the GitHub Release from these notes). CI workflows aligned with the other Softwarity repos: Node 22, `npm ci`.
 
 ---
 
